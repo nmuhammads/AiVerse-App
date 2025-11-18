@@ -6,7 +6,7 @@ export default function Profile() {
   ]
   const history = Array.from({ length: 6 }).map((_, i) => ({ id: i+1, src: '/favicon.svg' }))
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
         <div className="rounded-lg p-6 bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
           <div className="flex items-center gap-3">

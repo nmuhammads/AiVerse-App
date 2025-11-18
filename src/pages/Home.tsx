@@ -6,7 +6,7 @@ export default function Home() {
   const [q, setQ] = useState('')
   const items = mockItems.filter(x => x.author.toLowerCase().includes(q.toLowerCase()))
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
         <div className="flex justify-center">
           <div className={`transition-all ${q? 'w-full' : 'w-12'} h-12 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center px-4`}> 

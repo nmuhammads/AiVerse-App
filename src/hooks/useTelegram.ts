@@ -3,14 +3,13 @@ import WebApp from '@twa-dev/sdk'
 
 export function useTelegram() {
   useEffect(() => {
-    // Инициализация Telegram Web App
     WebApp.ready()
+    WebApp.expand()
     
     // Установка цветовой схемы
     WebApp.setHeaderColor('#1a1a1a')
     WebApp.setBackgroundColor('#1a1a1a')
     
-    // Разблокировка главной кнопки
     WebApp.MainButton.hide()
     WebApp.MainButton.setText('Generate')
     WebApp.MainButton.color = '#8B5CF6'

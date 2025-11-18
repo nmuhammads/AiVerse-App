@@ -18,3 +18,7 @@
 
 @keyframes spin-slow { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
 .animate-spin-slow { animation: spin-slow 8s linear infinite }
+
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom-padding { padding-bottom: env(safe-area-inset-bottom); }
+.safe-bottom-fixed { bottom: calc(env(safe-area-inset-bottom) + 1rem); }

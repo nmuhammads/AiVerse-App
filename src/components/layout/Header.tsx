@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 export function Header() {
   useEffect(() => {}, [])
   return (
-    <div className={'sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/10'}> 
+    <div className={'sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/10 safe-top'}> 
       <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 animate-spin-slow" />
