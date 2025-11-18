@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "server:dev": "nodemon",
-    "server:prod": "tsx api/index.ts",
+    "server:prod": "tsx api/server.ts",
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
     "start": "npm run server:prod"
   },
