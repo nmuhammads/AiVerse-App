@@ -14,6 +14,8 @@ import authRoutes from './routes/auth.js'
 import generationRoutes from './routes/generation.js'
 import enhanceRoutes from './routes/enhance.js'
 import userRoutes from './routes/user.js'
+import telegramRoutes from './routes/telegram.js'
+import { registerBotCommands } from './controllers/telegramController.js'
 
 
 // load env
@@ -32,6 +34,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/generation', generationRoutes)
 app.use('/api/enhance', enhanceRoutes)
 app.use('/api/user', userRoutes)
+app.use('/api/telegram', telegramRoutes)
 
 /**
  * Serve frontend build
@@ -41,6 +44,8 @@ const clientDistPath = path.resolve(appRoot, 'dist')
 const uploadsPath = path.resolve(appRoot, 'uploads')
 app.use(express.static(clientDistPath))
 app.use('/uploads', express.static(uploadsPath))
+
+void registerBotCommands().catch(() => {})
 
 
 /**

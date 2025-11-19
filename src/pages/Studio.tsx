@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles, Loader2, Wand2, CloudRain, Code2, Aperture } from 'lucide-react'
@@ -40,19 +40,9 @@ export default function Studio() {
     setCurrentScreen,
   } = useGenerationStore()
 
-  const { showMainButton, hideMainButton, showProgress, hideProgress, shareImage } = useTelegram()
+  const { shareImage } = useTelegram()
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (currentScreen === 'form') {
-      const t = selectedModel === 'qwen-edit' ? 'Редактировать' : 'Сгенерировать'
-      showMainButton(t, handleGenerate)
-    } else {
-      hideMainButton()
-    }
-    return () => hideMainButton()
-  }, [currentScreen, selectedModel, prompt, uploadedImage])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -76,7 +66,7 @@ export default function Studio() {
     }
     setIsGenerating(true)
     setError(null)
-    showProgress(selectedModel === 'qwen-edit' ? 'Редактирование...' : 'Создание...')
+    
     impact('heavy')
     try {
       const res = await fetch('/api/generation/generate', {
@@ -100,7 +90,7 @@ export default function Studio() {
       notify('error')
     } finally {
       setIsGenerating(false)
-      hideProgress()
+      
     }
   }
 
