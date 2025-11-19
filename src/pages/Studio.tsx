@@ -116,7 +116,7 @@ export default function Studio() {
 
   if (currentScreen === 'result' && generatedImage) {
     return (
-      <div className="min-h-screen bg-black safe-bottom-padding">
+      <div className="min-h-dvh bg-black safe-bottom-padding">
         <div className="mx-auto max-w-3xl px-4 py-4">
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
@@ -142,7 +142,7 @@ export default function Studio() {
   const ratios = SUPPORTED_RATIOS[selectedModel]
 
   return (
-    <div className="min-h-screen bg-black safe-bottom-padding">
+    <div className="min-h-dvh bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
         <Card className="bg-white/5 border-white/10">
           <CardHeader>

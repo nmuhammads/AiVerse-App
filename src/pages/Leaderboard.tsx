@@ -5,7 +5,7 @@ export default function Leaderboard() {
   const { impact } = useHaptics()
   const items = Array.from({ length: 12 }).map((_, i) => ({ rank: i+1, name: `Создатель ${i+1}`, badge: i===0?'Legend': i<3?'Pro':'Expert', uses: Math.floor(Math.random()*1000), avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i+1}` }))
   return (
-    <div className="min-h-screen bg-black safe-bottom-padding">
+    <div className="min-h-dvh bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-3">
         {items.map(x => (
           <div key={x.rank} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3 text-white">

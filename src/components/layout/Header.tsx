@@ -20,7 +20,7 @@ export function Header() {
     }
   }, [user?.id])
   return (
-    <div className={'sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/10'}>
+    <div className={'sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/10 safe-top'}>
       <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between relative">
         <div className="w-10" />
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">

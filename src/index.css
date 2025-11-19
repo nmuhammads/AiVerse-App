@@ -14,12 +14,20 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html, body, #root {
+  height: 100%;
+  background-color: #000;
+}
+
+body { margin: 0; }
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @keyframes spin-slow { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
 .animate-spin-slow { animation: spin-slow 8s linear infinite }
 
+.min-h-dvh { min-height: 100dvh; min-height: 100svh; }
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom-padding { padding-bottom: env(safe-area-inset-bottom); }
 .safe-bottom-fixed { bottom: calc(env(safe-area-inset-bottom) + 1rem); }

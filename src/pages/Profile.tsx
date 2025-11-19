@@ -36,7 +36,7 @@ export default function Profile() {
     { label: 'Лайки', value: 1200 },
   ]
   return (
-    <div className="min-h-screen bg-black safe-bottom-padding">
+    <div className="min-h-dvh bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
         <div className="bg-gradient-to-b from-zinc-900 to-black p-5 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5 text-violet-500"><Sparkles size={140} /></div>

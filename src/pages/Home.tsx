@@ -10,7 +10,7 @@ export default function Home() {
   const [q, setQ] = useState('')
   const items = mockItems.filter(x => x.author.toLowerCase().includes(q.toLowerCase()))
   return (
-    <div className="min-h-screen bg-black safe-bottom-padding">
+    <div className="min-h-dvh bg-black safe-bottom-padding">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
         <div className="flex items-center justify-between mb-4 px-1 h-10">
           {!isSearchOpen ? (
