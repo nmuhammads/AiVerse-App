@@ -57,8 +57,17 @@ export async function webhook(req: Request, res: Response) {
 }
 
 export async function registerBotCommands() {
-  if (!API) return
-  await tg('deleteMyCommands', {})
+  if (!API) {
+    console.error('registerBotCommands: Missing API');
+    return;
+  }
+  console.log('registerBotCommands: Deleting bot commands');
+  const resp = await tg('deleteMyCommands', {});
+  if (resp?.ok) {
+    console.log('registerBotCommands: Successfully deleted commands');
+  } else {
+    console.error('registerBotCommands: Failed to delete commands', resp);
+  }
 }
 
 export async function setupCommands(req: Request, res: Response) {
@@ -66,7 +75,38 @@ export async function setupCommands(req: Request, res: Response) {
   res.json({ ok: true })
 }
 
-export async function setupMenuButton(req: Request, res: Response) {
+export async function setupMenuButton(req?: Request, res?: Response) {
+  try {
+    if (!API || !APP_URL) {
+      console.error('setupMenuButton: Missing API or APP_URL');
+      if (res) return res.status(400).json({ ok: false });
+      return { ok: false };
+    }
+    const startParam = 'generate';
+    const url = `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startParam)}`;
+    const chat_id = req && typeof req.body?.chat_id === 'number' ? req.body.chat_id : undefined;
+    console.log(`setupMenuButton: Attempting to set menu button with URL: ${url}` + (chat_id ? ` for chat ${chat_id}` : ' globally'));
+    const resp = await tg('setChatMenuButton', {
+      chat_id,
+      menu_button: {
+        type: 'web_app',
+        text: 'AI Verse',
+        web_app: { url }
+      }
+    });
+    if (!resp || resp.ok !== true) {
+      console.error('setupMenuButton: Failed to set menu button', resp);
+      if (res) return res.status(500).json({ ok: false, resp });
+      return { ok: false, resp };
+    }
+    console.log('setupMenuButton: Successfully set menu button', resp);
+    if (res) res.json({ ok: true, resp });
+    return { ok: true, resp };
+  } catch (error) {
+    console.error('setupMenuButton: Error', error);
+    if (res) return res.status(500).json({ ok: false, error });
+    return { ok: false, error };
+  }
   if (!API || !APP_URL) {
     return res.status(400).json({ ok: false })
   }
