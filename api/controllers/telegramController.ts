@@ -72,12 +72,17 @@ export async function setupMenuButton(req: Request, res: Response) {
   }
   const startParam = 'generate'
   const url = `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startParam)}`
-  await tg('setChatMenuButton', {
+  const chat_id = typeof req.body?.chat_id === 'number' ? req.body.chat_id : undefined
+  const resp = await tg('setChatMenuButton', {
+    chat_id,
     menu_button: {
       type: 'web_app',
       text: 'AI Verse',
       web_app: { url }
     }
   })
-  res.json({ ok: true })
+  if (!resp || resp.ok !== true) {
+    return res.status(500).json({ ok: false, resp })
+  }
+  res.json({ ok: true, resp })
 }
