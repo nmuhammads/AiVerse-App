@@ -40,8 +40,9 @@ app.use('/api/user', userRoutes)
 /**
  * Serve frontend build
  */
-const clientDistPath = path.resolve(__dirname, '..', 'dist')
-const uploadsPath = path.resolve(__dirname, '..', 'uploads')
+const appRoot = process.cwd()
+const clientDistPath = path.resolve(appRoot, 'dist')
+const uploadsPath = path.resolve(appRoot, 'uploads')
 app.use(express.static(clientDistPath))
 app.use('/uploads', express.static(uploadsPath))
 

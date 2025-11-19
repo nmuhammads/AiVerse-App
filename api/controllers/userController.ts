@@ -3,7 +3,8 @@ import path from 'path'
 import fs from 'fs'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
-const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'avatars')
+const appRoot = process.cwd()
+const uploadsDir = path.resolve(appRoot, 'uploads', 'avatars')
 
 function ensureDirs() {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
