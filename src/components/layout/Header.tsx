@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
- 
+import { Settings } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function Header() {
   useEffect(() => {}, [])
@@ -11,8 +12,8 @@ export function Header() {
           <span className="text-white font-semibold">AI Verse</span>
         </div>
         <div className="flex items-center gap-3">
-          <button className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white">⚙️</button>
-          <div className="h-8 w-8 rounded-full ring-2 ring-violet-600 bg-white/10" />
+          <button className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></button>
+          <Link to="/profile" className="h-8 w-8 rounded-full ring-2 ring-violet-600 bg-white/10" />
         </div>
       </div>
     </div>

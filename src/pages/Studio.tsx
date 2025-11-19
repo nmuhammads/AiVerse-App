@@ -1,15 +1,16 @@
 import { useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Sparkles, Loader2, Wand2, CloudRain, Code2, Aperture } from 'lucide-react'
 import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 
-const MODELS: { id: ModelType; name: string; desc: string }[] = [
-  { id: 'flux', name: 'Flux', desc: 'Default' },
-  { id: 'seedream4', name: 'Seedream 4', desc: 'Quality' },
-  { id: 'nanobanana', name: 'Nanobanana', desc: 'Fast' },
-  { id: 'qwen-edit', name: 'Qwen Edit', desc: 'Edit' },
+const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: JSX.Element }[] = [
+  { id: 'nanobanana', name: 'NanoBanana', desc: 'Топ 2025', color: 'from-yellow-400 to-orange-500', icon: <Sparkles size={20} /> },
+  { id: 'seedream4', name: 'Seedream 4', desc: 'Сюрреализм', color: 'from-purple-400 to-fuchsia-500', icon: <CloudRain size={20} /> },
+  { id: 'qwen-edit', name: 'Qwen Edit', desc: 'Точность', color: 'from-emerald-400 to-teal-500', icon: <Code2 size={20} /> },
+  { id: 'flux', name: 'Flux 1.1', desc: 'Фотореализм', color: 'from-blue-400 to-indigo-500', icon: <Aperture size={20} /> },
 ]
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
@@ -86,6 +87,12 @@ export default function Studio() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Ошибка генерации')
       setGeneratedImage(data.image)
+      try {
+        const item = { id: Date.now(), url: data.image, prompt, model: MODELS.find(m=>m.id===selectedModel)?.name, ratio: aspectRatio, date: new Date().toLocaleDateString() }
+        const prev = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
+        const next = [item, ...prev]
+        localStorage.setItem('img_gen_history_v2', JSON.stringify(next))
+      } catch { void 0 }
       setCurrentScreen('result')
       notify('success')
     } catch (e) {
@@ -143,31 +150,45 @@ export default function Studio() {
             <CardDescription className="text-white/60">Создавайте изображения с ИИ</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-white text-sm">Промпт</span>
-                <button onClick={handleEnhance} className="text-white/80 hover:text-white">✨ Magic Enhance</button>
+            <div className="space-y-3">
+              <div className="flex justify-between items-end px-1">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Промпт</label>
+                <button onClick={handleEnhance} disabled={isGenerating} className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 hover:border-violet-500/40 transition-all">
+                  {isGenerating ? <Loader2 size={12} className="animate-spin text-violet-400" /> : <Wand2 size={12} className="text-violet-400 group-hover:rotate-12 transition-transform" />}
+                  <span className="text-[11px] font-bold text-violet-300 group-hover:text-violet-200">{prompt ? 'AI Улучшение' : 'Мне повезёт'}</span>
+                </button>
               </div>
-              <textarea value={prompt} onChange={(e)=>setPrompt(e.target.value)} placeholder="Опишите изображение" className="w-full h-24 p-3 rounded-lg bg-black/60 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-violet-600" />
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl opacity-20 blur"></div>
+                <textarea value={prompt} onChange={(e)=>setPrompt(e.target.value)} placeholder="Опишите вашу идею..." className="relative w-full bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:bg-zinc-900 transition-all min-h-[120px] resize-none shadow-inner" />
+                {prompt && <button onClick={() => setPrompt('')} className="absolute top-3 right-3 p-1.5 bg-zinc-800/50 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 transition-colors">Очистить</button>}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {MODELS.map(m => (
-                <button key={m.id} onClick={()=>{ setSelectedModel(m.id); impact('light') }}
-                  className={`rounded-lg p-4 border ${selectedModel===m.id?'border-violet-500 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 shadow-indigo-500/20 shadow-lg':'border-white/10 bg-white/5'} text-left text-white`}
-                >
-                  <div className="text-sm font-semibold">{m.name}</div>
-                  <div className="text-xs text-white/60">{m.desc}</div>
-                </button>
-              ))}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">Модель</label>
+              <div className="grid grid-cols-2 gap-3">
+                {MODELS.map(m => (
+                  <button key={m.id} onClick={()=>{ setSelectedModel(m.id); impact('light') }} className={`group relative p-4 rounded-2xl border transition-all duration-300 flex flex-col items-center text-center gap-3 overflow-hidden ${selectedModel===m.id ? 'bg-zinc-900 border-transparent ring-1 ring-white/20 shadow-2xl' : 'bg-zinc-900/40 border-white/5 hover:bg-zinc-900/60 hover:border-white/10'}`}>
+                    {selectedModel===m.id && <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${m.color}`}></div>}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${selectedModel===m.id ? `bg-gradient-to-br ${m.color} text-white scale-110 shadow-lg` : 'bg-zinc-800 text-zinc-500 group-hover:bg-zinc-700 group-hover:text-zinc-300'}`}>{m.icon}</div>
+                    <div className="relative z-10">
+                      <span className={`block font-bold text-sm ${selectedModel===m.id ? 'text-white' : 'text-zinc-400'}`}>{m.name}</span>
+                      <span className="text-[10px] text-zinc-600">{m.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {selectedModel !== 'qwen-edit' && (
               <div className="space-y-2">
                 <span className="text-white text-sm">Формат</span>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                   {ratios.map(r => (
-                    <button key={r} onClick={()=>{ setAspectRatio(r); impact('light') }} className={`px-4 py-2 rounded-full text-sm ${aspectRatio===r?'bg-white text-black':'bg-white/10 text-white hover:bg-white/20'}`}>{r}</button>
+                    <button key={r} onClick={()=>{ setAspectRatio(r); impact('light') }} className={`flex-shrink-0 w-16 h-12 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all ${aspectRatio===r ? 'bg-white text-black border-white shadow-lg shadow-white/10 scale-105' : 'bg-zinc-900 text-zinc-500 border-white/5 hover:bg-zinc-800 hover:border-white/10'}`}>
+                      <span className={aspectRatio===r ? 'opacity-100' : 'opacity-60'}>{r}</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -192,9 +213,13 @@ export default function Studio() {
 
             {error && <div className="bg-rose-500/20 border border-rose-500/30 rounded-lg p-3 text-rose-200 text-sm">{error}</div>}
 
-            <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50">
-              {isGenerating ? 'Создание...' : selectedModel==='qwen-edit' ? 'Редактировать' : 'Сгенерировать'}
-            </Button>
+            <div className="sticky bottom-28 pt-2 z-30">
+              <div className={`absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl opacity-30 blur-md transition-opacity duration-500 ${isGenerating ? 'opacity-10' : 'opacity-40'}`}></div>
+              <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className={`relative w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-lg transition-all active:scale-[0.98] ${isGenerating ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800' : 'bg-white text-black hover:bg-zinc-100'}`}>
+                {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="text-violet-600" />}
+                <span>{isGenerating ? 'Создание...' : selectedModel==='qwen-edit' ? 'Редактировать' : 'Сгенерировать'}</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
