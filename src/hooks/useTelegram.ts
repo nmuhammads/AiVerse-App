@@ -5,6 +5,11 @@ export function useTelegram() {
   useEffect(() => {
     WebApp.ready()
     WebApp.expand()
+    const ensure = () => { try { if (!WebApp.isExpanded) WebApp.expand() } catch { void 0 } }
+    ensure()
+    setTimeout(ensure, 100)
+    setTimeout(ensure, 300)
+    WebApp.onEvent('viewportChanged', ensure)
     
     // Установка цветовой схемы
     WebApp.setHeaderColor('#1a1a1a')
@@ -16,6 +21,7 @@ export function useTelegram() {
     WebApp.MainButton.textColor = '#FFFFFF'
     
     return () => {
+      WebApp.offEvent('viewportChanged', ensure)
       WebApp.MainButton.hide()
     }
   }, [])
