@@ -53,8 +53,13 @@ async function supaStorageSignedUrl(pathname: string, expiresIn = Number(process
   const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn }) })
   const data = await r.json().catch(() => null)
   const signed = (data && (data.signedURL || data.signedUrl)) ? String(data.signedURL || data.signedUrl) : null
-  if (!r.ok || !signed) return null
-  return signed.startsWith('http') ? signed : `${SUPABASE_URL}${signed}`
+  if (!r.ok || !signed) {
+    console.error('avatar:signed-url:fail', { status: r.status, data })
+    return null
+  }
+  const abs = signed.startsWith('http')
+  console.info('avatar:signed-url:ok', { abs, len: signed.length })
+  return abs ? signed : `${SUPABASE_URL}${signed}`
 }
 
 // signed URL helper can be added when bucket is private
@@ -74,14 +79,18 @@ export async function getAvatar(req: Request, res: Response) {
   try {
     const userId = req.params.userId
     if (!userId) return res.status(400).json({ error: 'userId required' })
+    console.info('avatar:get:start', { userId, supa: Boolean(SUPABASE_URL && SUPABASE_KEY) })
     if (SUPABASE_URL && SUPABASE_KEY) {
       const qp = await supaSelect('avatars', `?user_id=eq.${encodeURIComponent(userId)}&is_profile_pic=eq.true&select=file_path,created_at&order=created_at.desc&limit=1`)
+      console.info('avatar:query', { ok: qp.ok, count: Array.isArray(qp.data) ? qp.data.length : null })
       const filePath = Array.isArray(qp.data) && qp.data[0]?.file_path ? String(qp.data[0].file_path) : null
+      console.info('avatar:file-path', { filePath })
       if (filePath) {
         const signed = await supaStorageSignedUrl(filePath)
         if (signed) {
           try {
             const imgResp = await fetch(signed)
+            console.info('avatar:fetch', { status: imgResp.status, ct: imgResp.headers.get('content-type') })
             if (imgResp.ok) {
               const ct = imgResp.headers.get('content-type') || 'image/jpeg'
               const buf = Buffer.from(await imgResp.arrayBuffer())
@@ -89,8 +98,9 @@ export async function getAvatar(req: Request, res: Response) {
               res.setHeader('Cache-Control', 'no-store')
               return res.end(buf)
             }
-          } catch { /* fall through to redirect */ }
+          } catch (e) { console.error('avatar:fetch:error', { message: (e as Error)?.message }) }
           res.setHeader('Cache-Control', 'no-store')
+          console.info('avatar:redirect', { to: 'signed-url' })
           return res.redirect(signed)
         }
       }
@@ -99,9 +109,11 @@ export async function getAvatar(req: Request, res: Response) {
     ensureDirs()
     const localFile = path.join(uploadsDir, `${userId}.jpg`)
     if (fs.existsSync(localFile)) {
+      console.info('avatar:local:return', { path: localFile })
       return res.sendFile(localFile)
     }
     if (!TOKEN) return res.status(404).json({ error: 'avatar not found' })
+    console.info('avatar:telegram:fetch', { userId })
     const photosResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getUserProfilePhotos?user_id=${encodeURIComponent(userId)}&limit=1`)
     const photosJson = await photosResp.json()
     const first = photosJson?.result?.photos?.[0]
@@ -118,8 +130,10 @@ export async function getAvatar(req: Request, res: Response) {
     const buf = Buffer.from(await imgResp.arrayBuffer())
     fs.writeFileSync(localFile, buf)
     res.setHeader('Content-Type', 'image/jpeg')
+    console.info('avatar:telegram:return', { saved: true })
     return res.end(buf)
-  } catch {
+  } catch (e) {
+    console.error('avatar:get:error', { message: (e as Error)?.message })
     return res.status(500).json({ error: 'avatar error' })
   }
 }
