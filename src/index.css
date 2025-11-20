@@ -101,6 +101,9 @@ body { margin: 0; }
     filter: blur(20px);
     opacity: 0.8;
     animation: rotate 3s linear infinite;
+    will-change: transform;
+    transform: translate3d(0,0,0);
+    backface-visibility: hidden;
 }
 
 @keyframes rotate {
