@@ -32,3 +32,4 @@ body { margin: 0; }
 .safe-bottom-padding { padding-bottom: var(--safe-area-bottom, env(safe-area-inset-bottom)); }
 .safe-bottom-fixed { bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 1rem); }
 .sticky-safe-top { top: calc(var(--safe-area-top, env(safe-area-inset-top)) + var(--tma-offset, 56px)); }
+.safe-bottom-tabbar { padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 6rem); }

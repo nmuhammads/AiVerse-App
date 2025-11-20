@@ -106,7 +106,7 @@ export default function Studio() {
 
   if (currentScreen === 'result' && generatedImage) {
     return (
-      <div className="min-h-dvh bg-black safe-bottom-padding">
+      <div className="min-h-dvh bg-black safe-bottom-tabbar">
         <div className="mx-auto max-w-3xl px-4 py-4">
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
@@ -132,7 +132,7 @@ export default function Studio() {
   const ratios = SUPPORTED_RATIOS[selectedModel]
 
   return (
-    <div className="min-h-dvh bg-black safe-bottom-padding">
+    <div className="min-h-dvh bg-black safe-bottom-tabbar">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
         <Card className="bg-white/5 border-white/10">
           <CardHeader>
@@ -203,9 +203,8 @@ export default function Studio() {
 
             {error && <div className="bg-rose-500/20 border border-rose-500/30 rounded-lg p-3 text-rose-200 text-sm">{error}</div>}
 
-            <div className="sticky bottom-28 pt-2 z-30">
-              <div className={`absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl opacity-30 blur-md transition-opacity duration-500 ${isGenerating ? 'opacity-10' : 'opacity-40'}`}></div>
-              <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className={`relative w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-lg transition-all active:scale-[0.98] ${isGenerating ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800' : 'bg-white text-black hover:bg-zinc-100'}`}>
+            <div className="relative z-10">
+              <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className={`mt-2 w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-lg transition-all active:scale-[0.98] ${isGenerating ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800' : 'bg-white text-black hover:bg-zinc-100'}`}>
                 {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="text-violet-600" />}
                 <span>{isGenerating ? 'Создание...' : selectedModel==='qwen-edit' ? 'Редактировать' : 'Сгенерировать'}</span>
               </Button>
