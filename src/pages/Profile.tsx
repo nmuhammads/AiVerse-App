@@ -8,13 +8,11 @@ export default function Profile() {
   const { user } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
-  const [history, setHistory] = useState<{ id:number; url:string; prompt:string; model:string; ratio:string; date:string }[]>([])
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
-      setHistory(saved)
-    } catch { /* noop */ }
-  }, [])
+  const [balance, setBalance] = useState<number | null>(null)
+  const [items, setItems] = useState<{ id:number; image_url:string | null; prompt:string; created_at:string | null }[]>([])
+  const [total, setTotal] = useState<number | undefined>(undefined)
+  const [offset, setOffset] = useState(0)
+  const [loading, setLoading] = useState(false)
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name}`
     : (user?.first_name || user?.username || 'Гость')
@@ -27,12 +25,21 @@ export default function Profile() {
     setAvatarSrc(url)
     if (user?.id) {
       fetch(`/api/user/avatar/${user.id}`).then(r => { if (r.ok) setAvatarSrc(`/api/user/avatar/${user.id}`) })
+      fetch(`/api/user/info/${user.id}`).then(async r => { const j = await r.json().catch(()=>null); if (r.ok && j && typeof j.balance==='number') setBalance(j.balance) })
+      ;(async () => {
+        setLoading(true)
+        try {
+          const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=0`)
+          const j = await r.json().catch(()=>null)
+          if (r.ok && j) { setItems(j.items || []); setTotal(j.total) }
+        } finally { setLoading(false) }
+      })()
     }
   }, [user?.id])
 
   const stats = [
-    { label: 'Генерации', value: history.length },
-    { label: 'Подписчики', value: 842 },
+    { label: 'Генерации', value: typeof total==='number' ? total : items.length },
+    { label: 'Баланс', value: balance ?? '—' },
     { label: 'Лайки', value: 1200 },
   ]
   return (
@@ -83,22 +90,22 @@ export default function Profile() {
         <div>
           <div className="flex justify-between items-end mb-4 px-1">
             <div className="text-lg font-bold text-white">Мои генерации</div>
-            {history.length>0 && (
-              <button onClick={() => { if (confirm('Очистить историю?')) { localStorage.removeItem('img_gen_history_v2'); setHistory([]); impact('medium') } }} className="text-xs text-rose-400 bg-rose-500/5 border border-rose-500/10 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg">Очистить</button>
+            {items.length>0 && (
+              <button onClick={async () => { if (loading || !user?.id) return; setLoading(true); try { const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=${offset+6}`); const j = await r.json().catch(()=>null); if (r.ok && j) { setItems([...items, ...j.items]); setOffset(offset+6); setTotal(j.total) } } finally { setLoading(false); impact('light') } }} className="text-xs text-violet-400 bg-violet-500/5 border border-violet-500/10 hover:bg-violet-500/10 px-3 py-1.5 rounded-lg">Загрузить ещё</button>
             )}
           </div>
-          {history.length===0 ? (
+          {items.length===0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-600 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800"><HistoryIcon size={32} className="mb-3 opacity-20" /><p className="text-sm font-medium">История пуста</p></div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {history.map((h) => (
+              {items.map((h) => (
                 <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                  <img src={h.url} alt="History" className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={h.image_url || ''} alt="History" className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-3">
                     <p className="text-[10px] text-zinc-300 truncate font-medium">{h.prompt}</p>
                   </div>
-                  <button className="absolute top-2 right-2 w-7 h-7 bg-black/40 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100" onClick={() => { const a=document.createElement('a'); a.href=h.url; a.download=`ai-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a) }}><Download size={12} /></button>
+                  <button className="absolute top-2 right-2 w-7 h-7 bg-black/40 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100" onClick={() => { const a=document.createElement('a'); a.href=h.image_url || ''; a.download=`ai-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a) }}><Download size={12} /></button>
                 </div>
               ))}
             </div>

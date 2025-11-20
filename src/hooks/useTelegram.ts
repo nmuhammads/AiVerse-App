@@ -50,6 +50,12 @@ export function useTelegram() {
     WebApp.MainButton.setText('Generate')
     WebApp.MainButton.color = '#8B5CF6'
     WebApp.MainButton.textColor = '#FFFFFF'
+    try {
+      const uid = (WebApp as unknown as { initDataUnsafe?: { user?: { id?: number } } }).initDataUnsafe?.user?.id
+      if (uid) {
+        fetch('/api/user/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) }).catch(() => {})
+      }
+    } catch { /* noop */ }
     
     return () => {
       wa.offEvent('activated', ensureExpand)
