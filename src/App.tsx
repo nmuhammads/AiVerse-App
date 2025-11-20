@@ -40,11 +40,25 @@ function StartParamRouter() {
 
 export default function App() {
   useEffect(() => {
+    const ensure = () => {
+      try { WebApp.requestFullscreen() } catch { void 0 }
+      try { WebApp.expand() } catch { void 0 }
+    }
     try {
       WebApp.ready();
-      WebApp.expand();
+      ensure()
+      WebApp.onEvent("activated", ensure)
+      WebApp.onEvent("fullscreenChanged", ensure)
+      WebApp.onEvent("viewportChanged", ensure)
       WebApp.setHeaderColor("bg_color");
     } catch { void 0 }
+    return () => {
+      try {
+        WebApp.offEvent("activated", ensure)
+        WebApp.offEvent("fullscreenChanged", ensure)
+        WebApp.offEvent("viewportChanged", ensure)
+      } catch { void 0 }
+    }
   }, []);
   return (
     <>

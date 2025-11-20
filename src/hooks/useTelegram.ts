@@ -5,10 +5,15 @@ export function useTelegram() {
   useEffect(() => {
     WebApp.ready()
     WebApp.expand()
-    const ensure = () => { try { if (!WebApp.isExpanded) WebApp.expand() } catch { void 0 } }
+    const ensure = () => {
+      try { WebApp.requestFullscreen() } catch { void 0 }
+      try { if (!WebApp.isExpanded) WebApp.expand() } catch { void 0 }
+    }
     ensure()
     setTimeout(ensure, 100)
     setTimeout(ensure, 300)
+    WebApp.onEvent('activated', ensure)
+    WebApp.onEvent('fullscreenChanged', ensure)
     WebApp.onEvent('viewportChanged', ensure)
     
     // Установка цветовой схемы
@@ -21,6 +26,8 @@ export function useTelegram() {
     WebApp.MainButton.textColor = '#FFFFFF'
     
     return () => {
+      WebApp.offEvent('activated', ensure)
+      WebApp.offEvent('fullscreenChanged', ensure)
       WebApp.offEvent('viewportChanged', ensure)
       WebApp.MainButton.hide()
     }
