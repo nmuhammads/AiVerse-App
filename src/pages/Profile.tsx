@@ -1,4 +1,4 @@
-import { Sparkles, Share2, Edit, History as HistoryIcon, Download } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, Download, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -10,6 +10,7 @@ export default function Profile() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [items, setItems] = useState<{ id:number; image_url:string | null; prompt:string; created_at:string | null }[]>([])
+  const [preview, setPreview] = useState<{ image_url: string; prompt: string } | null>(null)
   const [total, setTotal] = useState<number | undefined>(undefined)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -94,11 +95,14 @@ export default function Profile() {
           {items.length===0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-600 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800"><HistoryIcon size={32} className="mb-3 opacity-20" /><p className="text-sm font-medium">История пуста</p></div>
           ) : (
+            <>
             <div>
               <div className="grid grid-cols-2 gap-3">
-                {items.map((h) => (
+                {items.filter(h => !!h.image_url).map((h) => (
                   <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                    <img src={h.image_url || ''} alt="History" className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <button onClick={() => setPreview({ image_url: h.image_url || '', prompt: h.prompt })} className="block w-full">
+                      <img src={h.image_url || ''} alt="History" className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105" />
+                    </button>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
                     <div className="absolute bottom-0 left-0 right-0 p-3">
                       <p className="text-[10px] text-zinc-300 truncate font-medium">{h.prompt}</p>
@@ -113,6 +117,19 @@ export default function Profile() {
                 </div>
               )}
             </div>
+            {preview && (
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e)=>{ if (e.target===e.currentTarget) setPreview(null) }}>
+                <div className="relative w-full max-w-3xl bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden">
+                  <button onClick={()=>setPreview(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"><X size={16} /></button>
+                  <img src={preview.image_url} alt="Preview" className="w-full max-h-[70vh] object-contain bg-black" />
+                  <div className="p-4 flex gap-3">
+                    <button onClick={() => { const a=document.createElement('a'); a.href=preview.image_url; a.download=`ai-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a) }} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700 py-2 rounded-lg font-bold">Скачать</button>
+                    <button onClick={async () => { if (!user?.id) return; await fetch('/api/telegram/sendPhoto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, photo_url: preview.image_url, caption: preview.prompt }) }) }} className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg font-bold">Отправить в чат</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

@@ -157,3 +157,17 @@ export async function logBotInfo() {
     console.warn('getMe error', e)
   }
 }
+
+export async function sendPhoto(req: Request, res: Response) {
+  try {
+    const chat_id = Number(req.body?.chat_id || 0)
+    const photo = String(req.body?.photo_url || '')
+    const caption = typeof req.body?.caption === 'string' ? String(req.body.caption) : undefined
+    if (!API || !chat_id || !photo) return res.status(400).json({ ok: false })
+    const resp = await tg('sendPhoto', { chat_id, photo, caption })
+    if (!resp || resp.ok !== true) return res.status(500).json({ ok: false, resp })
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ ok: false })
+  }
+}

@@ -177,7 +177,7 @@ export async function listGenerations(req: Request, res: Response) {
     const offset = Number(req.query.offset || 0)
     if (!userId) return res.status(400).json({ error: 'user_id required' })
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
-    const q = await supaSelect('generations', `?user_id=eq.${encodeURIComponent(userId)}&select=id,image_url,prompt,created_at&order=created_at.desc&limit=${limit}&offset=${offset}`)
+    const q = await supaSelect('generations', `?user_id=eq.${encodeURIComponent(userId)}&image_url=ilike.http%25&select=id,image_url,prompt,created_at&order=created_at.desc&limit=${limit}&offset=${offset}`)
     if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
     const itemsRaw = Array.isArray(q.data) ? q.data : [] as Array<{ id: number; image_url?: string | null; prompt?: string; created_at?: string | null }>
     const items = itemsRaw.map((it) => ({
