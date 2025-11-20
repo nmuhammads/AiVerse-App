@@ -40,23 +40,24 @@ function StartParamRouter() {
 
 export default function App() {
   useEffect(() => {
-    const ensure = () => {
-      try { WebApp.requestFullscreen() } catch { void 0 }
+    const ensureExpand = () => {
       try { WebApp.expand() } catch { void 0 }
     }
     try {
       WebApp.ready();
-      ensure()
-      WebApp.onEvent("activated", ensure)
-      WebApp.onEvent("fullscreenChanged", ensure)
-      WebApp.onEvent("viewportChanged", ensure)
+      const ver = Number((WebApp as unknown as { version?: string }).version || '0')
+      if (WebApp.platform === 'ios' || WebApp.platform === 'android') {
+        if (ver >= 8) { try { (WebApp as unknown as { requestFullscreen?: () => void }).requestFullscreen?.() } catch { void 0 } }
+      }
+      ensureExpand()
+      WebApp.onEvent("activated", ensureExpand)
+      WebApp.onEvent("viewportChanged", ensureExpand)
       WebApp.setHeaderColor("bg_color");
     } catch { void 0 }
     return () => {
       try {
-        WebApp.offEvent("activated", ensure)
-        WebApp.offEvent("fullscreenChanged", ensure)
-        WebApp.offEvent("viewportChanged", ensure)
+        WebApp.offEvent("activated", ensureExpand)
+        WebApp.offEvent("viewportChanged", ensureExpand)
       } catch { void 0 }
     }
   }, []);

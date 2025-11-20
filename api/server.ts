@@ -11,11 +11,13 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 console.log(`Starting server on port ${PORT}...`);
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-import { registerBotCommands, setupMenuButton } from './controllers/telegramController.js';
+import { registerBotCommands, setupMenuButton, setupWebhook, logBotInfo } from './controllers/telegramController.js';
 
 (async () => {
   await registerBotCommands();
+  await setupWebhook();
   await setupMenuButton();
+  await logBotInfo();
 })();
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server ready on port ${PORT}`);

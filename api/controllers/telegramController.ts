@@ -9,6 +9,7 @@ const APP_URL = (
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '') ||
   ''
 )
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || ''
 
 async function tg(method: string, payload: Record<string, unknown>) {
   if (!API) return null
@@ -22,6 +23,12 @@ async function tg(method: string, payload: Record<string, unknown>) {
 
 export async function webhook(req: Request, res: Response) {
   try {
+    if (WEBHOOK_SECRET) {
+      const h = String(req.header('X-Telegram-Bot-API-Secret-Token') || '')
+      if (h !== WEBHOOK_SECRET) {
+        return res.status(403).json({ ok: false })
+      }
+    }
     const update = req.body
     const msg = update?.message
     const chatId = msg?.chat?.id
@@ -62,7 +69,7 @@ export async function registerBotCommands() {
     return;
   }
   console.log('registerBotCommands: Deleting bot commands');
-  const resp = await tg('deleteMyCommands', {});
+  const resp = await tg('deleteMyCommands', { scope: { type: 'default' } });
   if (resp?.ok) {
     console.log('registerBotCommands: Successfully deleted commands');
   } else {
@@ -107,22 +114,46 @@ export async function setupMenuButton(req?: Request, res?: Response) {
     if (res) return res.status(500).json({ ok: false, error });
     return { ok: false, error };
   }
-  if (!API || !APP_URL) {
-    return res.status(400).json({ ok: false })
-  }
-  const startParam = 'generate'
-  const url = `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startParam)}`
-  const chat_id = typeof req.body?.chat_id === 'number' ? req.body.chat_id : undefined
-  const resp = await tg('setChatMenuButton', {
-    chat_id,
-    menu_button: {
-      type: 'web_app',
-      text: 'AI Verse',
-      web_app: { url }
+}
+
+export async function setupWebhook(req?: Request, res?: Response) {
+  try {
+    if (!API || !APP_URL) {
+      console.error('setupWebhook: Missing API or APP_URL');
+      if (res) return res.status(400).json({ ok: false });
+      return { ok: false };
     }
-  })
-  if (!resp || resp.ok !== true) {
-    return res.status(500).json({ ok: false, resp })
+    const url = `${APP_URL}/api/telegram/webhook`
+    const payload: { url: string; drop_pending_updates: boolean; secret_token?: string } = {
+      url,
+      drop_pending_updates: true,
+    }
+    if (WEBHOOK_SECRET) payload.secret_token = WEBHOOK_SECRET
+    console.log('setupWebhook: Setting webhook to', url)
+    const resp = await tg('setWebhook', payload)
+    if (!resp || resp.ok !== true) {
+      console.error('setupWebhook: Failed to set webhook', resp)
+      if (res) return res.status(500).json({ ok: false, resp })
+      return { ok: false, resp }
+    }
+    if (res) res.json({ ok: true, resp })
+    return { ok: true, resp }
+  } catch (error) {
+    console.error('setupWebhook: Error', error)
+    if (res) return res.status(500).json({ ok: false, error })
+    return { ok: false, error }
   }
-  res.json({ ok: true, resp })
+}
+
+export async function logBotInfo() {
+  try {
+    const resp = await tg('getMe', {})
+    if (resp?.ok) {
+      console.log('Bot info:', resp.result)
+    } else {
+      console.warn('getMe failed', resp)
+    }
+  } catch (e) {
+    console.warn('getMe error', e)
+  }
 }

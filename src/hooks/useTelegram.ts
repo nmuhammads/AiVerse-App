@@ -3,18 +3,44 @@ import WebApp from '@twa-dev/sdk'
 
 export function useTelegram() {
   useEffect(() => {
-    WebApp.ready()
-    WebApp.expand()
-    const ensure = () => {
-      try { WebApp.requestFullscreen() } catch { void 0 }
-      try { if (!WebApp.isExpanded) WebApp.expand() } catch { void 0 }
+    const wa = WebApp as unknown as {
+      contentSafeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number }
+      safeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number }
+      platform?: string
+      isExpanded?: boolean
+      ready: () => void
+      expand: () => void
+      requestFullscreen?: () => void
+      onEvent: (name: string, cb: (data?: unknown) => void) => void
+      offEvent: (name: string, cb: (data?: unknown) => void) => void
+      MainButton: { hide: () => void; setText: (t: string) => void; onClick: (fn: () => void) => void; offClick: (fn: () => void) => void; show: () => void; showProgress: () => void; hideProgress: () => void; color: string; textColor: string }
+      setHeaderColor: (c: string) => void
+      setBackgroundColor: (c: string) => void
     }
-    ensure()
-    setTimeout(ensure, 100)
-    setTimeout(ensure, 300)
-    WebApp.onEvent('activated', ensure)
-    WebApp.onEvent('fullscreenChanged', ensure)
-    WebApp.onEvent('viewportChanged', ensure)
+    wa.ready()
+    const applySafe = () => {
+      const inset = wa.contentSafeAreaInset || wa.safeAreaInset || { top: 0, bottom: 0, left: 0, right: 0 }
+      const r = document.documentElement
+      r.style.setProperty('--safe-area-top', `${inset.top || 0}px`)
+      r.style.setProperty('--safe-area-bottom', `${inset.bottom || 0}px`)
+      r.style.setProperty('--safe-area-left', `${inset.left || 0}px`)
+      r.style.setProperty('--safe-area-right', `${inset.right || 0}px`)
+    }
+    applySafe()
+    const ensureExpand = () => { try { if (!wa.isExpanded) wa.expand() } catch { void 0 } }
+    if (wa.platform === 'ios' || wa.platform === 'android') {
+      const ver = Number(((WebApp as unknown as { version?: string }).version) || '0')
+      if (ver >= 8) {
+        try { if (wa.requestFullscreen) wa.requestFullscreen() } catch { void 0 }
+      }
+    }
+    ensureExpand()
+    setTimeout(ensureExpand, 100)
+    setTimeout(ensureExpand, 300)
+    wa.onEvent('activated', ensureExpand)
+    wa.onEvent('viewportChanged', ensureExpand)
+    wa.onEvent('safeAreaChanged', applySafe)
+    wa.onEvent('contentSafeAreaChanged', applySafe)
     
     // Установка цветовой схемы
     WebApp.setHeaderColor('#1a1a1a')
@@ -26,10 +52,11 @@ export function useTelegram() {
     WebApp.MainButton.textColor = '#FFFFFF'
     
     return () => {
-      WebApp.offEvent('activated', ensure)
-      WebApp.offEvent('fullscreenChanged', ensure)
-      WebApp.offEvent('viewportChanged', ensure)
-      WebApp.MainButton.hide()
+      wa.offEvent('activated', ensureExpand)
+      wa.offEvent('viewportChanged', ensureExpand)
+      wa.offEvent('safeAreaChanged', applySafe)
+      wa.offEvent('contentSafeAreaChanged', applySafe)
+      wa.MainButton.hide()
     }
   }, [])
 

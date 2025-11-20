@@ -28,7 +28,7 @@ body { margin: 0; }
 .animate-spin-slow { animation: spin-slow 8s linear infinite }
 
 .min-h-dvh { min-height: 100dvh; min-height: 100svh; }
-.safe-top { padding-top: env(safe-area-inset-top); }
-.safe-bottom-padding { padding-bottom: env(safe-area-inset-bottom); }
-.safe-bottom-fixed { bottom: calc(env(safe-area-inset-bottom) + 1rem); }
-.sticky-safe-top { top: calc(env(safe-area-inset-top) + var(--tma-offset, 56px)); }
+.safe-top { padding-top: var(--safe-area-top, env(safe-area-inset-top)); }
+.safe-bottom-padding { padding-bottom: var(--safe-area-bottom, env(safe-area-inset-bottom)); }
+.safe-bottom-fixed { bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 1rem); }
+.sticky-safe-top { top: calc(var(--safe-area-top, env(safe-area-inset-top)) + var(--tma-offset, 56px)); }
