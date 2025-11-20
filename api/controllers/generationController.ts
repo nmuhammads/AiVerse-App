@@ -170,6 +170,58 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
   throw new Error('Jobs task timeout')
 }
 
+// --- Supabase helpers for recording generation and deducting balance ---
+const SUPABASE_URL = process.env.SUPABASE_URL || ''
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
+
+function supaHeaders() {
+  return { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } as Record<string, string>
+}
+
+async function supaSelect(table: string, query: string) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
+  const r = await fetch(url, { headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'count=exact' } })
+  const data = await r.json().catch(() => null)
+  return { ok: r.ok, data }
+}
+
+async function supaPost(table: string, body: unknown, params = '') {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${params}`
+  const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) })
+  const data = await r.json().catch(() => null)
+  return { ok: r.ok, data }
+}
+
+async function supaPatch(table: string, filter: string, body: unknown) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
+  const r = await fetch(url, { method: 'PATCH', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await r.json().catch(() => null)
+  return { ok: r.ok, data }
+}
+
+const MODEL_PRICES: Record<string, number> = {
+  nanobanana: 3,
+  seedream4: 3,
+  flux: 4,
+  'qwen-edit': 3,
+}
+
+async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: string, model: string) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !userId) return
+  const cost = MODEL_PRICES[model] ?? 0
+  try {
+    await supaPost('generations', { user_id: userId, image_url: imageUrl, prompt })
+    const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
+    const curr = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : null
+    if (typeof curr === 'number') {
+      const next = curr - cost
+      await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: next })
+    }
+  } catch {
+    /* silent */
+  }
+}
+
 // Функция для генерации изображения через Kie.ai
 async function generateImageWithKieAI(
   apiKey: string,
@@ -255,7 +307,7 @@ async function generateImageWithKieAI(
 // Основной контроллер для обработки запросов генерации
 export async function handleGenerateImage(req: Request, res: Response) {
   try {
-    const { prompt, model, aspect_ratio, image } = req.body
+    const { prompt, model, aspect_ratio, image, user_id } = req.body
 
     // Валидация входных данных
     if (!prompt || typeof prompt !== 'string') {
@@ -293,8 +345,12 @@ export async function handleGenerateImage(req: Request, res: Response) {
     }
 
     if (result.images && result.images.length > 0) {
+      const imageUrl = result.images[0]
+      if (user_id && Number(user_id)) {
+        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model).catch(() => {})
+      }
       return res.json({ 
-        image: result.images[0],
+        image: imageUrl,
         prompt: prompt,
         model: model
       })

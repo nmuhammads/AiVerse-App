@@ -7,11 +7,18 @@ import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: JSX.Element }[] = [
-  { id: 'nanobanana', name: 'NanoBanana', desc: 'Топ 2025', color: 'from-yellow-400 to-orange-500', icon: <Sparkles size={16} /> },
-  { id: 'seedream4', name: 'Seedream 4', desc: 'Сюрреализм', color: 'from-purple-400 to-fuchsia-500', icon: <CloudRain size={16} /> },
-  { id: 'qwen-edit', name: 'Qwen Edit', desc: 'Точность', color: 'from-emerald-400 to-teal-500', icon: <Code2 size={16} /> },
-  { id: 'flux', name: 'Flux 1.1', desc: 'Фотореализм', color: 'from-blue-400 to-indigo-500', icon: <Aperture size={16} /> },
+  { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: <Sparkles size={16} /> },
+  { id: 'seedream4', name: 'Seedream 4', desc: '3 токена', color: 'from-purple-400 to-fuchsia-500', icon: <CloudRain size={16} /> },
+  { id: 'qwen-edit', name: 'Qwen Edit', desc: '3 токена', color: 'from-emerald-400 to-teal-500', icon: <Code2 size={16} /> },
+  { id: 'flux', name: 'Flux 1.1', desc: '4 токена', color: 'from-blue-400 to-indigo-500', icon: <Aperture size={16} /> },
 ]
+
+const MODEL_PRICES: Record<ModelType, number> = {
+  nanobanana: 3,
+  seedream4: 3,
+  'qwen-edit': 3,
+  flux: 4,
+}
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
   flux: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16', '16:21'],
@@ -42,7 +49,7 @@ export default function Studio() {
     setCurrentScreen,
   } = useGenerationStore()
 
-  const { shareImage } = useTelegram()
+  const { shareImage, user } = useTelegram()
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -74,7 +81,7 @@ export default function Studio() {
       const res = await fetch('/api/generation/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, model: selectedModel, aspect_ratio: aspectRatio, image: generationMode==='image' ? uploadedImage : null })
+        body: JSON.stringify({ prompt, model: selectedModel, aspect_ratio: aspectRatio, image: generationMode==='image' ? uploadedImage : null, user_id: user?.id || null })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Ошибка генерации')
@@ -163,7 +170,6 @@ export default function Studio() {
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300 ${selectedModel===m.id ? `bg-gradient-to-br ${m.color} text-white scale-105 shadow-lg` : 'bg-zinc-800 text-zinc-500 group-hover:bg-zinc-700 group-hover:text-zinc-300'}`}>{m.icon}</div>
                     <div className="relative z-10">
                       <span className={`block font-semibold text-[10px] leading-tight ${selectedModel===m.id ? 'text-white' : 'text-zinc-400'}`}>{m.name}</span>
-                      <span className="hidden sm:block text-[8px] text-zinc-600">{m.desc}</span>
                     </div>
                   </button>
                 ))}
@@ -223,6 +229,7 @@ export default function Studio() {
               <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim() || (generationMode==='image' && !uploadedImage)} className={`mt-2 w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-lg transition-all active:scale-[0.98] ${isGenerating ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800' : 'bg-white text-black hover:bg-zinc-100'}`}>
                 {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="text-violet-600" />}
                 <span>{isGenerating ? 'Создание...' : generationMode==='image' ? 'Редактировать' : 'Сгенерировать'}</span>
+                {!isGenerating && <span className="text-zinc-500">• {MODEL_PRICES[selectedModel]} токена</span>}
               </Button>
             </div>
           </CardContent>
