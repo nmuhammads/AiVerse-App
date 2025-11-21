@@ -280,3 +280,35 @@ export async function sendDocument(req: Request, res: Response) {
     return res.status(500).json({ ok: false })
   }
 }
+
+export async function proxyDownload(req: Request, res: Response) {
+  try {
+    const src = String(req.query?.url || '')
+    const nameParam = String(req.query?.name || '')
+    if (!src) return res.status(400).json({ ok: false, error: 'missing url' })
+    console.info('proxyDownload:start', { src: src.slice(0, 160), name: nameParam })
+    const r = await fetch(src, { headers: { 'Accept': 'image/*;q=0.9, */*;q=0.1' } })
+    if (!r.ok) {
+      console.warn('proxyDownload:fetch_failed', { status: r.status })
+      return res.status(400).json({ ok: false, error: 'fetch failed', status: r.status })
+    }
+    const ct = r.headers.get('content-type') || 'application/octet-stream'
+    const ab = await r.arrayBuffer()
+    const buf = Buffer.from(ab)
+    const ext = (() => {
+      if (ct.includes('png')) return 'png'
+      if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg'
+      if (ct.includes('webp')) return 'webp'
+      return 'bin'
+    })()
+    const filename = nameParam || `ai-${Date.now()}.${ext}`
+    res.setHeader('Content-Type', ct)
+    res.setHeader('Content-Length', String(buf.length))
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.send(buf)
+  } catch (e) {
+    console.warn('proxyDownload:error', { message: (e as Error)?.message })
+    res.status(500).json({ ok: false, error: 'proxy error' })
+  }
+}

@@ -104,7 +104,8 @@ export function useTelegram() {
     }
     try {
       wa.HapticFeedback?.impactOccurred?.('medium')
-      await wa.downloadFile(url, name)
+      const proxyUrl = `/api/telegram/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`
+      await wa.downloadFile(proxyUrl, name)
       WebApp.HapticFeedback?.notificationOccurred?.('success')
     } catch (err) {
       console.error('downloadFile error', err)
