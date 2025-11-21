@@ -112,33 +112,41 @@ export async function getAvatar(req: Request, res: Response) {
         }
       }
     }
-    // Fallback: local cache or Telegram
-    ensureDirs()
-    const localFile = path.join(uploadsDir, `${userId}.jpg`)
-    if (fs.existsSync(localFile)) {
-      console.info('avatar:local:return', { path: localFile })
-      return res.sendFile(localFile)
+    // Fallback: fetch from Telegram and upload to Supabase
+    if (!TOKEN) return res.status(404).json({ error: 'avatar not found' });
+    console.info('avatar:telegram:fetch', { userId });
+    const photosResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getUserProfilePhotos?user_id=${encodeURIComponent(userId)}&limit=1`);
+    const photosJson = await photosResp.json();
+    const first = photosJson?.result?.photos?.[0];
+    if (!first) return res.status(404).json({ error: 'no photos' });
+    const sizes = first as Array<{ file_id: string }>;
+    const largest = sizes[sizes.length - 1];
+    const fileResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${largest.file_id}`);
+    const fileJson = await fileResp.json();
+    const filePathTg = fileJson?.result?.file_path;
+    if (!filePathTg) return res.status(404).json({ error: 'file not found' });
+    const downloadUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePathTg}`;
+    const imgResp = await fetch(downloadUrl);
+    if (!imgResp.ok) return res.status(404).json({ error: 'download failed' });
+    const buf = Buffer.from(await imgResp.arrayBuffer());
+    // Upload to Supabase bucket 'photo_reference'
+    const supaPath = `${userId}/profile.jpg`;
+    const up = await supaStorageUpload(supaPath, buf, 'image/jpeg');
+    if (!up.ok) return res.status(500).json({ error: 'upload to storage failed', detail: up.data });
+    // Update or insert avatars table
+    const existing = await supaSelect('avatars', `?user_id=eq.${encodeURIComponent(userId)}&is_profile_pic=eq.true&select=id&limit=1`);
+    const existingId = Array.isArray(existing.data) && existing.data[0]?.id ? Number(existing.data[0].id) : null;
+    if (existingId) {
+      const upd = await supaPatch('avatars', `?id=eq.${existingId}`, { file_path: supaPath, is_profile_pic: true });
+      if (!upd.ok) return res.status(500).json({ error: 'record update failed', detail: upd.data });
+    } else {
+      const ins = await supaPost('avatars', { user_id: Number(userId), file_path: supaPath, display_name: null, is_profile_pic: true });
+      if (!ins.ok) return res.status(500).json({ error: 'record insert failed', detail: ins.data });
     }
-    if (!TOKEN) return res.status(404).json({ error: 'avatar not found' })
-    console.info('avatar:telegram:fetch', { userId })
-    const photosResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getUserProfilePhotos?user_id=${encodeURIComponent(userId)}&limit=1`)
-    const photosJson = await photosResp.json()
-    const first = photosJson?.result?.photos?.[0]
-    if (!first) return res.status(404).json({ error: 'no photos' })
-    const sizes = first as Array<{ file_id: string }>
-    const largest = sizes[sizes.length - 1]
-    const fileResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${largest.file_id}`)
-    const fileJson = await fileResp.json()
-    const filePath = fileJson?.result?.file_path
-    if (!filePath) return res.status(404).json({ error: 'file not found' })
-    const downloadUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`
-    const imgResp = await fetch(downloadUrl)
-    if (!imgResp.ok) return res.status(404).json({ error: 'download failed' })
-    const buf = Buffer.from(await imgResp.arrayBuffer())
-    fs.writeFileSync(localFile, buf)
-    res.setHeader('Content-Type', 'image/jpeg')
-    console.info('avatar:telegram:return', { saved: true })
-    return res.end(buf)
+    // Return the image
+    res.setHeader('Content-Type', 'image/jpeg');
+    console.info('avatar:telegram:return', { saved: true });
+    return res.end(buf);
   } catch (e) {
     console.error('avatar:get:error', { message: (e as Error)?.message })
     return res.status(500).json({ error: 'avatar error' })
@@ -170,11 +178,7 @@ export async function uploadAvatar(req: Request, res: Response) {
       return res.json({ ok: true, file_path: filePath })
     }
 
-    // Fallback to local filesystem
-    ensureDirs()
-    const localFile = path.join(uploadsDir, `${userId}.jpg`)
-    fs.writeFileSync(localFile, buf)
-    return res.json({ ok: true })
+    return res.status(500).json({ error: 'Supabase not configured, local storage removed' });
   } catch {
     return res.status(500).json({ error: 'upload failed' })
   }
