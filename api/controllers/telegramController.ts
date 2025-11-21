@@ -301,7 +301,7 @@ export async function proxyDownload(req: Request, res: Response) {
       if (ct.includes('webp')) return 'webp'
       return 'bin'
     })()
-    const filename = nameParam || `ai-${Date.now()}.${ext}`
+    const filename = nameParam || `image.${ext}`
     res.setHeader('Content-Type', ct)
     res.setHeader('Content-Length', String(buf.length))
     res.setHeader('Accept-Ranges', 'bytes')
@@ -337,7 +337,7 @@ export async function proxyDownloadHead(req: Request, res: Response) {
       if (ct.includes('webp')) return 'webp'
       return 'bin'
     })()
-    const filename = nameParam || `ai-${Date.now()}.${ext}`
+    const filename = nameParam || `image.${ext}`
     res.setHeader('Content-Type', ct)
     res.setHeader('Content-Length', clen)
     res.setHeader('Accept-Ranges', 'bytes')
