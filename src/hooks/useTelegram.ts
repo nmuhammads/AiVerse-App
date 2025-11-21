@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import WebApp from '@twa-dev/sdk'
-import { downloadFile as sdkDownloadFile } from '@telegram-apps/sdk'
 
 export function useTelegram() {
   useEffect(() => {
@@ -95,32 +94,26 @@ export function useTelegram() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`)
   }
 
-  const downloadFile = async (url: string, filename?: string) => {
-    const name = filename || `ai-${Date.now()}.png`
+  const saveToGallery = async (url: string, filename?: string) => {
+    const ext = /\.png(\?|$)/i.test(url) ? 'png' : 'jpg'
+    const name = filename || `ai-${Date.now()}.${ext}`
+    const wa = WebApp as unknown as { downloadFile?: (u: string, name?: string) => Promise<void> | void; HapticFeedback?: { impactOccurred?: (s: string) => void; notificationOccurred?: (s: string) => void }; showAlert?: (t: string) => void }
+    if (!wa.downloadFile) {
+      WebApp.showAlert?.('Обновите Telegram до последней версии')
+      return
+    }
     try {
-      if (sdkDownloadFile && typeof sdkDownloadFile.isAvailable === 'function' && sdkDownloadFile.isAvailable()) {
-        await sdkDownloadFile(url, name)
-        return
-      }
-    } catch { /* noop */ }
-    try {
-      const wa = WebApp as unknown as { downloadFile?: (u: string, name?: string) => void }
-      if (typeof wa.downloadFile === 'function') {
-        wa.downloadFile(url, name)
-        return
-      }
-    } catch { /* noop */ }
-    try {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    } catch {
-      WebApp.openLink(url)
+      wa.HapticFeedback?.impactOccurred?.('medium')
+      await wa.downloadFile(url, name)
+      WebApp.HapticFeedback?.notificationOccurred?.('success')
+    } catch (err) {
+      console.error('downloadFile error', err)
+      WebApp.showAlert?.('Не удалось сохранить фото')
+      WebApp.HapticFeedback?.notificationOccurred?.('error')
     }
   }
+
+  const downloadFile = saveToGallery
 
   const openLink = (url: string) => {
     WebApp.openLink(url)
@@ -138,6 +131,7 @@ export function useTelegram() {
     hideProgress,
     shareImage,
     downloadFile,
+    saveToGallery,
     openLink,
     openBotDeepLink,
     user: WebApp.initDataUnsafe.user,

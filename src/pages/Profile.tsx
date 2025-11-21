@@ -5,7 +5,7 @@ import { useTelegram } from '@/hooks/useTelegram'
 
 export default function Profile() {
   const { impact, notify } = useHaptics()
-  const { user, downloadFile, shareImage } = useTelegram()
+  const { user, saveToGallery, shareImage } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
@@ -123,7 +123,7 @@ export default function Profile() {
                   <img src={preview.image_url} alt="Preview" className="w-full max-h-[70vh] object-contain bg-black" />
                   <div className="p-4 flex gap-3">
                     <button
-                      onClick={() => { impact('light'); downloadFile(preview.image_url, `ai-${Date.now()}.png`) }}
+                      onClick={() => { impact('light'); saveToGallery(preview.image_url, `ai-${Date.now()}.jpg`) }}
                       className="flex-1 h-11 rounded-xl bg-white text-black hover:bg-zinc-100 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
                     >
                       <DownloadIcon size={16} />

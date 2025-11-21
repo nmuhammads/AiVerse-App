@@ -49,7 +49,7 @@ export default function Studio() {
     setCurrentScreen,
   } = useGenerationStore()
 
-  const { shareImage, downloadFile, user } = useTelegram()
+  const { shareImage, saveToGallery, user } = useTelegram()
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -117,7 +117,7 @@ export default function Studio() {
             <CardContent className="space-y-4">
               <img src={generatedImage} alt="result" className="w-full rounded-lg shadow-lg" />
               <div className="flex gap-3">
-                <Button onClick={() => { downloadFile(generatedImage, `ai-${Date.now()}.png`) }} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700">Скачать</Button>
+                <Button onClick={() => { saveToGallery(generatedImage, `ai-${Date.now()}.jpg`) }} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700">Скачать</Button>
                 <Button onClick={() => shareImage(generatedImage, prompt)} className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700">Поделиться</Button>
               </div>
               <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} variant="outline" className="w-full border-white/20 text-white hover:bg-white/10">Создать ещё</Button>
