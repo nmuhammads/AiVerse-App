@@ -137,14 +137,14 @@ export function useTelegram() {
       } catch { void 0 }
       wa.HapticFeedback?.impactOccurred?.('medium')
       try {
-        await wa.downloadFile(proxyUrl)
+        await wa.downloadFile(proxyUrl, name)
       } catch (e1) {
         const msg = (e1 as Error)?.message || ''
         try {
           await fetch('/api/telegram/log/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: 'retry', platform: wa.platform, version: wa.version, hasDownloadFile: true, name, rawUrl: url, proxyUrl, error: msg }) })
         } catch { void 0 }
         if (/WebAppDownloadFileParamInvalid/i.test(msg)) {
-          await wa.downloadFile(proxyUrl, name)
+          await wa.downloadFile(proxyUrl)
         } else {
           throw e1
         }
