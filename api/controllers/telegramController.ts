@@ -163,10 +163,28 @@ export async function sendPhoto(req: Request, res: Response) {
     const chat_id = Number(req.body?.chat_id || 0)
     const photo = String(req.body?.photo_url || '')
     const caption = typeof req.body?.caption === 'string' ? String(req.body.caption) : undefined
-    if (!API || !chat_id || !photo) return res.status(400).json({ ok: false })
-    const resp = await tg('sendPhoto', { chat_id, photo, caption })
-    if (!resp || resp.ok !== true) return res.status(500).json({ ok: false, resp })
-    return res.json({ ok: true })
+    if (!API || !chat_id || !photo) return res.status(400).json({ ok: false, error: 'invalid payload' })
+    try {
+      const imgResp = await fetch(photo)
+      if (!imgResp.ok) return res.status(400).json({ ok: false, error: 'image fetch failed', status: imgResp.status })
+      const ct = imgResp.headers.get('content-type') || 'image/jpeg'
+      const ab = await imgResp.arrayBuffer()
+      const blob = new Blob([ab], { type: ct })
+      const ext = ct.includes('png') ? 'png' : (ct.includes('webp') ? 'webp' : 'jpg')
+      const filename = `ai-${Date.now()}.${ext}`
+      const form = new FormData()
+      form.append('chat_id', String(chat_id))
+      if (caption) form.append('caption', caption)
+      form.append('photo', blob, filename)
+      const r = await fetch(`${API}/sendPhoto`, { method: 'POST', body: form })
+      const j = await r.json().catch(() => null)
+      if (!j || j.ok !== true) return res.status(500).json({ ok: false, resp: j })
+      return res.json({ ok: true })
+    } catch {
+      const resp = await tg('sendPhoto', { chat_id, photo, caption })
+      if (!resp || resp.ok !== true) return res.status(500).json({ ok: false, resp })
+      return res.json({ ok: true })
+    }
   } catch {
     return res.status(500).json({ ok: false })
   }

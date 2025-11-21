@@ -1,11 +1,11 @@
-import { Sparkles, Share2, Edit, History as HistoryIcon, X } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 
 export default function Profile() {
-  const { impact } = useHaptics()
-  const { user } = useTelegram()
+  const { impact, notify } = useHaptics()
+  const { user, downloadFile } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
@@ -122,8 +122,28 @@ export default function Profile() {
                   <button onClick={()=>setPreview(null)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"><X size={16} /></button>
                   <img src={preview.image_url} alt="Preview" className="w-full max-h-[70vh] object-contain bg-black" />
                   <div className="p-4 flex gap-3">
-                    <button onClick={() => { const a=document.createElement('a'); a.href=preview.image_url; a.download=`ai-${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a) }} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700 py-2 rounded-lg font-bold">Скачать</button>
-                    <button onClick={async () => { if (!user?.id) return; await fetch('/api/telegram/sendPhoto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, photo_url: preview.image_url, caption: preview.prompt }) }) }} className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg font-bold">Отправить в чат</button>
+                    <button
+                      onClick={() => { impact('light'); downloadFile(preview.image_url, `ai-${Date.now()}.png`) }}
+                      className="flex-1 h-11 rounded-xl bg-white text-black hover:bg-zinc-100 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
+                    >
+                      <DownloadIcon size={16} />
+                      Скачать
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!user?.id) return
+                        impact('light')
+                        try {
+                          const r = await fetch('/api/telegram/sendPhoto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, photo_url: preview.image_url, caption: preview.prompt }) })
+                          const j = await r.json().catch(()=>null)
+                          if (r.ok && j?.ok) { notify('success') } else { notify('error') }
+                        } catch { notify('error') }
+                      }}
+                      className="flex-1 h-11 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
+                    >
+                      <Send size={16} />
+                      Отправить в чат
+                    </button>
                   </div>
                 </div>
               </div>

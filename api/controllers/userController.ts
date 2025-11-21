@@ -1,10 +1,6 @@
 import { Request, Response } from 'express'
-import path from 'path'
-import fs from 'fs'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
-const appRoot = process.cwd()
-const uploadsDir = path.resolve(appRoot, 'uploads', 'avatars')
 
 function stripQuotes(s: string) { return s.trim().replace(/^['"`]+|['"`]+$/g, '') }
 
@@ -65,10 +61,6 @@ async function supaStorageSignedUrl(pathname: string, expiresIn = Number(process
 }
 
 // signed URL helper can be added when bucket is private
-
-function ensureDirs() {
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
-}
 
 function sanitizeUrl(u: unknown): string | null {
   if (!u) return null

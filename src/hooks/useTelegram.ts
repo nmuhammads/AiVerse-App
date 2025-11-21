@@ -93,6 +93,26 @@ export function useTelegram() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`)
   }
 
+  const downloadFile = (url: string, filename?: string) => {
+    try {
+      const wa = WebApp as unknown as { downloadFile?: (u: string, name?: string) => void }
+      if (typeof wa.downloadFile === 'function') {
+        wa.downloadFile(url, filename || `ai-${Date.now()}.png`)
+        return
+      }
+    } catch { /* noop */ }
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || `ai-${Date.now()}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch {
+      WebApp.openLink(url)
+    }
+  }
+
   const openLink = (url: string) => {
     WebApp.openLink(url)
   }
@@ -108,6 +128,7 @@ export function useTelegram() {
     showProgress,
     hideProgress,
     shareImage,
+    downloadFile,
     openLink,
     openBotDeepLink,
     user: WebApp.initDataUnsafe.user,
