@@ -103,7 +103,9 @@ export function useTelegram() {
       return
     }
     try {
-      const proxyUrl = `/api/telegram/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`
+      const proxyPath = `/api/telegram/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const proxyUrl = origin ? `${origin}${proxyPath}` : proxyPath
       let ct = ''
       let clen = ''
       let headOk = false
