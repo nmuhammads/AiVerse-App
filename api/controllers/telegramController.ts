@@ -196,3 +196,42 @@ export async function sendPhoto(req: Request, res: Response) {
     return res.status(500).json({ ok: false })
   }
 }
+
+export async function sendDocument(req: Request, res: Response) {
+  try {
+    const chat_id = Number(req.body?.chat_id || 0)
+    const url = String(req.body?.file_url || req.body?.document_url || req.body?.photo_url || '')
+    const caption = typeof req.body?.caption === 'string' ? String(req.body.caption) : undefined
+    if (!API || !chat_id || !url) return res.status(400).json({ ok: false, error: 'invalid payload' })
+    console.info('sendDocument:start', { chat_id, caption_len: caption ? caption.length : 0, url_preview: url.slice(0, 128) })
+    try {
+      const resp = await fetch(url)
+      const contentType = resp.headers.get('content-type') || 'application/octet-stream'
+      const clen = resp.headers.get('content-length')
+      console.info('sendDocument:file_fetch', { status: resp.status, ct: contentType, content_length: clen })
+      if (!resp.ok) return res.status(400).json({ ok: false, error: 'file fetch failed', status: resp.status, ct: contentType })
+      const ab = await resp.arrayBuffer()
+      const blob = new Blob([ab], { type: contentType })
+      const ext = contentType.includes('png') ? 'png' : (contentType.includes('jpeg') || contentType.includes('jpg')) ? 'jpg' : (contentType.includes('webp') ? 'webp' : 'bin')
+      const filename = `ai-${Date.now()}.${ext}`
+      const form = new FormData()
+      form.append('chat_id', String(chat_id))
+      if (caption) form.append('caption', caption)
+      form.append('document', blob, filename)
+      console.info('sendDocument:upload_post', { filename, ct: contentType })
+      const r = await fetch(`${API}/sendDocument`, { method: 'POST', body: form })
+      const j = await r.json().catch(() => null)
+      console.info('sendDocument:upload_resp', { ok: j?.ok === true, desc: j?.description, error_code: j?.error_code })
+      if (!j || j.ok !== true) return res.status(500).json({ ok: false, error: j?.description || 'telegram sendDocument failed', resp: j })
+      return res.json({ ok: true })
+    } catch (e) {
+      console.warn('sendDocument:upload_error', { message: (e as Error)?.message })
+      const j = await tg('sendDocument', { chat_id, document: url, caption })
+      console.info('sendDocument:fallback_url_resp', { ok: j?.ok === true, desc: j?.description, error_code: j?.error_code })
+      if (!j || j.ok !== true) return res.status(500).json({ ok: false, error: j?.description || 'telegram sendDocument failed', resp: j })
+      return res.json({ ok: true })
+    }
+  } catch {
+    return res.status(500).json({ ok: false })
+  }
+}

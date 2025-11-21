@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import WebApp from '@twa-dev/sdk'
+import { downloadFile as sdkDownloadFile } from '@telegram-apps/sdk'
 
 export function useTelegram() {
   useEffect(() => {
@@ -41,6 +42,7 @@ export function useTelegram() {
     wa.onEvent('viewportChanged', ensureExpand)
     wa.onEvent('safeAreaChanged', applySafe)
     wa.onEvent('contentSafeAreaChanged', applySafe)
+    try { wa.onEvent('fileDownloadRequested', (d) => { console.info('fileDownloadRequested', d) }) } catch { /* noop */ }
     
     // Установка цветовой схемы
     WebApp.setHeaderColor('#1a1a1a')
@@ -93,18 +95,25 @@ export function useTelegram() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`)
   }
 
-  const downloadFile = (url: string, filename?: string) => {
+  const downloadFile = async (url: string, filename?: string) => {
+    const name = filename || `ai-${Date.now()}.png`
+    try {
+      if (sdkDownloadFile && typeof sdkDownloadFile.isAvailable === 'function' && sdkDownloadFile.isAvailable()) {
+        await sdkDownloadFile(url, name)
+        return
+      }
+    } catch { /* noop */ }
     try {
       const wa = WebApp as unknown as { downloadFile?: (u: string, name?: string) => void }
       if (typeof wa.downloadFile === 'function') {
-        wa.downloadFile(url, filename || `ai-${Date.now()}.png`)
+        wa.downloadFile(url, name)
         return
       }
     } catch { /* noop */ }
     try {
       const a = document.createElement('a')
       a.href = url
-      a.download = filename || `ai-${Date.now()}.png`
+      a.download = name
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

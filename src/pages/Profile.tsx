@@ -134,7 +134,7 @@ export default function Profile() {
                         if (!user?.id) return
                         impact('light')
                         try {
-                          const r = await fetch('/api/telegram/sendPhoto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, photo_url: preview.image_url, caption: preview.prompt }) })
+                          const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: preview.image_url, caption: preview.prompt }) })
                           const j = await r.json().catch(()=>null)
                           if (r.ok && j?.ok) { notify('success') }
                           else {
