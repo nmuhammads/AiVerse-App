@@ -88,20 +88,27 @@ export async function getAvatar(req: Request, res: Response) {
       const filePath = Array.isArray(qp.data) && qp.data[0]?.file_path ? String(qp.data[0].file_path) : null
       console.info('avatar:file-path', { filePath })
       if (filePath) {
-        const signed = await supaStorageSignedUrl(filePath)
-        if (signed) {
-          try {
-            const imgResp = await fetch(signed)
-            console.info('avatar:fetch', { status: imgResp.status, ct: imgResp.headers.get('content-type') })
-            if (imgResp.ok) {
-              const ct = imgResp.headers.get('content-type') || 'image/jpeg'
-              const buf = Buffer.from(await imgResp.arrayBuffer())
-              res.setHeader('Content-Type', ct)
-              res.setHeader('Cache-Control', 'no-store')
-              return res.end(buf)
-            }
-          } catch (e) { console.error('avatar:fetch:error', { message: (e as Error)?.message }) }
-          // Fall through to local/Telegram fallback when storage fetch fails
+        const canonical = `${encodeURIComponent(String(userId))}/profile.jpg`
+        const candidates = [filePath, ...(filePath !== canonical ? [canonical] : [])]
+        for (const p of candidates) {
+          const signed = await supaStorageSignedUrl(p)
+          if (signed) {
+            try {
+              const imgResp = await fetch(signed)
+              console.info('avatar:fetch', { status: imgResp.status, ct: imgResp.headers.get('content-type'), path: p })
+              if (imgResp.ok) {
+                const ct = imgResp.headers.get('content-type') || 'image/jpeg'
+                const buf = Buffer.from(await imgResp.arrayBuffer())
+                res.setHeader('Content-Type', ct)
+                res.setHeader('Cache-Control', 'no-store')
+                if (p !== filePath) {
+                  console.info('avatar:canonical:update', { from: filePath, to: p })
+                  await supaPatch('avatars', `?user_id=eq.${encodeURIComponent(String(userId))}&is_profile_pic=eq.true`, { file_path: p })
+                }
+                return res.end(buf)
+              }
+            } catch (e) { console.error('avatar:fetch:error', { message: (e as Error)?.message }) }
+          }
         }
       }
     }
