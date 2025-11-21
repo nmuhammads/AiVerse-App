@@ -112,7 +112,7 @@ export async function getAvatar(req: Request, res: Response) {
         }
       }
     }
-    // Fallback: fetch from Telegram and upload to Supabase
+    // Fallback: fetch from Telegram and return without uploading to Supabase
     if (!TOKEN) return res.status(404).json({ error: 'avatar not found' });
     console.info('avatar:telegram:fetch', { userId });
     const photosResp = await fetch(`https://api.telegram.org/bot${TOKEN}/getUserProfilePhotos?user_id=${encodeURIComponent(userId)}&limit=1`);
@@ -129,23 +129,10 @@ export async function getAvatar(req: Request, res: Response) {
     const imgResp = await fetch(downloadUrl);
     if (!imgResp.ok) return res.status(404).json({ error: 'download failed' });
     const buf = Buffer.from(await imgResp.arrayBuffer());
-    // Upload to Supabase bucket 'photo_reference'
-    const supaPath = `${userId}/profile.jpg`;
-    const up = await supaStorageUpload(supaPath, buf, 'image/jpeg');
-    if (!up.ok) return res.status(500).json({ error: 'upload to storage failed', detail: up.data });
-    // Update or insert avatars table
-    const existing = await supaSelect('avatars', `?user_id=eq.${encodeURIComponent(userId)}&is_profile_pic=eq.true&select=id&limit=1`);
-    const existingId = Array.isArray(existing.data) && existing.data[0]?.id ? Number(existing.data[0].id) : null;
-    if (existingId) {
-      const upd = await supaPatch('avatars', `?id=eq.${existingId}`, { file_path: supaPath, is_profile_pic: true });
-      if (!upd.ok) return res.status(500).json({ error: 'record update failed', detail: upd.data });
-    } else {
-      const ins = await supaPost('avatars', { user_id: Number(userId), file_path: supaPath, display_name: null, is_profile_pic: true });
-      if (!ins.ok) return res.status(500).json({ error: 'record insert failed', detail: ins.data });
-    }
-    // Return the image
+    // Return the image directly from Telegram
     res.setHeader('Content-Type', 'image/jpeg');
-    console.info('avatar:telegram:return', { saved: true });
+    res.setHeader('Cache-Control', 'no-store');
+    console.info('avatar:telegram:return', { saved: false });
     return res.end(buf);
   } catch (e) {
     console.error('avatar:get:error', { message: (e as Error)?.message })
