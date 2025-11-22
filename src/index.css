@@ -14,180 +14,182 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   background-color: #000;
 }
 
-body { margin: 0; }
-
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-@keyframes spin-slow { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-.animate-spin-slow { animation: spin-slow 8s linear infinite }
-
-/* Определяем переменную для угла, чтобы её можно было анимировать */
-@property --angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
+body {
+  margin: 0;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg)
+  }
+
+  to {
+    transform: rotate(360deg)
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite
+}
+
+/* Prompt Input Animation - Rotating Snake Border */
 .prompt-container {
-    position: relative;
-    width: 100%;
-    /* Отступ, чтобы свечение не обрезалось краями экрана на мобильных */
-    margin: 20px 0; 
+  position: relative;
+  border-radius: 18px;
+  background: #1a1a1d;
+  padding: 2px;
+  overflow: hidden;
+  z-index: 0;
 }
 
-.input-wrapper {
-    position: relative;
-    border-radius: 16px;
-    border: 3px solid transparent;
-    background:
-      conic-gradient(
-        from var(--angle),
-        transparent 0%,
-        transparent 30%,
-        rgba(255,0,0,0) 35%,
-        #ff0000 50%,
-        #ffff00 60%,
-        #00ff00 70%,
-        #00ffff 80%,
-        #0000ff 90%,
-        #ff00ff 95%,
-        #ff0000 100%
-      ) border-box,
-      linear-gradient(#1a1a1a, #1a1a1a) padding-box;
-    background-clip: border-box, padding-box;
-    animation: rotate 3s linear infinite;
-    /* z-index нужен, чтобы псевдоэлементы были позади */
-    z-index: 0; 
+.prompt-container::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 500%;
+  height: 500%;
+  background: conic-gradient(transparent 0%,
+      transparent 70%,
+      #ff0000 75%,
+      #ffff00 80%,
+      #00ff00 85%,
+      #00ffff 90%,
+      #0000ff 95%,
+      #ff00ff 100%);
+  animation: rotate-border 4s linear infinite;
+  z-index: -1;
 }
 
-/* Слой 1: Четкая граница (Змея) */
-.input-wrapper::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 3px;
-    border-radius: 16px;
-    z-index: -1;
-    background: conic-gradient(
-        from var(--angle),
-        transparent 0%,
-        transparent 30%,
-        rgba(255,0,0,0) 35%,
-        #ff0000 50%,
-        #ffff00 60%,
-        #00ff00 70%,
-        #00ffff 80%,
-        #0000ff 90%,
-        #ff00ff 95%,
-        #ff0000 100%
-    );
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    animation: rotate 3s linear infinite;
-    pointer-events: none;
+.prompt-container::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: #1a1a1d;
+  border-radius: 16px;
+  z-index: -1;
 }
 
-/* Слой 2: Размытое свечение */
-.input-wrapper::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 3px;
-    border-radius: 16px;
-    z-index: -2;
-    background: conic-gradient(
-        from var(--angle),
-        transparent 0%,
-        transparent 30%,
-        rgba(255,0,0,0) 35%,
-        #ff0000 50%,
-        #ffff00 60%,
-        #00ff00 70%,
-        #00ffff 80%,
-        #0000ff 90%,
-        #ff00ff 95%,
-        #ff0000 100%
-    );
-    filter: blur(16px);
-    opacity: 0.7;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    animation: rotate 3s linear infinite;
-    will-change: transform, filter;
-    transform: translate3d(0,0,0);
-    backface-visibility: hidden;
-    pointer-events: none;
+@keyframes rotate-border {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
-@keyframes rotate {
-    0% { --angle: 0deg; }
-    100% { --angle: 360deg; }
-}
-
-/* Поле ввода */
 .prompt-input {
-    width: 100%;
-    background: #1a1a1d; /* Цвет фона внутри рамки */
-    border: none;
-    border-radius: 16px; /* Совпадает с wrapper */
-    padding: 20px 24px;
-    font-size: 16px;
-    color: #ffffff;
-    outline: none;
-    resize: none;
-    min-height: 100px;
-    font-family: inherit;
-    line-height: 1.6;
-    display: block; /* Убираем отступы строчных элементов */
+  width: 100%;
+  background: transparent;
+  /* Transparent to show container::after bg */
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+  font-size: 16px;
+  color: white;
+  outline: none;
+  resize: none;
+  min-height: 120px;
+  display: block;
+  position: relative;
+  z-index: 1;
 }
 
-.prompt-input::placeholder {
-    color: #5c5c63;
+/* Remove old input-wrapper styles */
+.input-wrapper {
+  all: unset;
+  display: block;
+  width: 100%;
 }
 
-.min-h-dvh { min-height: 100dvh; min-height: 100svh; }
-.safe-top { padding-top: var(--safe-area-top, env(safe-area-inset-top)); }
-.safe-bottom-padding { padding-bottom: var(--safe-area-bottom, env(safe-area-inset-bottom)); }
-.safe-bottom-fixed { bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 1rem); }
-.sticky-safe-top { top: calc(var(--safe-area-top, env(safe-area-inset-top)) + var(--tma-offset, 56px)); }
-.safe-bottom-tabbar { padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom)) + 6rem); }
-
-.input-wrapper::before { content: none !important; }
-
+.input-wrapper::before,
 .input-wrapper::after {
-  content: '' !important;
-  position: absolute !important;
-  inset: -6px !important;
-  border-radius: 20px !important;
-  z-index: -1 !important;
-  background: conic-gradient(
-      from var(--angle),
-      transparent 0%,
-      transparent 30%,
-      rgba(255,0,0,0) 35%,
-      #ff0000 50%,
-      #ffff00 60%,
-      #00ff00 70%,
-      #00ffff 80%,
-      #0000ff 90%,
-      #ff00ff 95%,
-      #ff0000 100%
-  ) !important;
-  filter: blur(16px) !important;
-  opacity: 0.7 !important;
-  animation: rotate 3s linear infinite !important;
-  will-change: transform, filter !important;
-  transform: translate3d(0,0,0) !important;
-  backface-visibility: hidden !important;
-  pointer-events: none !important;
+  display: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-1rem);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation-duration: 0.3s;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.slide-in-from-top-4 {
+  animation-name: slideInFromTop;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slideInFromBottom;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Safe Area Utilities */
+.safe-bottom-fixed {
+  bottom: 1.5rem;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-bottom-tabbar {
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
 }

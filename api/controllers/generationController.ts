@@ -20,6 +20,7 @@ const MODEL_CONFIGS = {
   flux: { kind: 'flux-kontext' as const, model: 'flux-kontext-pro' },
   seedream4: { kind: 'jobs' as const, model: 'bytedance/seedream-v4-text-to-image' },
   nanobanana: { kind: 'jobs' as const, model: 'google/nano-banana-edit' },
+  'nanobanana-pro': { kind: 'jobs' as const, model: 'nano-banana-pro' },
   'qwen-edit': { kind: 'jobs' as const, model: 'qwen/text-or-image' },
 }
 
@@ -222,24 +223,46 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
   }
 }
 
+// Типы для запросов к Kie.ai
+interface KieAIRequest {
+  model: string
+  prompt: string
+  aspect_ratio?: string
+  images?: string[] // Changed from image?: string to images?: string[]
+  negative_prompt?: string
+}
+
+interface KieAIResponse {
+  images?: string[]
+  error?: string
+}
+
 // Функция для генерации изображения через Kie.ai
 async function generateImageWithKieAI(
   apiKey: string,
   requestData: KieAIRequest
 ): Promise<KieAIResponse> {
   try {
-    const { model, prompt, aspect_ratio, image } = requestData
+    const { model, prompt, aspect_ratio, images, negative_prompt } = requestData
     const cfg = MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]
 
-    const hasImage = Boolean(image)
-    let imageUrl: string | undefined
-    if (hasImage && typeof image === 'string') {
-      const saved = saveBase64Image(image)
-      imageUrl = saved.publicUrl
+    const hasImages = images && images.length > 0
+    let imageUrls: string[] = []
+
+    if (hasImages) {
+      // Save all images
+      imageUrls = images!.map(img => {
+        if (typeof img === 'string') {
+          const saved = saveBase64Image(img)
+          return saved.publicUrl
+        }
+        return ''
+      }).filter(Boolean)
     }
 
     if (cfg.kind === 'flux-kontext') {
-      const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrl)
+      // Flux supports single image
+      const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrls[0])
       const url = await pollFluxTask(apiKey, taskId)
       return { images: [url] }
     }
@@ -249,8 +272,9 @@ async function generateImageWithKieAI(
       const input: Record<string, unknown> = { prompt }
       if (image_size) input.image_size = image_size
       input.image_resolution = '2K'
-      if (hasImage && imageUrl) {
-        const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-edit', { ...input, image_urls: [imageUrl] })
+      if (imageUrls.length > 0) {
+        // Seedream supports multiple images
+        const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-edit', { ...input, image_urls: imageUrls })
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url] }
       } else {
@@ -260,37 +284,73 @@ async function generateImageWithKieAI(
       }
     }
 
-    if (model === 'nanobanana') {
-      const image_size = mapNanoBananaImageSize(aspect_ratio)
-      if (imageUrl) {
-        const input: Record<string, unknown> = {
-          prompt,
-          image_urls: [imageUrl],
-          output_format: 'png',
-          image_size
+    if (model === 'nanobanana' || model === 'nanobanana-pro') {
+      const isPro = model === 'nanobanana-pro'
+      const modelId = isPro ? 'nano-banana-pro' : (imageUrls.length > 0 ? 'google/nano-banana-edit' : 'google/nano-banana')
+
+      const resolution = isPro ? '4K' : undefined
+
+      let image_size: string | undefined
+      if (aspect_ratio !== 'Auto') {
+        image_size = mapNanoBananaImageSize(aspect_ratio)
+      }
+
+      const input: Record<string, unknown> = {
+        prompt,
+        output_format: 'png'
+      }
+
+      if (imageUrls.length > 0) {
+        input.image_urls = imageUrls
+      }
+
+      if (image_size) input.image_size = image_size
+      if (aspect_ratio && aspect_ratio !== 'Auto') input.aspect_ratio = aspect_ratio
+
+      if (isPro) {
+        if (aspect_ratio && aspect_ratio !== 'Auto') {
+          input.aspect_ratio = aspect_ratio
+          delete input.image_size
         }
-        const taskId = await createJobsTask(apiKey, 'google/nano-banana-edit', input)
+        if (resolution) input.resolution = resolution
+
+        const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url] }
       } else {
-        const input: Record<string, unknown> = { prompt, output_format: 'png' }
         if (image_size) input.image_size = image_size
-        const taskId = await createJobsTask(apiKey, 'google/nano-banana', input)
+        const taskId = await createJobsTask(apiKey, modelId, input)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url] }
       }
     }
 
     if (model === 'qwen-edit') {
-      if (imageUrl) {
-        const input: Record<string, unknown> = { prompt, image_url: imageUrl, strength: 0.8, output_format: 'png', acceleration: 'none' }
+      if (imageUrls.length > 0) {
+        // Qwen Edit supports single image
+        const input: Record<string, unknown> = {
+          prompt,
+          image_url: imageUrls[0],
+          strength: 0.8,
+          output_format: 'png',
+          acceleration: 'none',
+          enable_safety_checker: false
+        }
+        if (negative_prompt) input.negative_prompt = negative_prompt
+
         const taskId = await createJobsTask(apiKey, 'qwen/image-to-image', input)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url] }
       } else {
         const image_size = mapQwenImageSize(aspect_ratio)
-        const input: Record<string, unknown> = { prompt, output_format: 'png', enable_safety_checker: true }
+        const input: Record<string, unknown> = {
+          prompt,
+          output_format: 'png',
+          enable_safety_checker: false
+        }
+        if (negative_prompt) input.negative_prompt = negative_prompt
         if (image_size) input.image_size = image_size
+
         const taskId = await createJobsTask(apiKey, 'qwen/text-to-image', input)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url] }
@@ -307,37 +367,36 @@ async function generateImageWithKieAI(
 // Основной контроллер для обработки запросов генерации
 export async function handleGenerateImage(req: Request, res: Response) {
   try {
-    const { prompt, model, aspect_ratio, image, user_id } = req.body
+    const { prompt, model, aspect_ratio, images, negative_prompt, user_id } = req.body
 
     // Валидация входных данных
     if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ 
-        error: 'Prompt is required and must be a string' 
+      return res.status(400).json({
+        error: 'Prompt is required and must be a string'
       })
     }
 
     if (!model || !MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]) {
-      return res.status(400).json({ 
-        error: 'Valid model is required. Available models: flux, seedream4, nanobanana, qwen-edit' 
+      return res.status(400).json({
+        error: 'Valid model is required. Available models: flux, seedream4, nanobanana, qwen-edit'
       })
     }
 
     // Проверка API ключа
     const apiKey = process.env.KIE_API_KEY
     if (!apiKey) {
-      return res.status(500).json({ 
-        error: 'KIE_API_KEY is not configured' 
+      return res.status(500).json({
+        error: 'KIE_API_KEY is not configured'
       })
     }
-
-    
 
     // Вызов Kie.ai API
     const result = await generateImageWithKieAI(apiKey, {
       model,
       prompt,
       aspect_ratio,
-      image
+      images,
+      negative_prompt
     })
 
     if (result.error) {
@@ -347,23 +406,23 @@ export async function handleGenerateImage(req: Request, res: Response) {
     if (result.images && result.images.length > 0) {
       const imageUrl = result.images[0]
       if (user_id && Number(user_id)) {
-        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model).catch(() => {})
+        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model).catch(() => { })
       }
-      return res.json({ 
+      return res.json({
         image: imageUrl,
         prompt: prompt,
         model: model
       })
     } else {
-      return res.status(500).json({ 
-        error: 'No images generated' 
+      return res.status(500).json({
+        error: 'No images generated'
       })
     }
 
   } catch (error) {
     console.error('Generation error:', error)
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Internal server error'
     })
   }
 }

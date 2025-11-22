@@ -1,16 +1,18 @@
 import { create } from 'zustand'
 
-export type ModelType = 'flux' | 'seedream4' | 'nanobanana' | 'qwen-edit'
+export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'qwen-edit'
 
-export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21'
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto'
 
 export interface GenerationState {
   // Текущая выбранная модель
   selectedModel: ModelType
   // Промпт для генерации
   prompt: string
-  // Загруженное изображение (для Qwen Edit)
-  uploadedImage: string | null
+  // Негативный промпт (для Qwen)
+  negativePrompt: string
+  // Загруженные изображения
+  uploadedImages: string[]
   // Соотношение сторон
   aspectRatio: AspectRatio
   // Режим генерации
@@ -30,8 +32,14 @@ export interface GenerationActions {
   setSelectedModel: (model: ModelType) => void
   // Установить промпт
   setPrompt: (prompt: string) => void
-  // Установить загруженное изображение
-  setUploadedImage: (image: string | null) => void
+  // Установить негативный промпт
+  setNegativePrompt: (prompt: string) => void
+  // Установить загруженные изображения
+  setUploadedImages: (images: string[]) => void
+  // Добавить изображение
+  addUploadedImage: (image: string) => void
+  // Удалить изображение по индексу
+  removeUploadedImage: (index: number) => void
   // Установить соотношение сторон
   setAspectRatio: (ratio: AspectRatio) => void
   // Установить режим генерации
@@ -49,10 +57,11 @@ export interface GenerationActions {
 }
 
 const initialState: GenerationState = {
-  selectedModel: 'flux',
+  selectedModel: 'nanobanana-pro',
   prompt: '',
-  uploadedImage: null,
-  aspectRatio: '1:1',
+  negativePrompt: '',
+  uploadedImages: [],
+  aspectRatio: 'Auto',
   generationMode: 'text',
   generatedImage: null,
   isGenerating: false,
@@ -63,20 +72,24 @@ const initialState: GenerationState = {
 export const useGenerationStore = create<GenerationState & GenerationActions>()(
   (set) => ({
     ...initialState,
-    
+
     setSelectedModel: (model) => set({ selectedModel: model }),
     setPrompt: (prompt) => set({ prompt }),
-    setUploadedImage: (image) => set({ uploadedImage: image }),
+    setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
+    setUploadedImages: (images) => set({ uploadedImages: images }),
+    addUploadedImage: (image) => set((state) => ({ uploadedImages: [...state.uploadedImages, image] })),
+    removeUploadedImage: (index) => set((state) => ({ uploadedImages: state.uploadedImages.filter((_, i) => i !== index) })),
     setAspectRatio: (ratio) => set({ aspectRatio: ratio }),
     setGenerationMode: (mode) => set({ generationMode: mode }),
     setGeneratedImage: (image) => set({ generatedImage: image }),
     setIsGenerating: (isGenerating) => set({ isGenerating }),
     setError: (error) => set({ error }),
     setCurrentScreen: (screen) => set({ currentScreen: screen }),
-    
+
     reset: () => set({
       prompt: '',
-      uploadedImage: null,
+      negativePrompt: '',
+      uploadedImages: [],
       generationMode: 'text',
       generatedImage: null,
       isGenerating: false,
