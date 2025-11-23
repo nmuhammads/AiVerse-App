@@ -1,4 +1,5 @@
 import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon } from 'lucide-react'
+import { PaymentModal } from '@/components/PaymentModal'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -16,6 +17,7 @@ export default function Profile() {
   const [total, setTotal] = useState<number | undefined>(undefined)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name}`
     : (user?.first_name || user?.username || 'Гость')
@@ -76,7 +78,7 @@ export default function Profile() {
                   }
                   reader.readAsDataURL(f)
                 }} />
-                <button onClick={() => impact('light')} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/20"><Wallet size={12} /> Пополнить баланс</button>
+                <button onClick={() => { impact('light'); setIsPaymentModalOpen(true) }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/20"><Wallet size={12} /> Пополнить баланс</button>
                 <button className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-white/5"><Share2 size={12} /> Поделиться</button>
               </div>
             </div>
@@ -160,6 +162,7 @@ export default function Profile() {
           )}
         </div>
       </div>
+      <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
     </div>
   )
 }

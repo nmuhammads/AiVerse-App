@@ -5,6 +5,7 @@ import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X }
 import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
+import { PaymentModal } from '@/components/PaymentModal'
 
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
   { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/nanobanana.png' },
@@ -82,6 +83,7 @@ export default function Studio() {
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
 
   // Default ratio logic
   useEffect(() => {
@@ -380,16 +382,31 @@ export default function Studio() {
               <p className="text-zinc-400 text-center text-sm mb-6">
                 У вас закончились токены для генерации. Пополните баланс, чтобы продолжить создавать шедевры!
               </p>
-              <Button
-                onClick={() => { setShowBalancePopup(false); impact('medium'); }}
-                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold hover:opacity-90"
-              >
-                Купить токены
-              </Button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowBalancePopup(false)}
+                  className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => {
+                    impact('medium')
+                    setShowBalancePopup(false)
+                    setIsPaymentModalOpen(true)
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-bold shadow-lg shadow-violet-900/20"
+                >
+                  Купить токены
+                </button>
+              </div>
             </div>
           </div>
-        )
-      }
+        )}
+
+      <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
     </div>
   )
 }
+
+
