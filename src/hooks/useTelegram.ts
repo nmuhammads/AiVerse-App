@@ -42,11 +42,11 @@ export function useTelegram() {
     wa.onEvent('safeAreaChanged', applySafe)
     wa.onEvent('contentSafeAreaChanged', applySafe)
     try { wa.onEvent('fileDownloadRequested', (d) => { console.info('fileDownloadRequested', d) }) } catch { /* noop */ }
-    
+
     // Установка цветовой схемы
     WebApp.setHeaderColor('#1a1a1a')
     WebApp.setBackgroundColor('#1a1a1a')
-    
+
     WebApp.MainButton.hide()
     WebApp.MainButton.setText('Generate')
     WebApp.MainButton.color = '#8B5CF6'
@@ -54,10 +54,10 @@ export function useTelegram() {
     try {
       const uid = (WebApp as unknown as { initDataUnsafe?: { user?: { id?: number } } }).initDataUnsafe?.user?.id
       if (uid) {
-        fetch('/api/user/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) }).catch(() => {})
+        fetch('/api/user/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) }).catch(() => { })
       }
     } catch { /* noop */ }
-    
+
     return () => {
       wa.offEvent('activated', ensureExpand)
       wa.offEvent('viewportChanged', ensureExpand)
@@ -76,7 +76,7 @@ export function useTelegram() {
   const hideMainButton = () => {
     WebApp.MainButton.hide()
     // Очищаем все обработчики клика
-    WebApp.MainButton.offClick(() => {})
+    WebApp.MainButton.offClick(() => { })
   }
 
   const showProgress = (text: string = 'Generating...') => {
@@ -95,63 +95,22 @@ export function useTelegram() {
   }
 
   const saveToGallery = async (url: string, filename?: string) => {
-    const wa = WebApp as unknown as { downloadFile?: (u: string, name?: string) => Promise<void> | void; HapticFeedback?: { impactOccurred?: (s: string) => void; notificationOccurred?: (s: string) => void }; showAlert?: (t: string) => void; platform?: string; version?: string }
-    const extFromUrl = /\.png(\?|$)/i.test(url) ? 'png' : (/\.webp(\?|$)/i.test(url) ? 'webp' : 'jpg')
-    const sanitizeName = (s: string, fallbackExt: string) => {
-      const baseRaw = s.split('.')[0] || ''
-      const base = baseRaw.replace(/[^A-Za-z0-9_]/g, '_') || 'aiverse_image'
-      const extRaw = (s.split('.').pop() || fallbackExt).replace(/[^A-Za-z0-9]/g, '') || fallbackExt
-      const ext = /^(png|jpg|jpeg|webp)$/i.test(extRaw) ? (extRaw.toLowerCase() === 'jpeg' ? 'jpg' : extRaw.toLowerCase()) : fallbackExt
-      let nm = `${base}.${ext}`
-      if (nm.length > 64) nm = nm.slice(0, 64)
-      nm = nm.replace(/^\.+/, '').replace(/\.+$/, '')
-      return nm || `aiverse_image.${fallbackExt}`
-    }
-    let name = sanitizeName(filename || `aiverse_image.${extFromUrl}`, extFromUrl)
+    const wa = WebApp as any
     if (!wa.downloadFile) {
-      WebApp.showAlert?.('Обновите Telegram до последней версии')
+      wa.showAlert?.('Обновите Telegram до последней версии')
       return
     }
+
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : ''
-      const proxyPathInitial = `/api/telegram/download?url=${encodeURIComponent(url)}`
-      const proxyUrlInitial = origin ? `${origin}${proxyPathInitial}` : proxyPathInitial
-      let ct = ''
-      let clen = ''
-      let headOk = false
-      try {
-        const headResp = await fetch(proxyUrlInitial, { method: 'HEAD' })
-        headOk = headResp.ok
-        ct = String(headResp.headers.get('Content-Type') || '')
-        clen = String(headResp.headers.get('Content-Length') || '')
-        const fileExt = ct.includes('png') ? 'png' : (ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : (ct.includes('webp') ? 'webp' : extFromUrl))
-        name = sanitizeName(filename || `aiverse_image.${fileExt}`, fileExt)
-      } catch { void 0 }
-      const proxyPath = `/api/telegram/download?url=${encodeURIComponent(url)}`
-      const proxyUrl = origin ? `${origin}${proxyPath}` : proxyPath
-      try {
-        await fetch('/api/telegram/log/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: 'start', platform: wa.platform, version: wa.version, hasDownloadFile: true, name, rawUrl: url, proxyUrl, head: { ok: headOk, ct, clen } }) })
-      } catch { void 0 }
+      // Используем нативный метод скачивания
+      // Telegram сам обработает сохранение в галерею
       wa.HapticFeedback?.impactOccurred?.('medium')
-      try {
-        await wa.downloadFile(proxyUrl)
-      } catch (e1) {
-        const msg = (e1 as Error)?.message || ''
-        try {
-          await fetch('/api/telegram/log/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: 'retry', platform: wa.platform, version: wa.version, hasDownloadFile: true, name, rawUrl: url, proxyUrl, error: msg }) })
-        } catch { void 0 }
-        throw e1
-      }
-      WebApp.HapticFeedback?.notificationOccurred?.('success')
-      try {
-        await fetch('/api/telegram/log/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: 'success', platform: wa.platform, version: wa.version, hasDownloadFile: true, name, rawUrl: url, proxyUrl, head: { ok: headOk, ct, clen } }) })
-      } catch { void 0 }
-    } catch (err) {
-      try {
-        await fetch('/api/telegram/log/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: 'error', platform: wa.platform, version: wa.version, hasDownloadFile: true, name, rawUrl: url, error: (err as Error)?.message }) })
-      } catch { void 0 }
-      WebApp.showAlert?.('Не удалось сохранить фото')
-      WebApp.HapticFeedback?.notificationOccurred?.('error')
+      await wa.downloadFile({ url, file_name: filename || 'image.png' })
+      wa.HapticFeedback?.notificationOccurred?.('success')
+    } catch (e) {
+      console.error('Download failed:', e)
+      wa.showAlert?.('Не удалось сохранить файл. Попробуйте еще раз.')
+      wa.HapticFeedback?.notificationOccurred?.('error')
     }
   }
 
@@ -166,6 +125,22 @@ export function useTelegram() {
     WebApp.openTelegramLink(u)
   }
 
+  const addToHomeScreen = () => {
+    const wa = WebApp as any
+    if (wa.addToHomeScreen) {
+      wa.addToHomeScreen()
+    }
+  }
+
+  const checkHomeScreenStatus = (callback: (status: string) => void) => {
+    const wa = WebApp as any
+    if (wa.checkHomeScreenStatus) {
+      wa.checkHomeScreenStatus(callback)
+    } else {
+      callback('unsupported')
+    }
+  }
+
   return {
     showMainButton,
     hideMainButton,
@@ -176,6 +151,8 @@ export function useTelegram() {
     saveToGallery,
     openLink,
     openBotDeepLink,
+    addToHomeScreen,
+    checkHomeScreenStatus,
     user: WebApp.initDataUnsafe.user,
     platform: WebApp.platform
   }

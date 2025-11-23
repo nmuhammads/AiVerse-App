@@ -23,3 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 .vite
+.agent/rules/answerlanguage.md
+docs/nanobananapro.md
+buildlogs.txt
+deploylogs.txt
+mcp.txt
+SQLSCHEME.md
+docs/File upload API/Base64 File Upload.md
+docs/File upload API/File Stream Upload.md
+docs/File upload API/File Upload API Quickstart.md
+docs/File upload API/URL File Upload.md

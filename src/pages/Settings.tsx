@@ -1,10 +1,25 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Smartphone } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useTelegram } from '@/hooks/useTelegram'
+import { useEffect, useState } from 'react'
 
 export default function Settings() {
     const navigate = useNavigate()
     const { impact } = useHaptics()
+    const { addToHomeScreen, checkHomeScreenStatus } = useTelegram()
+    const [canAddToHome, setCanAddToHome] = useState(false)
+
+    useEffect(() => {
+        checkHomeScreenStatus((status) => {
+            // 'missed' means not installed. 'unknown' means not supported or unknown.
+            // We show it if it's 'missed' or if the API is available (we can't always know status perfectly)
+            // But usually checkHomeScreenStatus returns 'missed', 'installed', or 'unsupported' (from our hook)
+            if (status === 'missed' || status === 'unknown') {
+                setCanAddToHome(true)
+            }
+        })
+    }, [])
 
     const sections = [
         {
@@ -12,6 +27,7 @@ export default function Settings() {
             items: [
                 { icon: Globe, label: 'Язык', value: 'Русский', onClick: () => { } },
                 { icon: Moon, label: 'Тема', value: 'Темная', onClick: () => { } },
+                ...(canAddToHome ? [{ icon: Smartphone, label: 'Добавить на главный экран', onClick: addToHomeScreen }] : [])
             ]
         },
         {
