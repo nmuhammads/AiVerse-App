@@ -1,9 +1,11 @@
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 
 export default function Profile() {
+  const navigate = useNavigate()
   const { impact, notify } = useHaptics()
   const { user, saveToGallery, shareImage } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')

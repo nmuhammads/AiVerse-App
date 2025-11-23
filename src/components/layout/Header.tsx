@@ -6,7 +6,7 @@ import { useTelegram } from '@/hooks/useTelegram'
 export function Header() {
   const { user } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
-  useEffect(() => {}, [])
+  useEffect(() => { }, [])
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name}`
     : (user?.first_name || user?.username || 'Гость')
@@ -28,7 +28,7 @@ export function Header() {
           <Link to="/profile" className="h-8 w-8 rounded-full overflow-hidden ring-2 ring-violet-600 bg-white/10">
             <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" />
           </Link>
-          <button className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></button>
+          <Link to="/settings" className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></Link>
         </div>
         <div className="w-10" />
       </div>

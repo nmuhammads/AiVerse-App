@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X } from 'lucide-react'
@@ -21,10 +21,10 @@ const MODEL_PRICES: Record<ModelType, number> = {
 }
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
-  'nanobanana-pro': ['Auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16', '16:21'],
+  'nanobanana-pro': ['Auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
   seedream4: ['16:9', '4:3', '1:1', '3:4', '9:16'],
   nanobanana: ['Auto', '16:9', '4:3', '1:1', '3:4', '9:16'],
-  'qwen-edit': ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  'qwen-edit': ['square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
 }
 
 const RATIO_EMOJIS: Record<AspectRatio, string> = {
@@ -35,12 +35,26 @@ const RATIO_EMOJIS: Record<AspectRatio, string> = {
   '4:3': '📺',
   '3:4': '📕',
   '21:9': '🎬',
-  '16:21': '📜'
+  '16:21': '📜',
+  'square_hd': '🟧',
+  'portrait_4_3': '📕',
+  'portrait_16_9': '📱',
+  'landscape_4_3': '📺',
+  'landscape_16_9': '🖥️'
+}
+
+const RATIO_DISPLAY_NAMES: Record<string, string> = {
+  'square_hd': '1:1',
+  'portrait_4_3': '3:4',
+  'portrait_16_9': '9:16',
+  'landscape_4_3': '4:3',
+  'landscape_16_9': '16:9',
 }
 
 export default function Studio() {
   const {
     selectedModel,
+
     prompt,
     negativePrompt,
     uploadedImages,
@@ -68,6 +82,17 @@ export default function Studio() {
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
+
+  // Default ratio logic
+  useEffect(() => {
+    if (selectedModel === 'seedream4') {
+      setAspectRatio('3:4')
+    } else if (selectedModel === 'qwen-edit') {
+      setAspectRatio('square_hd')
+    } else if (selectedModel === 'nanobanana-pro' && aspectRatio === '16:21') {
+      setAspectRatio('Auto')
+    }
+  }, [selectedModel, setAspectRatio])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -308,7 +333,7 @@ export default function Studio() {
                   className={`flex-shrink-0 w-14 h-14 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all overflow-hidden ${aspectRatio === r ? 'bg-white text-black border-white shadow-lg shadow-white/10 scale-105' : 'bg-zinc-900/50 text-zinc-500 border-white/5 hover:bg-zinc-800'}`}
                 >
                   <span className="text-lg leading-none">{RATIO_EMOJIS[r]}</span>
-                  <span className={`leading-none ${aspectRatio === r ? 'opacity-100' : 'opacity-60'}`}>{r}</span>
+                  <span className={`leading-none ${aspectRatio === r ? 'opacity-100' : 'opacity-60'}`}>{RATIO_DISPLAY_NAMES[r] || r}</span>
                 </button>
               ))}
             </div>

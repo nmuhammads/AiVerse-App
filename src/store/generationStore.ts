@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'qwen-edit'
 
-export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto'
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto' | 'square_hd' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9'
 
 export interface GenerationState {
   // Текущая выбранная модель

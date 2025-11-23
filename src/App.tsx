@@ -4,6 +4,7 @@ import Home from "@/pages/Home";
 import Studio from "@/pages/Studio";
 import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { useEffect } from "react";
@@ -68,7 +69,7 @@ export default function App() {
           <div className="absolute -top-20 -left-10 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[120px]"></div>
           <div className="absolute -bottom-20 -right-10 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]"></div>
         </div>
-        <div className="pt-[env(safe-area-inset-top)] min-h-screen flex flex-col">
+        <div className="pt-[calc(env(safe-area-inset-top)+20px)] min-h-screen flex flex-col">
           <Header />
           <StartParamRouter />
           <div className="flex-1">
@@ -77,6 +78,7 @@ export default function App() {
               <Route path="/studio" element={<Studio />} />
               <Route path="/top" element={<Leaderboard />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
