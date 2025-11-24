@@ -1,7 +1,14 @@
 import { Request, Response } from 'express'
 import { Telegraf } from 'telegraf'
 
-const bot = new Telegraf(process.env.BOT_TOKEN || '')
+// Lazy initialization or just initialize inside handler to ensure env vars are loaded
+const getBot = () => {
+    const token = process.env.TELEGRAM_BOT_TOKEN
+    if (!token) {
+        throw new Error('TELEGRAM_BOT_TOKEN is not defined')
+    }
+    return new Telegraf(token)
+}
 
 export const createStarsInvoice = async (req: Request, res: Response) => {
     try {
@@ -11,6 +18,7 @@ export const createStarsInvoice = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Missing required fields' })
         }
 
+        const bot = getBot()
         const invoiceLink = await bot.telegram.createInvoiceLink({
             title,
             description,
@@ -21,8 +29,8 @@ export const createStarsInvoice = async (req: Request, res: Response) => {
         })
 
         res.json({ success: true, invoiceLink })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error creating invoice:', error)
-        res.status(500).json({ success: false, error: 'Failed to create invoice' })
+        res.status(500).json({ success: false, error: error.message || 'Failed to create invoice' })
     }
 }

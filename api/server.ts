@@ -1,6 +1,4 @@
-/**
- * local server entry file, for local development
- */
+import 'dotenv/config';
 import app from './app.js';
 
 /**
@@ -10,6 +8,7 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 
 console.log(`Starting server on port ${PORT}...`);
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log('Loaded Env Vars:', Object.keys(process.env).filter(k => !k.startsWith('npm_')));
 
 import { registerBotCommands, setupMenuButton, setupWebhook, logBotInfo } from './controllers/telegramController.js';
 
