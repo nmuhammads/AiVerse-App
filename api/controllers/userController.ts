@@ -74,6 +74,8 @@ export async function getAvatar(req: Request, res: Response) {
     const userId = req.params.userId
     if (!userId) return res.status(400).json({ error: 'userId required' })
     console.info('avatar:get:start', { userId, supa: Boolean(SUPABASE_URL && SUPABASE_KEY) })
+    /*
+    // TEMPORARY: Skip Supabase check to force Telegram avatar
     if (SUPABASE_URL && SUPABASE_KEY) {
       const qp = await supaSelect('avatars', `?user_id=eq.${encodeURIComponent(userId)}&is_profile_pic=eq.true&select=file_path,created_at&order=created_at.desc&limit=1`)
       console.info('avatar:query', { ok: qp.ok, count: Array.isArray(qp.data) ? qp.data.length : null })
@@ -104,6 +106,7 @@ export async function getAvatar(req: Request, res: Response) {
         }
       }
     }
+    */
     // Fallback: fetch from Telegram and return without uploading to Supabase
     if (!TOKEN) return res.status(404).json({ error: 'avatar not found' });
     console.info('avatar:telegram:fetch', { userId });
