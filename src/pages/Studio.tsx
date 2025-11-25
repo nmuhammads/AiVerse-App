@@ -84,6 +84,16 @@ export default function Studio() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [balance, setBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      fetch(`/api/user/info/${user.id}`).then(async r => {
+        const j = await r.json().catch(() => null)
+        if (r.ok && j && typeof j.balance === 'number') setBalance(j.balance)
+      })
+    }
+  }, [user?.id, isPaymentModalOpen]) // Refresh when payment modal closes
 
   // Default ratio logic
   useEffect(() => {
@@ -161,6 +171,9 @@ export default function Studio() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Ошибка генерации')
       setGeneratedImage(data.image)
+      // Update balance after generation
+      if (balance !== null) setBalance(prev => (prev !== null ? prev - MODEL_PRICES[selectedModel] : null))
+
       try {
         const item = { id: Date.now(), url: data.image, prompt, model: MODELS.find(m => m.id === selectedModel)?.name, ratio: aspectRatio, date: new Date().toLocaleDateString() }
         const prev = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
@@ -210,9 +223,13 @@ export default function Studio() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">Studio</h1>
-          <div className="px-2 py-1 rounded-full bg-zinc-900 border border-white/10 text-[10px] font-medium text-zinc-400">
-            v2.2
-          </div>
+          <button
+            onClick={() => { impact('light'); setIsPaymentModalOpen(true) }}
+            className="px-3 py-1.5 rounded-full bg-zinc-900 border border-white/10 flex items-center gap-1.5 active:scale-95 transition-transform"
+          >
+            <Zap size={14} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-xs font-bold text-white">{balance ?? '—'}</span>
+          </button>
         </div>
 
         {/* 1. Compact Model Selector (Grid, no scroll) */}

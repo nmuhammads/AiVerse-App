@@ -126,7 +126,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
             if (link) {
                 if (wa) {
-                    wa.openLink(link)
+                    wa.openTelegramLink(link)
                 } else {
                     window.open(link, '_blank')
                 }

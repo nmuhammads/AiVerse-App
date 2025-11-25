@@ -25,12 +25,41 @@ export default function Profile() {
   const avatarSeed = user?.username || String(user?.id || 'guest')
   const avatarUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`
 
+  const prevBalanceRef = useRef<number | null>(null)
+
+  const fetchBalance = () => {
+    if (user?.id) {
+      fetch(`/api/user/info/${user.id}`).then(async r => {
+        const j = await r.json().catch(() => null);
+        if (r.ok && j && typeof j.balance === 'number') {
+          const newBalance = j.balance
+          const prevBalance = prevBalanceRef.current
+
+          if (prevBalance !== null && newBalance > prevBalance) {
+            impact('heavy')
+            notify('success')
+            // Use Telegram's showAlert if available for native feel, fallback to alert
+            const wa = (window as any).Telegram?.WebApp
+            if (wa && wa.showAlert) {
+              wa.showAlert('Успешное пополнение баланса. Спасибо за покупку!')
+            } else {
+              alert('Успешное пополнение баланса. Спасибо за покупку!')
+            }
+          }
+
+          setBalance(newBalance)
+          prevBalanceRef.current = newBalance
+        }
+      })
+    }
+  }
+
   useEffect(() => {
     const url = user?.id ? `/api/user/avatar/${user.id}` : avatarUrl
     setAvatarSrc(url)
     if (user?.id) {
       fetch(`/api/user/avatar/${user.id}`).then(r => { if (r.ok) setAvatarSrc(`/api/user/avatar/${user.id}`) })
-      fetch(`/api/user/info/${user.id}`).then(async r => { const j = await r.json().catch(() => null); if (r.ok && j && typeof j.balance === 'number') setBalance(j.balance) })
+      fetchBalance()
         ; (async () => {
           setLoading(true)
           try {
@@ -39,6 +68,25 @@ export default function Profile() {
             if (r.ok && j) { setItems(j.items || []); setTotal(j.total) }
           } finally { setLoading(false) }
         })()
+    }
+  }, [user?.id])
+
+  // Refresh balance when modal closes or window gains focus (user returns from payment)
+  useEffect(() => {
+    if (!isPaymentModalOpen) {
+      fetchBalance()
+    }
+  }, [isPaymentModalOpen])
+
+  useEffect(() => {
+    const onFocus = () => fetchBalance()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') fetchBalance()
+    })
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
     }
   }, [user?.id])
 
