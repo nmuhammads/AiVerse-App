@@ -125,7 +125,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             const link = activeMethod === 'card' ? selectedPackage.webLink : selectedPackage.link
 
             if (link) {
-                if (wa) {
+                if (wa && activeMethod === 'sbp') {
                     wa.openTelegramLink(link)
                 } else {
                     window.open(link, '_blank')
@@ -232,7 +232,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 </div>
 
                 {/* Footer Action */}
-                <div className="p-5 pt-0 mt-auto shrink-0">
+                <div className="p-5 pt-0 mt-auto shrink-0 space-y-3">
+                    {activeMethod === 'sbp' && (
+                        <div className="text-[10px] text-zinc-500 text-center">
+                            При оплате через СБП взимается комиссия сервиса
+                        </div>
+                    )}
                     <button
                         onClick={handlePayment}
                         disabled={loading}
