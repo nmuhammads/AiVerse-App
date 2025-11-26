@@ -25,26 +25,70 @@ export default function Home() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [sort, setSort] = useState<'new' | 'popular'>('new')
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
 
-  const fetchFeed = useCallback(async () => {
+  const LIMIT_INITIAL = 6
+  const LIMIT_MORE = 4
+
+  const fetchFeed = useCallback(async (reset = false) => {
     try {
-      setLoading(true)
-      const userIdParam = user?.id ? `?user_id=${user.id}` : ''
-      const res = await fetch(`/api/feed${userIdParam}`)
+      if (reset) {
+        setLoading(true)
+        setOffset(0)
+      } else {
+        setIsFetchingMore(true)
+      }
+
+      const currentOffset = reset ? 0 : offset
+      const limit = reset ? LIMIT_INITIAL : LIMIT_MORE
+      const userIdParam = user?.id ? `&user_id=${user.id}` : ''
+
+      const res = await fetch(`/api/feed?limit=${limit}&offset=${currentOffset}&sort=${sort}${userIdParam}`)
+
       if (res.ok) {
         const data = await res.json()
-        setItems(data.items || [])
+        const newItems = data.items || []
+
+        if (reset) {
+          setItems(newItems)
+        } else {
+          setItems(prev => [...prev, ...newItems])
+        }
+
+        if (newItems.length < limit) {
+          setHasMore(false)
+        } else {
+          setHasMore(true)
+          setOffset(currentOffset + limit)
+        }
       }
     } catch (e) {
       console.error('Failed to fetch feed', e)
     } finally {
       setLoading(false)
+      setIsFetchingMore(false)
     }
-  }, [user?.id])
+  }, [user?.id, sort, offset])
 
   useEffect(() => {
-    fetchFeed()
-  }, [fetchFeed])
+    fetchFeed(true)
+  }, [sort])
+
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        if (!loading && !isFetchingMore && hasMore) {
+          fetchFeed(false)
+        }
+      }
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [loading, isFetchingMore, hasMore, fetchFeed])
 
   const handleLike = async (id: number) => {
     impact('light')
@@ -85,7 +129,21 @@ export default function Home() {
         <div className="flex items-center justify-between mb-4 px-1 h-10">
           {!isSearchOpen ? (
             <>
-              <h2 className="text-2xl font-bold text-white tracking-tight">Популярное</h2>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => { setSort('new'); impact('light') }}
+                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'new' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Новое
+                </button>
+                <div className="w-[1px] h-4 bg-zinc-800"></div>
+                <button
+                  onClick={() => { setSort('popular'); impact('light') }}
+                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'popular' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Популярное
+                </button>
+              </div>
               <button onClick={() => { setIsSearchOpen(true); impact('light') }} className="flex items-center justify-center w-10 h-10 bg-zinc-900 rounded-full text-zinc-400 hover:text-white border border-white/10 transition-all active:scale-95">
                 <Search size={18} />
               </button>
@@ -106,7 +164,7 @@ export default function Home() {
         {loading ? (
           <div className="text-center text-zinc-500 py-10">Загрузка...</div>
         ) : (
-          <div className="flex gap-4 items-start">
+          <div className="flex gap-4 items-start pb-20">
             <div className="flex-1 space-y-4">
               {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
                 <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
@@ -147,6 +205,9 @@ export default function Home() {
             </div>
             {!loading && filteredItems.length === 0 && (
               <div className="col-span-2 text-center text-zinc-500 py-10 w-full">Нет публикаций</div>
+            )}
+            {isFetchingMore && (
+              <div className="col-span-2 text-center text-zinc-500 py-4 w-full">Загрузка еще...</div>
             )}
           </div>
         )}

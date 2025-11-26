@@ -43,6 +43,7 @@ export async function getFeed(req: Request, res: Response) {
     try {
         const limit = Number(req.query.limit || 20)
         const offset = Number(req.query.offset || 0)
+        const sort = String(req.query.sort || 'new') // 'new' | 'popular'
         const currentUserId = req.query.user_id ? Number(req.query.user_id) : null
 
         if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
@@ -50,8 +51,14 @@ export async function getFeed(req: Request, res: Response) {
         // Select generations where is_published is true
         // Embed users to get author info
         // Embed generation_likes to calculate likes count and check if current user liked
-        const select = `select=id,image_url,prompt,created_at,user_id,users(username,first_name,last_name),generation_likes(user_id)`
-        const query = `?is_published=eq.true&order=created_at.desc&limit=${limit}&offset=${offset}&${select}`
+        const select = `select=id,image_url,prompt,created_at,likes_count,user_id,users(username,first_name,last_name),generation_likes(user_id)`
+
+        let order = 'created_at.desc'
+        if (sort === 'popular') {
+            order = 'likes_count.desc,created_at.desc'
+        }
+
+        const query = `?is_published=eq.true&order=${order}&limit=${limit}&offset=${offset}&${select}`
 
         const q = await supaSelect('generations', query)
         if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
@@ -71,13 +78,11 @@ export async function getFeed(req: Request, res: Response) {
                     id: it.user_id,
                     username: author.username || 'User',
                     first_name: author.first_name,
-                    // Avatar URL logic: use DiceBear or custom endpoint if we had it. 
-                    // For now, let's construct a DiceBear URL based on username/id
                     avatar_url: author.username
                         ? `https://api.dicebear.com/9.x/avataaars/svg?seed=${author.username}`
                         : `https://api.dicebear.com/9.x/avataaars/svg?seed=${it.user_id}`
                 },
-                likes_count: likes.length,
+                likes_count: it.likes_count || 0, // Use the column value
                 is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false
             }
         })
