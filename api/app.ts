@@ -16,6 +16,7 @@ import enhanceRoutes from './routes/enhance.js'
 import userRoutes from './routes/user.js'
 import telegramRoutes from './routes/telegram.js'
 import paymentRoutes from './routes/payment.js'
+import feedRoutes from './routes/feed.js'
 
 
 // load env
@@ -38,6 +39,7 @@ app.use('/api/enhance', enhanceRoutes)
 app.use('/api/user', userRoutes)
 app.use('/api/telegram', telegramRoutes)
 app.use('/api/payment', paymentRoutes)
+app.use('/api/feed', feedRoutes)
 
 /**
  * Serve frontend build

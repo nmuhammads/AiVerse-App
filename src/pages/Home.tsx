@@ -1,14 +1,84 @@
-import React, { useState } from 'react'
-import { Search, X, Heart, Eye } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Search, X, Heart } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useTelegram } from '@/hooks/useTelegram'
 
-const mockItems = Array.from({ length: 12 }).map((_, i) => ({ id: i+1, author: `Автор ${i+1}`, likes: Math.floor(Math.random()*100), src: `/favicon.svg` }))
+interface FeedItem {
+  id: number
+  image_url: string
+  prompt: string
+  created_at: string
+  author: {
+    id: number
+    username: string
+    first_name?: string
+    avatar_url: string
+  }
+  likes_count: number
+  is_liked: boolean
+}
 
 export default function Home() {
   const { impact } = useHaptics()
+  const { user } = useTelegram()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [q, setQ] = useState('')
-  const items = mockItems.filter(x => x.author.toLowerCase().includes(q.toLowerCase()))
+  const [items, setItems] = useState<FeedItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchFeed = useCallback(async () => {
+    try {
+      setLoading(true)
+      const userIdParam = user?.id ? `?user_id=${user.id}` : ''
+      const res = await fetch(`/api/feed${userIdParam}`)
+      if (res.ok) {
+        const data = await res.json()
+        setItems(data.items || [])
+      }
+    } catch (e) {
+      console.error('Failed to fetch feed', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchFeed()
+  }, [fetchFeed])
+
+  const handleLike = async (id: number) => {
+    impact('light')
+    if (!user?.id) return
+
+    // Optimistic update
+    setItems(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          is_liked: !item.is_liked,
+          likes_count: item.is_liked ? item.likes_count - 1 : item.likes_count + 1
+        }
+      }
+      return item
+    }))
+
+    try {
+      await fetch('/api/feed/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generationId: id, userId: user.id })
+      })
+    } catch (e) {
+      console.error('Like failed', e)
+      // Revert on error could be added here
+    }
+  }
+
+  const filteredItems = items.filter(x =>
+    x.prompt.toLowerCase().includes(q.toLowerCase()) ||
+    x.author.username.toLowerCase().includes(q.toLowerCase())
+  )
+
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar">
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
@@ -24,7 +94,7 @@ export default function Home() {
             <div className="flex-1 flex items-center gap-2 w-full">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input autoFocus value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Найти промпт..." className="w-full bg-zinc-900 border border-violet-500/50 rounded-full py-2.5 pl-9 pr-4 text-sm text-white focus:outline-none shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all placeholder:text-zinc-600" />
+                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Найти промпт..." className="w-full bg-zinc-900 border border-violet-500/50 rounded-full py-2.5 pl-9 pr-4 text-sm text-white focus:outline-none shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all placeholder:text-zinc-600" />
               </div>
               <button onClick={() => { setIsSearchOpen(false); setQ(''); impact('light') }} className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white rounded-full hover:bg-white/5">
                 <X size={20} />
@@ -32,20 +102,33 @@ export default function Home() {
             </div>
           )}
         </div>
-        <div className="columns-2 gap-4">
-          {items.map(item => (
-            <div key={item.id} className="break-inside-avoid mb-4 rounded-lg overflow-hidden border border-white/10 bg-white/5">
-              <img src={item.src} alt="item" className="w-full h-40 object-cover" loading="lazy" />
-              <div className="p-3 text-white text-sm flex items-center justify-between">
-                <span>{item.author}</span>
-                <div className="flex items-center gap-2 text-zinc-400">
-                  <span className="flex items-center gap-1"><Heart size={12} className="text-rose-500" />{item.likes}</span>
-                  <span className="flex items-center gap-1"><Eye size={12} />{Math.floor(item.likes*3)}</span>
+
+        {loading ? (
+          <div className="text-center text-zinc-500 py-10">Загрузка...</div>
+        ) : (
+          <div className="columns-2 gap-4">
+            {filteredItems.map(item => (
+              <div key={item.id} className="break-inside-avoid mb-4 rounded-lg overflow-hidden border border-white/10 bg-white/5">
+                <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
+                <div className="p-3 text-white text-sm flex items-center justify-between">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
+                    <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
+                    <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
+                      <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
+                      <span className="text-xs">{item.likes_count}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+            {!loading && filteredItems.length === 0 && (
+              <div className="col-span-2 text-center text-zinc-500 py-10">Нет публикаций</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
