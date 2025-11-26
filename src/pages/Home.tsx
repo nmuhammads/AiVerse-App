@@ -106,26 +106,47 @@ export default function Home() {
         {loading ? (
           <div className="text-center text-zinc-500 py-10">Загрузка...</div>
         ) : (
-          <div className="columns-2 gap-4">
-            {filteredItems.map(item => (
-              <div key={item.id} className="break-inside-avoid mb-4 rounded-lg overflow-hidden border border-white/10 bg-white/5">
-                <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
-                <div className="p-3 text-white text-sm flex items-center justify-between">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
-                    <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
-                    <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
-                      <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
-                      <span className="text-xs">{item.likes_count}</span>
-                    </button>
+          <div className="flex gap-4 items-start">
+            <div className="flex-1 space-y-4">
+              {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
+                <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
+                  <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
+                  <div className="p-3 text-white text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
+                      <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
+                      <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
+                        <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
+                        <span className="text-xs">{item.likes_count}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="flex-1 space-y-4">
+              {filteredItems.filter((_, i) => i % 2 !== 0).map(item => (
+                <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
+                  <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
+                  <div className="p-3 text-white text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
+                      <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
+                      <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
+                        <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
+                        <span className="text-xs">{item.likes_count}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
             {!loading && filteredItems.length === 0 && (
-              <div className="col-span-2 text-center text-zinc-500 py-10">Нет публикаций</div>
+              <div className="col-span-2 text-center text-zinc-500 py-10 w-full">Нет публикаций</div>
             )}
           </div>
         )}
