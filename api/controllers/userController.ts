@@ -265,19 +265,37 @@ export async function listGenerations(req: Request, res: Response) {
     const offset = Number(req.query.offset || 0)
     if (!userId) return res.status(400).json({ error: 'user_id required' })
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
-    const q = await supaSelect('generations', `?user_id=eq.${encodeURIComponent(userId)}&image_url=ilike.http%25&select=id,image_url,prompt,created_at&order=created_at.desc&limit=${limit}&offset=${offset}`)
+    const q = await supaSelect('generations', `?user_id=eq.${encodeURIComponent(userId)}&image_url=ilike.http%25&select=id,image_url,prompt,created_at,is_published&order=created_at.desc&limit=${limit}&offset=${offset}`)
     if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
-    const itemsRaw = Array.isArray(q.data) ? q.data : [] as Array<{ id: number; image_url?: string | null; prompt?: string; created_at?: string | null }>
+    const itemsRaw = Array.isArray(q.data) ? q.data : [] as Array<{ id: number; image_url?: string | null; prompt?: string; created_at?: string | null; is_published?: boolean }>
     const items = itemsRaw.map((it) => ({
       id: it.id,
       prompt: String(it.prompt || ''),
       created_at: it.created_at || null,
       image_url: sanitizeUrl(it.image_url),
+      is_published: !!it.is_published
     }))
     const cr = String(q.headers['content-range'] || '')
     const total = (() => { const m = /\d+-\d+\/(\d+)/.exec(cr); return m ? Number(m[1]) : undefined })()
     return res.json({ items, total })
   } catch {
     return res.status(500).json({ error: 'list generations failed' })
+  }
+}
+
+export async function togglePublish(req: Request, res: Response) {
+  try {
+    const { generationId, isPublished } = req.body
+    if (!generationId) return res.status(400).json({ error: 'generationId required' })
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    const update = await supaPatch('generations', `?id=eq.${generationId}`, { is_published: !!isPublished })
+    if (!update.ok) return res.status(500).json({ error: 'update failed', detail: update.data })
+
+    return res.json({ ok: true, is_published: !!isPublished })
+  } catch (e) {
+    console.error('togglePublish error:', e)
+    return res.status(500).json({ error: 'internal error' })
   }
 }
