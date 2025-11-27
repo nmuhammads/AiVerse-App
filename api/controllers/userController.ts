@@ -164,9 +164,28 @@ export async function syncAvatar(req: Request, res: Response) {
 }
 
 export async function getAvatar(req: Request, res: Response) {
-  // Legacy or fallback if needed, but for now we rely on avatar_url in users table
-  // We can redirect to the public URL if we want, or just return 404 if not found
-  return res.status(404).json({ error: 'use avatar_url from user object' })
+  try {
+    const userId = req.params.userId
+    if (!userId) return res.status(400).json({ error: 'userId required' })
+
+    // Fetch avatar_url from DB
+    const q = await supaSelect('users', `?user_id=eq.${userId}&select=avatar_url`)
+    const row = (q.ok && Array.isArray(q.data)) ? q.data[0] : null
+
+    if (row && row.avatar_url) {
+      // Redirect to the actual storage URL
+      // Add timestamp if not present to avoid caching issues if needed, 
+      // but usually the stored URL might already have it or we rely on browser cache.
+      // For now, just redirect.
+      return res.redirect(row.avatar_url)
+    }
+
+    // If no custom avatar, return 404 or redirect to default
+    return res.status(404).json({ error: 'avatar not found' })
+  } catch (e) {
+    console.error('getAvatar error:', e)
+    return res.status(500).json({ error: 'internal error' })
+  }
 }
 
 export async function uploadAvatar(req: Request, res: Response) {
