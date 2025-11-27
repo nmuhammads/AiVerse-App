@@ -45,7 +45,7 @@ async function supaStorageUpload(pathname: string, buf: Buffer, contentType = 'i
   const r = await fetch(url, {
     method: 'POST',
     headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
-    body: buf
+    body: buf as any
   })
 
   const data = await r.json().catch(() => null)
@@ -117,6 +117,10 @@ export async function syncAvatar(req: Request, res: Response) {
     if (!imgResp.ok) return res.status(500).json({ error: 'failed to download from telegram' })
 
     const buf = Buffer.from(await imgResp.arrayBuffer())
+    if (buf.length < 100) {
+      console.error('[Avatar] File too small from Telegram', buf.length)
+      return res.status(500).json({ error: 'telegram file too small' })
+    }
 
     // 3. Upload to Supabase Storage
     // Use fixed filename to save space (overwrite existing)
@@ -127,9 +131,8 @@ export async function syncAvatar(req: Request, res: Response) {
     if (!upload.ok) return res.status(500).json({ error: 'upload failed', detail: upload.data })
 
     // 4. Get Public URL
-    // Add timestamp to query param to bust cache if needed, but for DB we store clean URL
-    // Actually, better to store clean URL and let frontend handle caching
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uploadPath}`
+    // Add timestamp to force cache busting on client side
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uploadPath}?t=${Date.now()}`
 
     // 5. Update users table
     const update = await supaPatch('users', `?user_id=eq.${userId}`, { avatar_url: publicUrl })
