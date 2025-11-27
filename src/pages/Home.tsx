@@ -40,7 +40,11 @@ const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: bool
   const [isLikeAnimating, setIsLikeAnimating] = useState(false)
 
   const handleLike = async () => {
-    if (!user?.id) return
+    console.log('handleLike called', { userId: user?.id, itemId: item.id })
+    if (!user?.id) {
+      console.warn('User not logged in, cannot like')
+      return
+    }
     impact('light')
 
     // Optimistic update
@@ -51,12 +55,16 @@ const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: bool
     setTimeout(() => setIsLikeAnimating(false), 300)
 
     try {
-      await fetch('/api/user/like', {
+      console.log('Sending like request...')
+      const res = await fetch('/api/feed/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generationId: item.id, userId: user.id })
       })
-    } catch {
+      console.log('Like response:', res.status)
+      if (!res.ok) throw new Error('Failed to like')
+    } catch (e) {
+      console.error('Like error:', e)
       // Revert on error
       setIsLiked(!newLiked)
       setLikesCount(prev => !newLiked ? prev + 1 : prev - 1)
@@ -64,6 +72,7 @@ const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: bool
   }
 
   const modelName = getModelDisplayName(item.model || null)
+  console.log('FeedImage render', { userId: user?.id, itemId: item.id, isLiked })
 
   return (
     <div className="mb-4 break-inside-avoid">
@@ -177,7 +186,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchFeed(true)
-  }, [sort])
+  }, [sort, user?.id])
 
   // Infinite scroll handler
   useEffect(() => {
