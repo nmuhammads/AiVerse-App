@@ -18,6 +18,26 @@ interface FeedItem {
   is_liked: boolean
 }
 
+// Component for smooth image loading
+const FeedImage = ({ src, alt }: { src: string, alt: string }) => {
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  return (
+    <div className="relative w-full bg-zinc-900 aspect-[3/4]">
+      {!isLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-zinc-800" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+        onLoad={() => setIsLoaded(true)}
+      />
+    </div>
+  )
+}
+
 export default function Home() {
   const { impact } = useHaptics()
   const { user } = useTelegram()
@@ -164,50 +184,52 @@ export default function Home() {
         {loading ? (
           <div className="text-center text-zinc-500 py-10">Загрузка...</div>
         ) : (
-          <div className="flex gap-4 items-start pb-20">
-            <div className="flex-1 space-y-4">
-              {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
-                <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
-                  <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
-                  <div className="p-3 text-white text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
-                      <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
-                      <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
-                        <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
-                        <span className="text-xs">{item.likes_count}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex-1 space-y-4">
-              {filteredItems.filter((_, i) => i % 2 !== 0).map(item => (
-                <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
-                  <img src={item.image_url} alt={item.prompt} className="w-full h-auto object-cover min-h-[100px]" loading="lazy" />
-                  <div className="p-3 text-white text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
-                      <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
-                      <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
-                        <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
-                        <span className="text-xs">{item.likes_count}</span>
-                      </button>
+          <div className="pb-20">
+            <div className="flex gap-4 items-start">
+              <div className="flex-1 space-y-4">
+                {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
+                  <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
+                    <FeedImage src={item.image_url} alt={item.prompt} />
+                    <div className="p-3 text-white text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
+                        <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
+                        <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
+                          <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
+                          <span className="text-xs">{item.likes_count}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="flex-1 space-y-4">
+                {filteredItems.filter((_, i) => i % 2 !== 0).map(item => (
+                  <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
+                    <FeedImage src={item.image_url} alt={item.prompt} />
+                    <div className="p-3 text-white text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
+                        <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
+                        <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
+                          <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
+                          <span className="text-xs">{item.likes_count}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             {!loading && filteredItems.length === 0 && (
-              <div className="col-span-2 text-center text-zinc-500 py-10 w-full">Нет публикаций</div>
+              <div className="text-center text-zinc-500 py-10 w-full">Нет публикаций</div>
             )}
             {isFetchingMore && (
-              <div className="col-span-2 text-center text-zinc-500 py-4 w-full">Загрузка еще...</div>
+              <div className="text-center text-zinc-500 py-4 w-full">Загрузка еще...</div>
             )}
           </div>
         )}
