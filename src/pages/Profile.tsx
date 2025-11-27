@@ -308,7 +308,7 @@ export default function Profile() {
               )}
               {isFullScreen && preview && (
                 <div className="fixed inset-0 z-[200] bg-black flex flex-col">
-                  <div className="absolute top-12 right-4 z-50 pt-[env(safe-area-inset-top)]">
+                  <div className="absolute top-0 right-0 z-50 p-4 pt-[calc(3.5rem+env(safe-area-inset-top))]">
                     <button
                       onClick={() => setIsFullScreen(false)}
                       className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
