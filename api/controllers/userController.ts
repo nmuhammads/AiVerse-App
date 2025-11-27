@@ -112,13 +112,16 @@ export async function syncAvatar(req: Request, res: Response) {
     const buf = Buffer.from(await imgResp.arrayBuffer())
 
     // 3. Upload to Supabase Storage
-    const fileName = `${userId}_${Date.now()}.jpg`
+    // Use fixed filename to save space (overwrite existing)
+    const fileName = `profile.jpg`
     const uploadPath = `${userId}/${fileName}`
 
     const upload = await supaStorageUpload(uploadPath, buf, 'image/jpeg')
     if (!upload.ok) return res.status(500).json({ error: 'upload failed', detail: upload.data })
 
     // 4. Get Public URL
+    // Add timestamp to query param to bust cache if needed, but for DB we store clean URL
+    // Actually, better to store clean URL and let frontend handle caching
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uploadPath}`
 
     // 5. Update users table
@@ -152,17 +155,15 @@ export async function uploadAvatar(req: Request, res: Response) {
       const filePath = `${encodeURIComponent(String(userId))}/profile.jpg`
       const up = await supaStorageUpload(filePath, buf, 'image/jpeg')
       if (!up.ok) return res.status(500).json({ error: 'upload to storage failed', detail: up.data })
-      const existing = await supaSelect('avatars', `?user_id=eq.${encodeURIComponent(String(userId))}&is_profile_pic=eq.true&select=id&limit=1`)
-      const existingId = Array.isArray(existing.data) && existing.data[0]?.id ? Number(existing.data[0].id) : null
-      if (existingId) {
-        const upd = await supaPatch('avatars', `?id=eq.${existingId}`, { file_path: filePath, is_profile_pic: true })
-        if (!upd.ok) return res.status(500).json({ error: 'record update failed', detail: upd.data })
-      } else {
-        const ins = await supaPost('avatars', { user_id: Number(userId), file_path: filePath, display_name: null, is_profile_pic: true })
-        if (!ins.ok) return res.status(500).json({ error: 'record insert failed', detail: ins.data })
-      }
-      return res.json({ ok: true, file_path: filePath })
+
+      // Update user avatar_url if not set (or just always update to be safe)
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filePath}`
+      const upd = await supaPatch('users', `?user_id=eq.${userId}`, { avatar_url: publicUrl })
+
+      return res.json({ ok: true, file_path: filePath, avatar_url: publicUrl })
     }
+
+    return res.status(500).json({ error: 'Supabase not configured, local storage removed' });
 
     return res.status(500).json({ error: 'Supabase not configured, local storage removed' });
   } catch {
