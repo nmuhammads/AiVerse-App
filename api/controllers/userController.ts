@@ -39,10 +39,17 @@ async function supaPatch(table: string, filter: string, body: unknown) {
 
 async function supaStorageUpload(pathname: string, buf: Buffer, contentType = 'image/jpeg') {
   const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_BUCKET)}/${pathname}`
-  const ab: ArrayBuffer = new ArrayBuffer(buf.length)
-  new Uint8Array(ab).set(buf)
-  const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' }, body: ab })
+  console.log(`[Avatar] Uploading to ${url}, size: ${buf.length} bytes`)
+
+  // Pass Buffer directly to fetch (Node.js environment)
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
+    body: buf
+  })
+
   const data = await r.json().catch(() => null)
+  console.log(`[Avatar] Upload response: ${r.status}`, data)
   return { ok: r.ok, data }
 }
 
