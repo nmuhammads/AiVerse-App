@@ -16,24 +16,102 @@ interface FeedItem {
   }
   likes_count: number
   is_liked: boolean
+  model?: string | null
 }
 
-// Component for smooth image loading
-const FeedImage = ({ src, alt }: { src: string, alt: string }) => {
-  const [isLoaded, setIsLoaded] = useState(false)
+function getModelDisplayName(model: string | null): string {
+  if (!model) return ''
+  switch (model) {
+    case 'nanobanana': return 'NanoBanana'
+    case 'nanobanana-pro': return 'NanoBanana Pro'
+    case 'seedream4': return 'Seedream 4'
+    case 'qwen-edit': return 'Qwen Edit'
+    case 'flux': return 'Flux'
+    default: return model
+  }
+}
+
+const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: boolean }) => {
+  const [loaded, setLoaded] = useState(false)
+  const { impact } = useHaptics()
+  const { user } = useTelegram()
+  const [isLiked, setIsLiked] = useState(item.is_liked)
+  const [likesCount, setLikesCount] = useState(item.likes_count)
+  const [isLikeAnimating, setIsLikeAnimating] = useState(false)
+
+  const handleLike = async () => {
+    if (!user?.id) return
+    impact('light')
+
+    // Optimistic update
+    const newLiked = !isLiked
+    setIsLiked(newLiked)
+    setLikesCount(prev => newLiked ? prev + 1 : prev - 1)
+    setIsLikeAnimating(true)
+    setTimeout(() => setIsLikeAnimating(false), 300)
+
+    try {
+      await fetch('/api/user/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generationId: item.id, userId: user.id })
+      })
+    } catch {
+      // Revert on error
+      setIsLiked(!newLiked)
+      setLikesCount(prev => !newLiked ? prev + 1 : prev - 1)
+    }
+  }
+
+  const modelName = getModelDisplayName(item.model || null)
 
   return (
-    <div className="relative w-full bg-zinc-900 aspect-[3/4]">
-      {!isLoaded && (
-        <div className="absolute inset-0 animate-pulse bg-zinc-800" />
-      )}
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-cover transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        loading="lazy"
-        onLoad={() => setIsLoaded(true)}
-      />
+    <div className="mb-4 break-inside-avoid">
+      <div className="relative rounded-xl overflow-hidden bg-zinc-900 shadow-sm border border-white/5">
+        <div className="aspect-auto w-full relative">
+          {!loaded && (
+            <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
+          )}
+          <img
+            src={item.image_url}
+            alt={item.prompt}
+            loading={priority ? "eager" : "lazy"}
+            className={`w-full h-auto block transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => setLoaded(true)}
+          />
+          {modelName && (
+            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md border border-white/10 font-medium">
+              {modelName}
+            </div>
+          )}
+        </div>
+
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[10px] font-bold text-white overflow-hidden">
+                {item.author.avatar_url ? (
+                  <img src={item.author.avatar_url} alt={item.author.username} className="w-full h-full object-cover" />
+                ) : (
+                  item.author.username[0].toUpperCase()
+                )}
+              </div>
+              <span className="text-xs font-medium text-zinc-300">{item.author.username}</span>
+            </div>
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
+            >
+              <Heart
+                size={14}
+                className={`transition-transform ${isLikeAnimating ? 'scale-125' : 'scale-100'} ${isLiked ? 'fill-current' : ''}`}
+              />
+              <span className="text-xs font-medium">{likesCount}</span>
+            </button>
+          </div>
+          <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">{item.prompt}</p>
+        </div>
+      </div>
     </div>
   )
 }
@@ -75,7 +153,11 @@ export default function Home() {
         if (reset) {
           setItems(newItems)
         } else {
-          setItems(prev => [...prev, ...newItems])
+          setItems(prev => {
+            const existingIds = new Set(prev.map(i => i.id))
+            const uniqueNewItems = newItems.filter((i: FeedItem) => !existingIds.has(i.id))
+            return [...prev, ...uniqueNewItems]
+          })
         }
 
         if (newItems.length < limit) {
@@ -110,33 +192,7 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [loading, isFetchingMore, hasMore, fetchFeed])
 
-  const handleLike = async (id: number) => {
-    impact('light')
-    if (!user?.id) return
-
-    // Optimistic update
-    setItems(prev => prev.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          is_liked: !item.is_liked,
-          likes_count: item.is_liked ? item.likes_count - 1 : item.likes_count + 1
-        }
-      }
-      return item
-    }))
-
-    try {
-      await fetch('/api/feed/like', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generationId: id, userId: user.id })
-      })
-    } catch (e) {
-      console.error('Like failed', e)
-      // Revert on error could be added here
-    }
-  }
+  // Removed handleLike from Home component as it's now in FeedImage
 
   const filteredItems = items.filter(x =>
     x.prompt.toLowerCase().includes(q.toLowerCase()) ||
@@ -188,40 +244,12 @@ export default function Home() {
             <div className="flex gap-4 items-start">
               <div className="flex-1 space-y-4">
                 {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
-                  <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
-                    <FeedImage src={item.image_url} alt={item.prompt} />
-                    <div className="p-3 text-white text-sm flex items-center justify-between">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
-                        <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
-                        <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
-                          <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
-                          <span className="text-xs">{item.likes_count}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <FeedImage key={item.id} item={item} priority={true} />
                 ))}
               </div>
               <div className="flex-1 space-y-4">
                 {filteredItems.filter((_, i) => i % 2 !== 0).map(item => (
-                  <div key={item.id} className="rounded-lg overflow-hidden border border-white/10 bg-white/5">
-                    <FeedImage src={item.image_url} alt={item.prompt} />
-                    <div className="p-3 text-white text-sm flex items-center justify-between">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <img src={item.author.avatar_url} alt={item.author.username} className="w-5 h-5 rounded-full bg-zinc-800 flex-shrink-0" />
-                        <span className="truncate text-xs text-zinc-300">{item.author.username}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-zinc-400 flex-shrink-0">
-                        <button onClick={() => handleLike(item.id)} className="flex items-center gap-1 hover:text-white transition-colors">
-                          <Heart size={14} className={item.is_liked ? "fill-rose-500 text-rose-500" : ""} />
-                          <span className="text-xs">{item.likes_count}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <FeedImage key={item.id} item={item} priority={true} />
                 ))}
               </div>
             </div>

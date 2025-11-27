@@ -51,7 +51,7 @@ export async function getFeed(req: Request, res: Response) {
         // Select generations where is_published is true
         // Embed users to get author info
         // Embed generation_likes to calculate likes count and check if current user liked
-        const select = `select=id,image_url,prompt,created_at,likes_count,user_id,users(username,first_name,last_name),generation_likes(user_id)`
+        const select = `select=id,image_url,prompt,created_at,likes_count,model,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
 
         let order = 'created_at.desc'
         if (sort === 'popular') {
@@ -78,12 +78,13 @@ export async function getFeed(req: Request, res: Response) {
                     id: it.user_id,
                     username: author.username || 'User',
                     first_name: author.first_name,
-                    avatar_url: author.username
+                    avatar_url: author.avatar_url || (author.username
                         ? `https://api.dicebear.com/9.x/avataaars/svg?seed=${author.username}`
-                        : `https://api.dicebear.com/9.x/avataaars/svg?seed=${it.user_id}`
+                        : `https://api.dicebear.com/9.x/avataaars/svg?seed=${it.user_id}`)
                 },
                 likes_count: it.likes_count || 0, // Use the column value
-                is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false
+                is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false,
+                model: it.model || null
             }
         })
 

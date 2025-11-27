@@ -6,6 +6,18 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
+function getModelDisplayName(model: string | null): string {
+  if (!model) return ''
+  switch (model) {
+    case 'nanobanana': return 'NanoBanana'
+    case 'nanobanana-pro': return 'NanoBanana Pro'
+    case 'seedream4': return 'Seedream 4'
+    case 'qwen-edit': return 'Qwen Edit'
+    case 'flux': return 'Flux'
+    default: return model
+  }
+}
+
 export default function Profile() {
   const navigate = useNavigate()
   const { impact, notify } = useHaptics()
@@ -13,8 +25,8 @@ export default function Profile() {
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
-  const [items, setItems] = useState<{ id: number; image_url: string | null; prompt: string; created_at: string | null; is_published: boolean }[]>([])
-  const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean } | null>(null)
+  const [items, setItems] = useState<{ id: number; image_url: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
+  const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null } | null>(null)
   const [total, setTotal] = useState<number | undefined>(undefined)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -184,10 +196,15 @@ export default function Profile() {
                 <div className="grid grid-cols-2 gap-3">
                   {items.filter(h => !!h.image_url).map((h) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                      <button onClick={() => setPreview({ id: h.id, image_url: h.image_url || '', prompt: h.prompt, is_published: h.is_published })} className="block w-full">
+                      <button onClick={() => setPreview({ id: h.id, image_url: h.image_url || '', prompt: h.prompt, is_published: h.is_published, model: h.model })} className="block w-full">
                         <img src={h.image_url || ''} alt="History" className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105" />
                       </button>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 pointer-events-none"></div>
+                      {h.model && (
+                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md border border-white/10 font-medium z-10 pointer-events-none">
+                          {getModelDisplayName(h.model)}
+                        </div>
+                      )}
                       <div className="absolute bottom-0 left-0 right-0 p-3">
                         <p className="text-[10px] text-zinc-300 truncate font-medium">{h.prompt}</p>
                         {h.is_published && <div className="absolute top-2 right-2 bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-md backdrop-blur-sm border border-emerald-500/20">Public</div>}

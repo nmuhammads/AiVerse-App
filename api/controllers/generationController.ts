@@ -212,7 +212,7 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
   if (!SUPABASE_URL || !SUPABASE_KEY || !userId) return
   const cost = MODEL_PRICES[model] ?? 0
   try {
-    await supaPost('generations', { user_id: userId, image_url: imageUrl, prompt })
+    await supaPost('generations', { user_id: userId, image_url: imageUrl, prompt, model })
     const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
     const curr = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : null
     if (typeof curr === 'number') {
