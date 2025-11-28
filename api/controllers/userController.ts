@@ -233,11 +233,24 @@ export async function getUserInfo(req: Request, res: Response) {
   try {
     const userId = req.params.userId
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
-    const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,updated_at`)
-    if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
-    const row = Array.isArray(q.data) ? q.data[0] : null
+
+    // Parallel fetch: User Info + Likes Count
+    const [userQuery, likesQuery] = await Promise.all([
+      supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,updated_at`),
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_likes_count`, {
+        method: 'POST',
+        headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_user_id: userId })
+      })
+    ])
+
+    if (!userQuery.ok) return res.status(500).json({ error: 'query failed', detail: userQuery.data })
+    const row = Array.isArray(userQuery.data) ? userQuery.data[0] : null
     if (!row) return res.status(404).json({ error: 'user not found' })
-    return res.json(row)
+
+    const likesCount = await likesQuery.json().catch(() => 0)
+
+    return res.json({ ...row, likes_count: typeof likesCount === 'number' ? likesCount : 0 })
   } catch {
     return res.status(500).json({ error: 'user info error' })
   }
@@ -297,6 +310,30 @@ export async function togglePublish(req: Request, res: Response) {
     return res.json({ ok: true, is_published: !!isPublished })
   } catch (e) {
     console.error('togglePublish error:', e)
+    return res.status(500).json({ error: 'internal error' })
+  }
+}
+
+export async function getLeaderboard(req: Request, res: Response) {
+  try {
+    const limit = Number(req.query.limit || 10)
+    const offset = Number(req.query.offset || 0)
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    const url = `${SUPABASE_URL}/rest/v1/rpc/get_monthly_leaderboard`
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit_val: limit, offset_val: offset })
+    })
+
+    const data = await r.json().catch(() => null)
+    if (!r.ok) return res.status(500).json({ error: 'rpc failed', detail: data })
+
+    return res.json({ items: data })
+  } catch (e) {
+    console.error('getLeaderboard error:', e)
     return res.status(500).json({ error: 'internal error' })
   }
 }

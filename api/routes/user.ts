@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish } from '../controllers/userController.js'
+import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard } from '../controllers/userController.js'
 
 const router = Router()
 router.get('/avatar/:userId', getAvatar)
@@ -9,4 +9,5 @@ router.get('/info/:userId', getUserInfo)
 router.post('/subscribe', subscribeBot)
 router.get('/generations', listGenerations)
 router.post('/publish', togglePublish)
+router.get('/leaderboard', getLeaderboard)
 export default router
