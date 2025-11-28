@@ -130,69 +130,92 @@ export default function Profile() {
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
-        <div className="bg-gradient-to-b from-zinc-900 to-black p-5 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-5 text-violet-500"><Sparkles size={140} /></div>
-          <div className="flex items-center gap-5 relative z-10">
-            <div className="relative group">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 p-0.5 flex-shrink-0 shadow-lg">
-                <div className="w-full h-full bg-black rounded-full overflow-hidden">
-                  <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = avatarUrl }} />
+        <div className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl">
+          {/* Background Effects */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center text-center">
+            {/* Avatar */}
+            <div className="relative mb-3 group">
+              <div className="w-20 h-20 rounded-full p-1 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 shadow-xl shadow-violet-500/20">
+                <div className="w-full h-full rounded-full bg-black overflow-hidden relative">
+                  <img
+                    src={avatarSrc || avatarUrl}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = avatarUrl }}
+                  />
+                  <div className="absolute inset-0 bg-black/20 hidden group-hover:flex items-center justify-center transition-all cursor-pointer" onClick={() => fileRef.current?.click()}>
+                    <Edit className="text-white opacity-80" size={20} />
+                  </div>
                 </div>
               </div>
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-300 to-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg tracking-wide uppercase">
+                PRO
+              </div>
+            </div>
+
+            {/* Name & Username */}
+            <h1 className="text-xl font-bold text-white mb-0.5 tracking-tight">{displayName}</h1>
+            <p className="text-zinc-400 font-medium text-sm mb-4">{username}</p>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-2 w-full mb-4">
+              {stats.filter(s => s.label !== 'Баланс').map(s => (
+                <div key={s.label} className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center gap-0.5">
+                  <span className="text-lg font-bold text-white">{s.value}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">{s.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 w-full">
               <button
-                onClick={() => fileRef.current?.click()}
-                className="absolute bottom-0 right-0 w-7 h-7 bg-white text-black rounded-full flex items-center justify-center shadow-lg hover:bg-zinc-200 transition-colors"
+                onClick={() => { impact('light'); setIsPaymentModalOpen(true) }}
+                className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-violet-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
               >
-                <Edit size={14} />
+                <Wallet size={16} />
+                <span>{balance ?? 0}</span>
+                <span className="opacity-70 font-normal text-[10px] ml-0.5">токены</span>
               </button>
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-2xl font-bold text-white">{displayName}</div>
-                  <div className="text-xs text-zinc-400 mt-1 font-medium">{username} • <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 font-bold">PRO</span></div>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const f = e.target.files?.[0]
-                  if (!f || !user?.id) return
+              <button
+                className="w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all"
+                onClick={() => {
+                  // Share logic
+                }}
+              >
+                <Share2 size={18} />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                const f = e.target.files?.[0]
+                if (!f || !user?.id) return
 
-                  // Optimistic update
-                  const reader = new FileReader()
-                  reader.onload = (ev) => {
-                    const base64 = String(ev.target?.result || '')
-                    setAvatarSrc(base64) // Show immediately
+                // Optimistic update
+                const reader = new FileReader()
+                reader.onload = (ev) => {
+                  const base64 = String(ev.target?.result || '')
+                  setAvatarSrc(base64) // Show immediately
 
-                    // Upload
-                    fetch('/api/user/avatar/upload', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ userId: user.id, imageBase64: base64 })
-                    }).then(async (r) => {
-                      if (r.ok) {
-                        impact('medium')
-                        notify('success')
-                      } else {
-                        notify('error')
-                        // Revert if failed (optional, but good UX)
-                      }
-                    })
-                  }
-                  reader.readAsDataURL(f)
-                }} />
-                <button onClick={() => { impact('light'); setIsPaymentModalOpen(true) }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/20"><Wallet size={12} /> Пополнить баланс</button>
-                <button className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-white/5"><Share2 size={12} /> Поделиться</button>
-              </div>
+                  // Upload
+                  fetch('/api/user/avatar/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.id, imageBase64: base64 })
+                  }).then(async (r) => {
+                    if (r.ok) {
+                      impact('medium')
+                      notify('success')
+                    } else {
+                      notify('error')
+                      // Revert if failed (optional, but good UX)
+                    }
+                  })
+                }
+                reader.readAsDataURL(f)
+              }} />
             </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-8 border-t border-white/5 pt-5 relative z-10">
-            {stats.map(s => (
-              <div key={s.label} className="text-center">
-                <div className="text-lg font-bold text-white">{s.value}</div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">{s.label}</div>
-              </div>
-            ))}
           </div>
         </div>
         <div>

@@ -7,8 +7,25 @@ import { useEffect, useState } from 'react'
 export default function Settings() {
     const navigate = useNavigate()
     const { impact } = useHaptics()
-    const { addToHomeScreen, checkHomeScreenStatus } = useTelegram()
+    const { addToHomeScreen, checkHomeScreenStatus, platform, tg } = useTelegram()
     const [canAddToHome, setCanAddToHome] = useState(false)
+
+    const isMobile = platform === 'ios' || platform === 'android'
+
+    useEffect(() => {
+        if (isMobile) {
+            tg.BackButton.show()
+            const handleBack = () => {
+                impact('light')
+                navigate(-1)
+            }
+            tg.BackButton.onClick(handleBack)
+            return () => {
+                tg.BackButton.hide()
+                tg.BackButton.offClick(handleBack)
+            }
+        }
+    }, [isMobile, navigate, tg])
 
     useEffect(() => {
         checkHomeScreenStatus((status) => {
@@ -42,17 +59,26 @@ export default function Settings() {
         }
     ]
 
+    // Custom padding for different platforms
+    const getPaddingTop = () => {
+        if (platform === 'ios') return 'calc(env(safe-area-inset-top) + 10px)'
+        if (platform === 'android') return 'calc(env(safe-area-inset-top) + 30px)'
+        return '50px' // Desktop/Web
+    }
+
     return (
-        <div className="min-h-dvh bg-black text-white pt-[calc(env(safe-area-inset-top)+5px)] pb-10">
+        <div className="min-h-dvh bg-black text-white pb-10" style={{ paddingTop: getPaddingTop() }}>
             {/* Header */}
             <div className="px-4 py-4 flex items-center gap-4 relative">
-                <button
-                    onClick={() => { impact('light'); navigate(-1) }}
-                    className="w-10 h-10 rounded-xl bg-zinc-900/50 border border-white/10 flex items-center justify-center text-white hover:bg-zinc-800 transition-colors"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                <h1 className="text-xl font-bold">Настройки</h1>
+                {!isMobile && (
+                    <button
+                        onClick={() => { impact('light'); navigate(-1) }}
+                        className="w-10 h-10 rounded-xl bg-zinc-900/50 border border-white/10 flex items-center justify-center text-white hover:bg-zinc-800 transition-colors"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                )}
+                <h1 className={`text-xl font-bold ${isMobile ? 'ml-1' : ''}`}>Настройки</h1>
             </div>
 
             {/* Content */}

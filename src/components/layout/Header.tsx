@@ -39,7 +39,7 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [lastScrollY])
 
-  const topOffset = platform === 'ios' ? '2px' : (platform === 'android' ? '30px' : '12px')
+  const topOffset = platform === 'ios' ? '2px' : (platform === 'android' ? '32px' : '12px')
 
   return (
     <div className={`fixed left-0 right-0 z-50 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-[200%]'}`} style={{ top: `calc(env(safe-area-inset-top) + ${topOffset})` }}>
