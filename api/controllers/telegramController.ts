@@ -43,8 +43,9 @@ export async function webhook(req: Request, res: Response) {
         const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url } }]] }
         await tg('sendMessage', { chat_id: chatId, text: 'Открыть мини‑апп', reply_markup: kb })
       } else {
-        const info = 'AI Verse — мини‑приложение генерации изображений ИИ. Используйте /home чтобы открыть.'
-        await tg('sendMessage', { chat_id: chatId, text: info })
+        const info = 'AI Verse — мини‑приложение генерации изображений ИИ.'
+        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
       }
       return res.json({ ok: true })
     }
