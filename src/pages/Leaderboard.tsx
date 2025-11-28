@@ -86,7 +86,7 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 50px)' }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-3">
         <h1 className="text-2xl font-bold text-white mb-6">Топ за {capitalizedMonth}</h1>
 

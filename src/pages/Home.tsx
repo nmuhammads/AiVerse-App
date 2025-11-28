@@ -301,7 +301,7 @@ export default function Home() {
   )
 
   return (
-    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 50px)' }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
         <div className="flex items-center justify-between mb-4 px-1 h-10">
           {!isSearchOpen ? (

@@ -126,7 +126,7 @@ export default function Profile() {
     { label: 'Ремиксы', value: remixCount },
   ]
   return (
-    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+    <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 50px)' }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
         <div className="bg-gradient-to-b from-zinc-900 to-black p-5 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5 text-violet-500"><Sparkles size={140} /></div>

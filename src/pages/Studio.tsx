@@ -298,7 +298,7 @@ export default function Studio() {
   const maxImages = selectedModel === 'qwen-edit' ? 1 : 8
 
   return (
-    <div className="min-h-dvh bg-black pb-32 flex flex-col" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+    <div className="min-h-dvh bg-black pb-32 flex flex-col" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 50px)' }}>
       <div className="mx-auto max-w-3xl w-full px-4 py-4 flex-1 flex flex-col gap-6">
 
         {/* Header */}
@@ -392,7 +392,7 @@ export default function Studio() {
               value={negativePrompt}
               onChange={(e) => setNegativePrompt(e.target.value.slice(0, 500))}
               placeholder="Что исключить (без людей, размыто...)"
-              className="w-full bg-zinc-900/30 border border-red-500/50 rounded-xl p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500 transition-colors min-h-[80px] resize-none"
+              className="w-full bg-zinc-900/30 border border-red-500/50 rounded-xl p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500 transition-colors min-h-[50px] resize-none"
             />
             <div className="text-[10px] text-zinc-600 text-right px-1">{negativePrompt.length}/500</div>
           </div>
