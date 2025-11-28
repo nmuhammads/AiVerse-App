@@ -109,7 +109,6 @@ const FeedImage = ({ item, priority = false, handleRemix }: { item: FeedItem; pr
                   item.author.username[0].toUpperCase()
                 )}
               </div>
-              <span className="text-xs font-medium text-zinc-300">{item.author.username}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -134,6 +133,7 @@ const FeedImage = ({ item, priority = false, handleRemix }: { item: FeedItem; pr
               </button>
             </div>
           </div>
+          <div className="text-xs font-medium text-zinc-300 truncate">{item.author.username}</div>
 
         </div>
       </div>
