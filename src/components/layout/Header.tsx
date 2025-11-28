@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useTelegram } from '@/hooks/useTelegram'
 
 export function Header() {
-  const { user } = useTelegram()
+  const { user, platform } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   useEffect(() => { }, [])
   const displayName = (user?.first_name && user?.last_name)
@@ -39,8 +39,10 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [lastScrollY])
 
+  const topOffset = platform === 'ios' ? '6px' : (platform === 'android' ? '16px' : '12px')
+
   return (
-    <div className={`fixed left-0 right-0 z-50 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-[200%]'}`} style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}>
+    <div className={`fixed left-0 right-0 z-50 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-[200%]'}`} style={{ top: `calc(env(safe-area-inset-top) + ${topOffset})` }}>
       <div className="backdrop-blur-xl bg-black/50 border-b border-white/10 rounded-full mx-2">
         <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between relative">
           <div className="w-10" />
