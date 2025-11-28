@@ -19,18 +19,40 @@ export function Header() {
       fetch(`/api/user/avatar/${user.id}`).then(r => { if (r.ok) setAvatarSrc(`/api/user/avatar/${user.id}`) })
     }
   }, [user?.id])
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY < 10) {
+        setIsVisible(true)
+      } else if (currentScrollY > lastScrollY) {
+        setIsVisible(false) // Scrolling down
+      } else {
+        setIsVisible(true) // Scrolling up
+      }
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScrollY])
+
   return (
-    <div className={'sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/10 safe-top'}>
-      <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between relative">
-        <div className="w-10" />
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          <span className="text-white font-semibold">{displayName}</span>
-          <Link to="/profile" className="h-8 w-8 rounded-full overflow-hidden ring-2 ring-violet-600 bg-white/10">
-            <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" />
-          </Link>
-          <Link to="/settings" className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></Link>
+    <div className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className="backdrop-blur-xl bg-black/50 border-b border-white/10 safe-top">
+        <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between relative">
+          <div className="w-10" />
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+            <span className="text-white font-semibold">{displayName}</span>
+            <Link to="/profile" className="h-8 w-8 rounded-full overflow-hidden ring-2 ring-violet-600 bg-white/10">
+              <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+            </Link>
+            <Link to="/settings" className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></Link>
+          </div>
+          <div className="w-10" />
         </div>
-        <div className="w-10" />
       </div>
     </div>
   )
