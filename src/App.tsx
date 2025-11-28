@@ -5,6 +5,7 @@ import Studio from "@/pages/Studio";
 import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
+import Accumulations from "@/pages/Accumulations";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { useEffect } from "react";
@@ -79,6 +80,7 @@ export default function App() {
               <Route path="/top" element={<Leaderboard />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/accumulations" element={<Accumulations />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

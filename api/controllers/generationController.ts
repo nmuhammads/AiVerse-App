@@ -225,7 +225,8 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
     const genBody: any = { user_id: userId, image_url: imageUrl, prompt: promptWithMeta, model }
     if (parentId) genBody.parent_id = parentId
     if (inputImages && inputImages.length > 0) genBody.input_images = inputImages
-    await supaPost('generations', genBody)
+    const genRes = await supaPost('generations', genBody)
+    const newGenId = (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) ? genRes.data[0].id : null
 
     // 3. Deduct balance
     const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
@@ -236,21 +237,37 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
     }
 
     // 4. Handle Remix Logic
-    if (parentId) {
+    if (parentId && newGenId) {
       // Increment remix_count for parent generation
-      // We need to fetch current count first or use RPC. For simplicity, fetch-update.
       const pGen = await supaSelect('generations', `?id=eq.${parentId}&select=remix_count,user_id`)
       if (pGen.ok && Array.isArray(pGen.data) && pGen.data.length > 0) {
         const parentGen = pGen.data[0]
         const newGenCount = (parentGen.remix_count || 0) + 1
         await supaPatch('generations', `?id=eq.${parentId}`, { remix_count: newGenCount })
 
-        // Increment remix_count for parent author
-        if (parentGen.user_id) {
-          const pUser = await supaSelect('users', `?user_id=eq.${parentGen.user_id}&select=remix_count`)
+        // Increment remix_count for parent author AND give reward
+        if (parentGen.user_id && String(parentGen.user_id) !== String(userId)) { // Don't reward self-remix
+          const pUser = await supaSelect('users', `?user_id=eq.${parentGen.user_id}&select=remix_count,balance`)
           if (pUser.ok && Array.isArray(pUser.data) && pUser.data.length > 0) {
-            const newUserCount = (pUser.data[0].remix_count || 0) + 1
-            await supaPatch('users', `?user_id=eq.${parentGen.user_id}`, { remix_count: newUserCount })
+            const parentUser = pUser.data[0]
+            const newUserCount = (parentUser.remix_count || 0) + 1
+
+            const rewardAmount = model === 'nanobanana-pro' ? 3 : 1
+            const newBalance = (parentUser.balance || 0) + rewardAmount
+
+            // Update user stats
+            await supaPatch('users', `?user_id=eq.${parentGen.user_id}`, {
+              remix_count: newUserCount,
+              balance: newBalance
+            })
+
+            // Record reward transaction
+            await supaPost('remix_rewards', {
+              user_id: parentGen.user_id,
+              source_generation_id: parentId,
+              remix_generation_id: newGenId,
+              amount: rewardAmount
+            })
           }
         }
       }

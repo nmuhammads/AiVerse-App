@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useEffect, useState } from 'react'
@@ -45,9 +45,9 @@ export default function Settings() {
             ]
         },
         {
-            title: 'Уведомления',
+            title: 'Реферальная система',
             items: [
-                { icon: Bell, label: 'Push-уведомления', value: 'Вкл', onClick: () => { } },
+                { icon: Users, label: 'Накопления', value: '0', onClick: () => navigate('/accumulations') },
             ]
         },
         {

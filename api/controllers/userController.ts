@@ -337,3 +337,31 @@ export async function getLeaderboard(req: Request, res: Response) {
     return res.status(500).json({ error: 'internal error' })
   }
 }
+
+export async function getRemixRewards(req: Request, res: Response) {
+  try {
+    const userId = req.query.user_id
+    const limit = Number(req.query.limit || 20)
+    const offset = Number(req.query.offset || 0)
+
+    if (!userId) return res.status(400).json({ error: 'user_id required' })
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // Query remix_rewards and embed related generations
+    // Note: We use explicit foreign key embedding syntax if needed, or just rely on auto-detection.
+    // Since we have two FKs to the same table, we must specify the FK column.
+    const query = `?user_id=eq.${userId}&select=id,amount,created_at,source_generation:generations!source_generation_id(id,image_url,prompt),remix_generation:generations!remix_generation_id(id,image_url,prompt)&order=created_at.desc&limit=${limit}&offset=${offset}`
+
+    const q = await supaSelect('remix_rewards', query)
+
+    if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
+
+    return res.json({
+      items: q.data,
+      total: q.headers['content-range'] ? Number(q.headers['content-range'].split('/')[1]) : undefined
+    })
+  } catch (e) {
+    console.error('getRemixRewards error:', e)
+    return res.status(500).json({ error: 'internal error' })
+  }
+}
