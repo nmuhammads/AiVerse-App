@@ -68,45 +68,44 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
         year: 'numeric'
     })
 
-    // Platform specific padding for top bar
-    const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 10px)' : 'calc(env(safe-area-inset-top) + 20px)'
-
     return (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-200">
-            {/* Header */}
+        <div
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={onClose}
+        >
             <div
-                className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4"
-                style={{ paddingTop }}
+                className="w-full max-w-2xl flex flex-col gap-4"
+                onClick={e => e.stopPropagation()}
             >
-                <div className="flex items-center gap-2">
-                    {modelName && (
-                        <div className="bg-black/50 backdrop-blur-md text-white/90 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
-                            <Sparkles size={12} className="text-violet-400" />
-                            {modelName}
-                        </div>
-                    )}
+                {/* Header */}
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                        {modelName && (
+                            <div className="bg-zinc-800 text-zinc-200 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
+                                <Sparkles size={12} className="text-violet-400" />
+                                {modelName}
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => { impact('light'); onClose() }}
+                        className="w-9 h-9 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center border border-white/10 active:scale-95 transition-all"
+                    >
+                        <X size={18} />
+                    </button>
                 </div>
-                <button
-                    onClick={() => { impact('light'); onClose() }}
-                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center border border-white/10 active:scale-95 transition-transform"
-                >
-                    <X size={20} />
-                </button>
-            </div>
 
-            {/* Main Image */}
-            <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative" onClick={onClose}>
-                <img
-                    src={item.image_url}
-                    alt={item.prompt}
-                    className="max-w-full max-h-full object-contain shadow-2xl"
-                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking image
-                />
-            </div>
+                {/* Main Image */}
+                <div className="relative flex items-center justify-center rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl border border-white/5">
+                    <img
+                        src={item.image_url}
+                        alt={item.prompt}
+                        className="max-w-full max-h-[65dvh] object-contain"
+                    />
+                </div>
 
-            {/* Footer / Info */}
-            <div className="bg-gradient-to-t from-black via-black/90 to-transparent pt-12 pb-8 px-4 safe-bottom-fixed">
-                <div className="max-w-3xl mx-auto space-y-4">
+                {/* Footer */}
+                <div className="space-y-4 px-1">
 
                     {/* User & Date */}
                     <div className="flex items-center justify-between">
@@ -131,9 +130,9 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={handleLikeClick}
-                            className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 ${item.is_liked
-                                    ? 'bg-pink-500/20 text-pink-500 border border-pink-500/20'
-                                    : 'bg-zinc-900 text-white border border-white/10 hover:bg-zinc-800'
+                            className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 border ${item.is_liked
+                                    ? 'bg-pink-500/20 text-pink-500 border-pink-500/20'
+                                    : 'bg-zinc-900 text-white border-white/10 hover:bg-zinc-800'
                                 }`}
                         >
                             <Heart
@@ -145,7 +144,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
 
                         <button
                             onClick={() => { impact('medium'); onRemix(item) }}
-                            className="flex-1 h-12 rounded-xl bg-violet-600 text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-violet-700"
+                            className="flex-1 h-12 rounded-xl bg-violet-600 text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-violet-700 border border-violet-500"
                         >
                             <Repeat size={20} />
                             <span>Повторить</span>
