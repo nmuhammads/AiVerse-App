@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon } from 'lucide-react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -85,6 +86,13 @@ export default function Studio() {
   const [showBalancePopup, setShowBalancePopup] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [balance, setBalance] = useState<number | null>(null)
+  const [isFullScreen, setIsFullScreen] = useState(false)
+  const [scale, setScale] = useState(1)
+
+  // Reset scale when closing fullscreen
+  useEffect(() => {
+    if (!isFullScreen) setScale(1)
+  }, [isFullScreen])
 
   useEffect(() => {
     if (user?.id) {
@@ -200,15 +208,81 @@ export default function Studio() {
               <CardDescription className="text-white/60">{MODELS.find(m => m.id === selectedModel)?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <img src={generatedImage} alt="result" className="w-full rounded-lg shadow-lg" />
-              <div className="flex gap-3">
-                <Button onClick={() => { saveToGallery(generatedImage, `ai-${Date.now()}.jpg`) }} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700">Сохранить в галерею</Button>
-                <Button onClick={() => shareImage(generatedImage, prompt)} className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700">Поделиться</Button>
+              <div className="relative rounded-lg overflow-hidden group">
+                <img src={generatedImage} alt="result" className="w-full shadow-lg" />
+                <button
+                  onClick={() => {
+                    impact('light')
+                    setIsFullScreen(true)
+                  }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                >
+                  <Maximize2 size={16} />
+                </button>
               </div>
-              <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} variant="outline" className="w-full border-white/20 text-white hover:bg-white/10">Создать ещё</Button>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button onClick={() => { saveToGallery(generatedImage, `ai-${Date.now()}.jpg`) }} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">
+                    <DownloadIcon size={16} className="mr-2" />
+                    Сохранить
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!user?.id) return
+                      impact('light')
+                      try {
+                        const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: generatedImage, caption: prompt }) })
+                        const j = await r.json().catch(() => null)
+                        if (r.ok && j?.ok) { notify('success') }
+                        else {
+                          notify('error')
+                          shareImage(generatedImage, prompt)
+                        }
+                      } catch {
+                        notify('error')
+                      }
+                    }}
+                    className="flex-1 bg-violet-600 text-white hover:bg-violet-700 font-bold"
+                  >
+                    <Send size={16} className="mr-2" />
+                    Отправить в чат
+                  </Button>
+                </div>
+                <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">Создать ещё</Button>
+              </div>
             </CardContent>
           </Card>
         </div>
+        {isFullScreen && (
+          <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+            <div className={`absolute top-0 right-0 z-50 p-4 pt-[calc(3rem+env(safe-area-inset-top))]`}>
+              <button
+                onClick={() => setIsFullScreen(false)}
+                className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+              <TransformWrapper
+                initialScale={1}
+                minScale={1}
+                maxScale={4}
+                centerOnInit
+                alignmentAnimation={{ sizeX: 0, sizeY: 0 }}
+              >
+                <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img
+                    src={generatedImage}
+                    alt="Fullscreen"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </TransformComponent>
+              </TransformWrapper>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

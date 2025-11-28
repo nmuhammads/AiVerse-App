@@ -383,6 +383,16 @@ export async function handleGenerateImage(req: Request, res: Response) {
       })
     }
 
+    // SIMULATION MODE
+    if (prompt.trim().toLowerCase() === 'test') {
+      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate delay
+      return res.json({
+        image: 'https://placehold.co/1024x1024/png?text=Test+Generation',
+        prompt: prompt,
+        model: model
+      })
+    }
+
     // Проверка API ключа
     const apiKey = process.env.KIE_API_KEY
     if (!apiKey) {
