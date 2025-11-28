@@ -26,6 +26,7 @@ export default function Profile() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [likes, setLikes] = useState<number>(0)
+  const [remixCount, setRemixCount] = useState<number>(0)
   const [items, setItems] = useState<{ id: number; image_url: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
   const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null } | null>(null)
   const [total, setTotal] = useState<number | undefined>(undefined)
@@ -66,6 +67,9 @@ export default function Profile() {
         }
         if (r.ok && j && typeof j.likes_count === 'number') {
           setLikes(j.likes_count)
+        }
+        if (r.ok && j && typeof j.remix_count === 'number') {
+          setRemixCount(j.remix_count)
         }
       })
     }
@@ -119,6 +123,7 @@ export default function Profile() {
     { label: 'Генерации', value: typeof total === 'number' ? total : items.length },
     { label: 'Баланс', value: balance ?? '—' },
     { label: 'Лайки', value: likes },
+    { label: 'Ремиксы', value: remixCount },
   ]
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar">

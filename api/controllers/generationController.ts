@@ -208,19 +208,55 @@ const MODEL_PRICES: Record<string, number> = {
   'qwen-edit': 3,
 }
 
-async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: string, model: string) {
+async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: string, model: string, parentId?: number, metadata?: { ratio?: string; imagesCount?: number }, inputImages?: string[]) {
   if (!SUPABASE_URL || !SUPABASE_KEY || !userId) return
   const cost = MODEL_PRICES[model] ?? 0
   try {
-    await supaPost('generations', { user_id: userId, image_url: imageUrl, prompt, model })
+    // 1. Construct Metadata String
+    const type = (metadata?.imagesCount && metadata.imagesCount > 0) ? 'text_photo' : 'text'
+    const ratio = metadata?.ratio || '1:1'
+    const photos = metadata?.imagesCount || 0
+    const metaString = ` [type=${type}; ratio=${ratio}; photos=${photos}; avatars=0]`
+
+    // Append to prompt
+    const promptWithMeta = prompt + metaString
+
+    // 2. Save generation
+    const genBody: any = { user_id: userId, image_url: imageUrl, prompt: promptWithMeta, model }
+    if (parentId) genBody.parent_id = parentId
+    if (inputImages && inputImages.length > 0) genBody.input_images = inputImages
+    await supaPost('generations', genBody)
+
+    // 3. Deduct balance
     const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
     const curr = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : null
     if (typeof curr === 'number') {
       const next = curr - cost
       await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: next })
     }
-  } catch {
-    /* silent */
+
+    // 4. Handle Remix Logic
+    if (parentId) {
+      // Increment remix_count for parent generation
+      // We need to fetch current count first or use RPC. For simplicity, fetch-update.
+      const pGen = await supaSelect('generations', `?id=eq.${parentId}&select=remix_count,user_id`)
+      if (pGen.ok && Array.isArray(pGen.data) && pGen.data.length > 0) {
+        const parentGen = pGen.data[0]
+        const newGenCount = (parentGen.remix_count || 0) + 1
+        await supaPatch('generations', `?id=eq.${parentId}`, { remix_count: newGenCount })
+
+        // Increment remix_count for parent author
+        if (parentGen.user_id) {
+          const pUser = await supaSelect('users', `?user_id=eq.${parentGen.user_id}&select=remix_count`)
+          if (pUser.ok && Array.isArray(pUser.data) && pUser.data.length > 0) {
+            const newUserCount = (pUser.data[0].remix_count || 0) + 1
+            await supaPatch('users', `?user_id=eq.${parentGen.user_id}`, { remix_count: newUserCount })
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('recordSuccessAndDeduct error:', e)
   }
 }
 
@@ -235,6 +271,7 @@ interface KieAIRequest {
 
 interface KieAIResponse {
   images?: string[]
+  inputImages?: string[]
   error?: string
 }
 
@@ -254,6 +291,7 @@ async function generateImageWithKieAI(
       // Save all images
       imageUrls = images!.map(img => {
         if (typeof img === 'string') {
+          if (img.startsWith('http')) return img
           const saved = saveBase64Image(img)
           return saved.publicUrl
         }
@@ -265,7 +303,7 @@ async function generateImageWithKieAI(
       // Flux supports single image
       const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrls[0])
       const url = await pollFluxTask(apiKey, taskId)
-      return { images: [url] }
+      return { images: [url], inputImages: imageUrls }
     }
 
     if (model === 'seedream4') {
@@ -277,11 +315,11 @@ async function generateImageWithKieAI(
         // Seedream supports multiple images
         const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-edit', { ...input, image_urls: imageUrls })
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: imageUrls }
       } else {
         const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-text-to-image', input)
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: [] }
       }
     }
 
@@ -317,12 +355,12 @@ async function generateImageWithKieAI(
 
         const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input)
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: imageUrls }
       } else {
         if (image_size) input.image_size = image_size
         const taskId = await createJobsTask(apiKey, modelId, input)
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: imageUrls }
       }
     }
 
@@ -341,7 +379,7 @@ async function generateImageWithKieAI(
 
         const taskId = await createJobsTask(apiKey, 'qwen/image-to-image', input)
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: imageUrls }
       } else {
         const image_size = mapQwenImageSize(aspect_ratio)
         const input: Record<string, unknown> = {
@@ -354,7 +392,7 @@ async function generateImageWithKieAI(
 
         const taskId = await createJobsTask(apiKey, 'qwen/text-to-image', input)
         const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url] }
+        return { images: [url], inputImages: [] }
       }
     }
 
@@ -430,7 +468,17 @@ export async function handleGenerateImage(req: Request, res: Response) {
     if (result.images && result.images.length > 0) {
       const imageUrl = result.images[0]
       if (user_id && Number(user_id)) {
-        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model).catch(() => { })
+        // Extract parent_id from request body (it was missed in destructuring above)
+        const parent_id = req.body.parent_id
+
+        // Prepare metadata
+        const metadata = {
+          ratio: aspect_ratio,
+          imagesCount: images ? images.length : 0
+        }
+
+        // Pass inputImages from result (which are public URLs)
+        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, result.inputImages).catch(() => { })
       }
       return res.json({
         image: imageUrl,

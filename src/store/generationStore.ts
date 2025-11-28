@@ -23,6 +23,10 @@ export interface GenerationState {
   isGenerating: boolean
   // Ошибка
   error: string | null
+  // ID родительской генерации (для ремиксов)
+  parentGenerationId: number | null
+  // Имя автора родительской генерации
+  parentAuthorUsername: string | null
   // Текущий экран
   currentScreen: 'form' | 'result'
 }
@@ -52,6 +56,8 @@ export interface GenerationActions {
   setError: (error: string | null) => void
   // Переключить экран
   setCurrentScreen: (screen: 'form' | 'result') => void
+  // Установить родительскую генерацию
+  setParentGeneration: (id: number | null, username: string | null) => void
   // Сбросить состояние
   reset: () => void
 }
@@ -66,7 +72,9 @@ const initialState: GenerationState = {
   generatedImage: null,
   isGenerating: false,
   error: null,
-  currentScreen: 'form'
+  currentScreen: 'form',
+  parentGenerationId: null,
+  parentAuthorUsername: null
 }
 
 export const useGenerationStore = create<GenerationState & GenerationActions>()(
@@ -85,6 +93,7 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
     setIsGenerating: (isGenerating) => set({ isGenerating }),
     setError: (error) => set({ error }),
     setCurrentScreen: (screen) => set({ currentScreen: screen }),
+    setParentGeneration: (id, username) => set({ parentGenerationId: id, parentAuthorUsername: username }),
 
     reset: () => set({
       prompt: '',
@@ -94,7 +103,9 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
       generatedImage: null,
       isGenerating: false,
       error: null,
-      currentScreen: 'form'
+      currentScreen: 'form',
+      parentGenerationId: null,
+      parentAuthorUsername: null
     })
   })
 )

@@ -66,6 +66,8 @@ export default function Studio() {
     isGenerating,
     error,
     currentScreen,
+    parentAuthorUsername,
+    parentGenerationId,
     setSelectedModel,
     setPrompt,
     setNegativePrompt,
@@ -78,6 +80,7 @@ export default function Studio() {
     setIsGenerating,
     setError,
     setCurrentScreen,
+    setParentGeneration,
   } = useGenerationStore()
 
   const { shareImage, saveToGallery, user } = useTelegram()
@@ -105,6 +108,8 @@ export default function Studio() {
 
   // Default ratio logic
   useEffect(() => {
+    if (parentGenerationId) return // Skip default logic if remixing
+
     if (selectedModel === 'seedream4') {
       setAspectRatio('3:4')
     } else if (selectedModel === 'qwen-edit') {
@@ -112,7 +117,7 @@ export default function Studio() {
     } else if (selectedModel === 'nanobanana-pro' && aspectRatio === '16:21') {
       setAspectRatio('Auto')
     }
-  }, [selectedModel, setAspectRatio])
+  }, [selectedModel, setAspectRatio, parentGenerationId])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -165,7 +170,8 @@ export default function Studio() {
           model: selectedModel,
           aspect_ratio: aspectRatio,
           images: generationMode === 'image' ? uploadedImages : [],
-          user_id: user?.id || null
+          user_id: user?.id || null,
+          parent_id: parentGenerationId || undefined
         })
       })
 
@@ -179,6 +185,7 @@ export default function Studio() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Ошибка генерации')
       setGeneratedImage(data.image)
+      setParentGeneration(null, null) // Reset parent after success
       // Update balance after generation
       if (balance !== null) setBalance(prev => (prev !== null ? prev - MODEL_PRICES[selectedModel] : null))
 
@@ -342,21 +349,39 @@ export default function Studio() {
         </div>
 
         {/* 3. Prompt Input (New Animation) */}
-        <div className="prompt-container group">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Опишите вашу идею..."
-            className="prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm"
-          />
-          {prompt && (
-            <button
-              onClick={() => setPrompt('')}
-              className="absolute top-3 right-3 p-1.5 bg-zinc-800/50 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 transition-colors z-10"
-            >
-              <X size={14} />
-            </button>
+        <div className="relative mt-1">
+          {parentAuthorUsername && (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-violet-400 animate-in fade-in slide-in-from-bottom-2 mb-1 px-1">
+              <Sparkles size={12} />
+              <span>Промпт от @{parentAuthorUsername}</span>
+              <button
+                onClick={() => {
+                  setParentGeneration(null, null)
+                  setPrompt('')
+                  setUploadedImages([])
+                }}
+                className="ml-1 p-0.5 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={10} />
+              </button>
+            </div>
           )}
+          <div className="prompt-container group">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Опишите вашу идею..."
+              className={`prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar ${parentAuthorUsername ? 'border-violet-500/30 focus:border-violet-500/50' : ''}`}
+            />
+            {prompt && (
+              <button
+                onClick={() => setPrompt('')}
+                className="absolute top-3 right-3 p-1.5 bg-zinc-800/50 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 transition-colors z-10"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 3.1 Negative Prompt (Qwen only) */}

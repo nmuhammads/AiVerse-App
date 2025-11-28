@@ -25,6 +25,16 @@ body {
   margin: 0;
 }
 
+/* Global Scrollbar Hide */
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

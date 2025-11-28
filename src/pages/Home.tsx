@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Search, X, Heart } from 'lucide-react'
+import { Search, X, Heart, Repeat } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
+import { useGenerationStore, type ModelType } from '@/store/generationStore'
+import { useNavigate } from 'react-router-dom'
 
 interface FeedItem {
   id: number
@@ -15,6 +17,8 @@ interface FeedItem {
     avatar_url: string
   }
   likes_count: number
+  remix_count: number
+  input_images?: string[]
   is_liked: boolean
   model?: string | null
 }
@@ -31,7 +35,7 @@ function getModelDisplayName(model: string | null): string {
   }
 }
 
-const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: boolean }) => {
+const FeedImage = ({ item, priority = false, handleRemix }: { item: FeedItem; priority?: boolean; handleRemix: (item: FeedItem) => void }) => {
   const [loaded, setLoaded] = useState(false)
   const { impact } = useHaptics()
   const { user } = useTelegram()
@@ -107,18 +111,30 @@ const FeedImage = ({ item, priority = false }: { item: FeedItem; priority?: bool
               </div>
               <span className="text-xs font-medium text-zinc-300">{item.author.username}</span>
             </div>
-            <button
-              onClick={handleLike}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
-            >
-              <Heart
-                size={14}
-                className={`transition-transform ${isLikeAnimating ? 'scale-125' : 'scale-100'} ${isLiked ? 'fill-current' : ''}`}
-              />
-              <span className="text-xs font-medium">{likesCount}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleRemix(item)
+                }}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <Repeat size={14} />
+                {item.remix_count > 0 && <span className="text-xs font-medium">{item.remix_count}</span>}
+              </button>
+              <button
+                onClick={handleLike}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
+              >
+                <Heart
+                  size={14}
+                  className={`transition-transform ${isLikeAnimating ? 'scale-125' : 'scale-100'} ${isLiked ? 'fill-current' : ''}`}
+                />
+                <span className="text-xs font-medium">{likesCount}</span>
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">{item.prompt}</p>
+
         </div>
       </div>
     </div>
@@ -203,6 +219,82 @@ export default function Home() {
 
   // Removed handleLike from Home component as it's now in FeedImage
 
+  const {
+    setPrompt,
+    setSelectedModel,
+    setParentGeneration,
+    setCurrentScreen,
+    setAspectRatio,
+    setGenerationMode,
+    setUploadedImages
+  } = useGenerationStore()
+  const navigate = useNavigate()
+
+  const handleRemix = (item: FeedItem) => {
+    impact('medium')
+
+    // Parse metadata from prompt
+    // Format: ... real prompt ... [type=text_photo; ratio=3:4; photos=1]
+    let cleanPrompt = item.prompt
+    let metadata: Record<string, string> = {}
+
+    // Match [ ... ] at the end of the string, allowing for whitespace
+    const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
+    if (match) {
+      const metaString = match[1]
+      cleanPrompt = item.prompt.replace(match[0], '').trim()
+
+      metaString.split(';').forEach(part => {
+        const [key, val] = part.split('=').map(s => s.trim())
+        if (key && val) metadata[key] = val
+      })
+    }
+
+    setPrompt(cleanPrompt)
+
+    if (item.model) {
+      // Map model string to ModelType if possible, otherwise default
+      const modelMap: Record<string, ModelType> = {
+        'nanobanana': 'nanobanana',
+        'nanobanana-pro': 'nanobanana-pro',
+        'seedream4': 'seedream4',
+        'qwen-edit': 'qwen-edit'
+      }
+      if (modelMap[item.model]) {
+        setSelectedModel(modelMap[item.model])
+      }
+    }
+
+    // Apply metadata settings
+    if (metadata.ratio) {
+      // Validate ratio before setting
+      const validRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '16:21', 'Auto', 'square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']
+      if (validRatios.includes(metadata.ratio)) {
+        setAspectRatio(metadata.ratio as any)
+      }
+    }
+
+    if (metadata.type) {
+      if (metadata.type === 'text_photo') {
+        setGenerationMode('image')
+      } else {
+        setGenerationMode('text')
+      }
+    }
+
+    // Load input images if present
+    if (item.input_images && item.input_images.length > 0) {
+      setUploadedImages(item.input_images)
+      setGenerationMode('image') // Ensure we are in image mode
+    } else {
+      setUploadedImages([])
+    }
+
+    setParentGeneration(item.id, item.author.username)
+    setCurrentScreen('form')
+    navigate('/studio')
+  }
+
   const filteredItems = items.filter(x =>
     x.prompt.toLowerCase().includes(q.toLowerCase()) ||
     x.author.username.toLowerCase().includes(q.toLowerCase())
@@ -253,12 +345,12 @@ export default function Home() {
             <div className="flex gap-4 items-start">
               <div className="flex-1 space-y-4">
                 {filteredItems.filter((_, i) => i % 2 === 0).map(item => (
-                  <FeedImage key={item.id} item={item} priority={true} />
+                  <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} />
                 ))}
               </div>
               <div className="flex-1 space-y-4">
                 {filteredItems.filter((_, i) => i % 2 !== 0).map(item => (
-                  <FeedImage key={item.id} item={item} priority={true} />
+                  <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} />
                 ))}
               </div>
             </div>
