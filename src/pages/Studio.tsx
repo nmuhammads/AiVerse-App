@@ -207,8 +207,8 @@ export default function Studio() {
 
   if (currentScreen === 'result' && generatedImage) {
     return (
-      <div className="min-h-dvh bg-black safe-bottom-tabbar">
-        <div className="mx-auto max-w-3xl px-4 py-4">
+      <div className="min-h-dvh bg-black safe-bottom-tabbar flex items-center justify-center">
+        <div className="mx-auto max-w-3xl w-full px-4 py-4">
           <Card className="bg-zinc-900/50 border-white/10 backdrop-blur-xl">
             <CardHeader>
               <CardTitle className="text-white">Результат</CardTitle>
