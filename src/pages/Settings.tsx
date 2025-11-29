@@ -3,6 +3,7 @@ import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users,
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 export default function Settings() {
     const navigate = useNavigate()
@@ -54,7 +55,7 @@ export default function Settings() {
             title: 'Основные',
             items: [
                 { icon: Globe, label: 'Язык', value: 'Русский', onClick: () => { } },
-                { icon: Moon, label: 'Тема', value: 'Темная', onClick: () => { } },
+                { icon: Moon, label: 'Тема', value: 'Темная', onClick: () => toast.error('Упс пока доступна только темная тема') },
                 ...(canAddToHome ? [{ icon: Zap, label: 'Добавить на главный экран', onClick: addToHomeScreen }] : [])
             ]
         },
@@ -67,7 +68,7 @@ export default function Settings() {
         {
             title: 'О приложении',
             items: [
-                { icon: MessageCircle, label: 'Поддержка', onClick: () => tg.openTelegramLink('https://t.me/aiversebots?direct') },
+                { icon: MessageCircle, label: 'Поддержка', onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots?direct', '_blank') : tg.openTelegramLink('https://t.me/aiversebots?direct') },
                 { icon: Info, label: 'Версия', value: 'v2.2', onClick: () => { } },
             ]
         }
