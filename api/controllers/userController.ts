@@ -318,10 +318,28 @@ export async function getLeaderboard(req: Request, res: Response) {
   try {
     const limit = Number(req.query.limit || 10)
     const offset = Number(req.query.offset || 0)
+    const type = String(req.query.type || 'likes')
+    const period = String(req.query.period || 'month')
 
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
-    const url = `${SUPABASE_URL}/rest/v1/rpc/get_monthly_leaderboard`
+    // 1. Remixes + All Time (Query Users Table)
+    if (type === 'remixes' && period === 'all_time') {
+      const q = await supaSelect('users', `?select=user_id,username,first_name,avatar_url,remix_count&remix_count=gt.0&order=remix_count.desc&limit=${limit}&offset=${offset}`)
+      if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
+      return res.json({ items: Array.isArray(q.data) ? q.data : [] })
+    }
+
+    // Determine RPC name based on type and period
+    let rpcName = 'get_monthly_leaderboard' // Default: Likes + Month
+
+    if (type === 'likes' && period === 'all_time') {
+      rpcName = 'get_all_time_likes_leaderboard'
+    } else if (type === 'remixes' && period === 'month') {
+      rpcName = 'get_monthly_remixes_leaderboard'
+    }
+
+    const url = `${SUPABASE_URL}/rest/v1/rpc/${rpcName}`
     const r = await fetch(url, {
       method: 'POST',
       headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
