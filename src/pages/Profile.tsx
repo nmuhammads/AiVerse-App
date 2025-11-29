@@ -1,4 +1,4 @@
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2 } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -18,8 +18,22 @@ function getModelDisplayName(model: string | null): string {
   }
 }
 
+function cleanPrompt(prompt: string): string {
+  return prompt.replace(/\s*\[.*?\]\s*$/, '').trim()
+}
+
 export default function Profile() {
   const navigate = useNavigate()
+  // ... (rest of the component)
+
+  // ... inside the component, finding usages of prompt ...
+
+  // In the list:
+  // <p className="text-[10px] text-zinc-300 truncate font-medium">{cleanPrompt(h.prompt)}</p>
+
+  // In the preview modal:
+  // navigator.share({ title: 'AiVerse', text: cleanPrompt(preview.prompt), url: preview.image_url })
+  // shareImage(preview.image_url, cleanPrompt(preview.prompt))
   const { impact, notify } = useHaptics()
   const { user, platform, saveToGallery, shareImage } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
@@ -29,6 +43,8 @@ export default function Profile() {
   const [remixCount, setRemixCount] = useState<number>(0)
   const [items, setItems] = useState<{ id: number; image_url: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
   const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null } | null>(null)
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
   const [total, setTotal] = useState<number | undefined>(undefined)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -118,6 +134,11 @@ export default function Profile() {
   useEffect(() => {
     if (!isFullScreen) setScale(1)
   }, [isFullScreen])
+
+  // Reset showPrompt when preview changes
+  useEffect(() => {
+    setShowPrompt(false)
+  }, [preview])
 
   const stats = [
     { label: 'Генерации', value: typeof total === 'number' ? total : items.length },
@@ -240,7 +261,7 @@ export default function Profile() {
                         </div>
                       )}
                       <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-[10px] text-zinc-300 truncate font-medium">{h.prompt}</p>
+                        <p className="text-[10px] text-zinc-300 truncate font-medium">{cleanPrompt(h.prompt)}</p>
                         {h.is_published && <div className="absolute top-2 right-2 bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-md backdrop-blur-sm border border-emerald-500/20">Public</div>}
                       </div>
                     </div>
@@ -256,14 +277,14 @@ export default function Profile() {
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setPreview(null) }}>
                   <div className="relative w-full max-w-3xl bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden">
                     <div className="relative w-full aspect-square bg-black">
-                      <div className={`absolute top-0 left-0 right-0 px-2 flex justify-between items-start z-20 pointer-events-none ${platform === 'android' ? 'pt-[calc(3.5rem+env(safe-area-inset-top))]' : 'pt-[calc(0.5rem+env(safe-area-inset-top))]'}`}>
+                      <div className={`absolute top-0 left-0 right-0 px-2 flex justify-between items-start z-20 pointer-events-none ${platform === 'android' ? 'pt-[calc(0.5rem+env(safe-area-inset-top))]' : 'pt-[calc(0.5rem+env(safe-area-inset-top))]'}`}>
                         <button
                           onClick={() => {
                             impact('light')
                             if (navigator.share) {
-                              navigator.share({ title: 'AiVerse', text: preview.prompt, url: preview.image_url }).catch(() => { })
+                              navigator.share({ title: 'AiVerse', text: cleanPrompt(preview.prompt), url: preview.image_url }).catch(() => { })
                             } else {
-                              shareImage(preview.image_url, preview.prompt)
+                              shareImage(preview.image_url, cleanPrompt(preview.prompt))
                             }
                           }}
                           className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto"
@@ -302,12 +323,12 @@ export default function Profile() {
                             if (!user?.id) return
                             impact('light')
                             try {
-                              const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: preview.image_url, caption: preview.prompt }) })
+                              const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: preview.image_url, caption: cleanPrompt(preview.prompt) }) })
                               const j = await r.json().catch(() => null)
                               if (r.ok && j?.ok) { notify('success') }
                               else {
                                 notify('error')
-                                shareImage(preview.image_url, preview.prompt)
+                                shareImage(preview.image_url, cleanPrompt(preview.prompt))
                               }
                             } catch {
                               notify('error')
@@ -355,6 +376,39 @@ export default function Profile() {
                         {preview.is_published ? <EyeOff size={16} /> : <Globe size={16} />}
                         {preview.is_published ? 'Убрать из ленты' : 'Опубликовать в ленту'}
                       </button>
+
+                      {/* Prompt Actions */}
+                      <div className="w-full flex gap-2">
+                        <button
+                          onClick={() => {
+                            impact('light')
+                            setShowPrompt(!showPrompt)
+                          }}
+                          className="flex-1 py-2 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 flex items-center justify-center gap-2 text-zinc-300 hover:text-white transition-colors text-xs font-bold"
+                        >
+                          {showPrompt ? <EyeOff size={14} /> : <Sparkles size={14} />}
+                          {showPrompt ? 'Скрыть промпт' : 'Показать промпт'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            impact('light')
+                            navigator.clipboard.writeText(cleanPrompt(preview.prompt))
+                            notify('success')
+                            setIsCopied(true)
+                            setTimeout(() => setIsCopied(false), 2000)
+                          }}
+                          className={`flex-1 py-2 rounded-xl border border-white/5 flex items-center justify-center gap-2 transition-all text-xs font-bold ${isCopied ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white'}`}
+                        >
+                          {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {isCopied ? 'Скопировано!' : 'Копировать промпт'}
+                        </button>
+                      </div>
+
+                      {showPrompt && (
+                        <div className="w-full p-3 bg-zinc-900/80 rounded-xl border border-white/10 text-xs text-zinc-300 break-words animate-in fade-in slide-in-from-top-2 duration-200 max-h-32 overflow-y-auto custom-scrollbar">
+                          {cleanPrompt(preview.prompt)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
