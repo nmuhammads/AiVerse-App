@@ -448,6 +448,41 @@ export async function handleGenerateImage(req: Request, res: Response) {
       })
     }
 
+    // Upload input images to R2 (for DB) and Kie (for Generation) if present
+    let kieImages: string[] = []
+    let r2Images: string[] = []
+
+    if (images && images.length > 0) {
+      const { uploadImageFromUrl } = await import('../services/r2Service.js')
+      const { uploadImageToKie } = await import('../services/kieService.js')
+
+      // Process images in parallel
+      const results = await Promise.all(images.map(async (img: string) => {
+        // Skip if not http
+        if (!img.startsWith('http')) return { r2: img, kie: img }
+
+        // Run uploads in parallel
+        const [r2Url, kieUrl] = await Promise.all([
+          uploadImageFromUrl(img).catch(e => {
+            console.error('R2 upload failed:', e)
+            return img // Fallback to original
+          }),
+          uploadImageToKie(img).catch(e => {
+            console.error('Kie upload failed:', e)
+            return img // Fallback to original
+          })
+        ])
+
+        return { r2: r2Url, kie: kieUrl }
+      }))
+
+      r2Images = results.map(r => r.r2)
+      kieImages = results.map(r => r.kie)
+
+      // Use Kie URLs for generation request
+      req.body.images = kieImages
+    }
+
     // Проверка API ключа
     const apiKey = process.env.KIE_API_KEY
     if (!apiKey) {
@@ -494,8 +529,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
           imagesCount: images ? images.length : 0
         }
 
-        // Pass inputImages from result (which are public URLs)
-        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, result.inputImages).catch(() => { })
+        // Pass r2Images (permanent URLs) to DB
+        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, r2Images).catch(() => { })
       }
       return res.json({
         image: imageUrl,

@@ -40,3 +40,4 @@ SQLSCHEME.sql
 migrations/*
 .env
 scripts/temp_migrate.js
+uploads/*

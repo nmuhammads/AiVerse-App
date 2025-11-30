@@ -129,7 +129,10 @@ const FeedImage = ({ item, priority = false, handleRemix, onClick }: { item: Fee
                 {item.remix_count > 0 && <span className="text-xs font-medium">{item.remix_count}</span>}
               </button>
               <button
-                onClick={handleLike}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleLike()
+                }}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
               >
                 <Heart
