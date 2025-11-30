@@ -448,39 +448,25 @@ export async function handleGenerateImage(req: Request, res: Response) {
       })
     }
 
-    // Upload input images to R2 (for DB) and Kie (for Generation) if present
-    let kieImages: string[] = []
-    let r2Images: string[] = []
+    // Upload input images to R2 (for DB) in parallel
+    // We use original images for generation to ensure compatibility
+    let r2ImagesPromise: Promise<string[]> = Promise.resolve(images || [])
 
     if (images && images.length > 0) {
       const { uploadImageFromUrl } = await import('../services/r2Service.js')
-      const { uploadImageToKie } = await import('../services/kieService.js')
 
-      // Process images in parallel
-      const results = await Promise.all(images.map(async (img: string) => {
+      // Start R2 uploads in background
+      r2ImagesPromise = Promise.all(images.map(async (img: string) => {
         // Skip if not http
-        if (!img.startsWith('http')) return { r2: img, kie: img }
+        if (!img.startsWith('http')) return img
 
-        // Run uploads in parallel
-        const [r2Url, kieUrl] = await Promise.all([
-          uploadImageFromUrl(img).catch(e => {
-            console.error('R2 upload failed:', e)
-            return img // Fallback to original
-          }),
-          uploadImageToKie(img).catch(e => {
-            console.error('Kie upload failed:', e)
-            return img // Fallback to original
-          })
-        ])
-
-        return { r2: r2Url, kie: kieUrl }
+        try {
+          return await uploadImageFromUrl(img)
+        } catch (e) {
+          console.error('R2 upload failed:', e)
+          return img // Fallback to original
+        }
       }))
-
-      r2Images = results.map(r => r.r2)
-      kieImages = results.map(r => r.kie)
-
-      // Use Kie URLs for generation request
-      req.body.images = kieImages
     }
 
     // Проверка API ключа
@@ -528,6 +514,9 @@ export async function handleGenerateImage(req: Request, res: Response) {
           ratio: aspect_ratio,
           imagesCount: images ? images.length : 0
         }
+
+        // Wait for R2 uploads to complete before saving to DB
+        const r2Images = await r2ImagesPromise
 
         // Pass r2Images (permanent URLs) to DB
         recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, r2Images).catch(() => { })
