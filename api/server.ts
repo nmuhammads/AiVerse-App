@@ -10,6 +10,9 @@ console.log(`Starting server on port ${PORT}...`);
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log('Loaded Env Vars:', Object.keys(process.env).filter(k => !k.startsWith('npm_')));
 
+const r2Configured = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME && process.env.R2_PUBLIC_URL
+console.log('R2 Storage Configured:', r2Configured ? 'Yes' : 'No (Check environment variables)')
+
 import { registerBotCommands, setupMenuButton, setupWebhook, logBotInfo } from './controllers/telegramController.js';
 
 (async () => {

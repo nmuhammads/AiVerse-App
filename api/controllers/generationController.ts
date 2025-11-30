@@ -456,14 +456,17 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const { uploadImageFromUrl } = await import('../services/r2Service.js')
 
       // Start R2 uploads in background
+      console.log('Starting background R2 uploads for', images.length, 'images')
       r2ImagesPromise = Promise.all(images.map(async (img: string) => {
         // Skip if not http
         if (!img.startsWith('http')) return img
 
         try {
-          return await uploadImageFromUrl(img)
+          const result = await uploadImageFromUrl(img)
+          console.log('R2 upload complete. Original:', img, 'New:', result)
+          return result
         } catch (e) {
-          console.error('R2 upload failed:', e)
+          console.error('R2 upload failed for:', img, e)
           return img // Fallback to original
         }
       }))
@@ -516,10 +519,20 @@ export async function handleGenerateImage(req: Request, res: Response) {
         }
 
         // Wait for R2 uploads to complete before saving to DB
-        const r2Images = await r2ImagesPromise
+        let r2Images: string[] = []
+        try {
+          r2Images = await r2ImagesPromise
+        } catch (e) {
+          console.error('Failed to await R2 images:', e)
+          r2Images = images || [] // Fallback to original images
+        }
+
+        console.log('Saving to DB with images:', r2Images)
 
         // Pass r2Images (permanent URLs) to DB
-        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, r2Images).catch(() => { })
+        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, r2Images).catch(err => {
+          console.error('Failed to record success:', err)
+        })
       }
       return res.json({
         image: imageUrl,

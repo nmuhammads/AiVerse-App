@@ -1,24 +1,43 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import crypto from 'crypto'
 
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL
+let s3Client: S3Client | null = null
 
-const s3Client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID || '',
-        secretAccessKey: R2_SECRET_ACCESS_KEY || '',
-    },
-})
+function getS3Client() {
+    if (s3Client) return s3Client
+
+    const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID
+    const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID
+    const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY
+
+    if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+        return null
+    }
+
+    s3Client = new S3Client({
+        region: 'auto',
+        endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+            accessKeyId: R2_ACCESS_KEY_ID,
+            secretAccessKey: R2_SECRET_ACCESS_KEY,
+        },
+    })
+    return s3Client
+}
 
 export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
-    if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
-        console.warn('R2 credentials missing, skipping upload')
+    const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME
+    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL
+    const client = getS3Client()
+
+    console.log('Starting R2 upload for:', imageUrl)
+
+    if (!client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
+        console.warn('R2 credentials missing:', {
+            hasClient: !!client,
+            hasBucket: !!R2_BUCKET_NAME,
+            hasPublicUrl: !!R2_PUBLIC_URL
+        })
         return imageUrl
     }
 
@@ -36,7 +55,7 @@ export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
         const fileName = `${hash}.${ext}`
 
         // 3. Upload to R2
-        await s3Client.send(new PutObjectCommand({
+        await client.send(new PutObjectCommand({
             Bucket: R2_BUCKET_NAME,
             Key: fileName,
             Body: buffer,
