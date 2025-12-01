@@ -148,6 +148,40 @@ export default function Profile() {
   ]
   const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+
+  const handlePublish = async () => {
+    if (!preview) return
+    impact('medium')
+    const newStatus = !preview.is_published
+
+    // Optimistic update
+    setPreview(prev => prev ? { ...prev, is_published: newStatus } : null)
+    setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: newStatus } : i))
+    setShowPublishConfirm(false)
+
+    try {
+      const r = await fetch('/api/user/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generationId: preview.id, isPublished: newStatus })
+      })
+      if (r.ok) {
+        notify('success')
+      } else {
+        notify('error')
+        // Revert
+        setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
+        setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
+      }
+    } catch {
+      notify('error')
+      // Revert
+      setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
+      setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
@@ -342,33 +376,11 @@ export default function Profile() {
                       </div>
 
                       <button
-                        onClick={async () => {
-                          impact('medium')
-                          const newStatus = !preview.is_published
-
-                          // Optimistic update
-                          setPreview(prev => prev ? { ...prev, is_published: newStatus } : null)
-                          setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: newStatus } : i))
-
-                          try {
-                            const r = await fetch('/api/user/publish', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ generationId: preview.id, isPublished: newStatus })
-                            })
-                            if (r.ok) {
-                              notify('success')
-                            } else {
-                              notify('error')
-                              // Revert
-                              setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
-                              setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
-                            }
-                          } catch {
-                            notify('error')
-                            // Revert
-                            setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
-                            setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
+                        onClick={() => {
+                          if (preview.is_published) {
+                            handlePublish()
+                          } else {
+                            setShowPublishConfirm(true)
                           }
                         }}
                         className={`w-full min-h-[48px] h-auto py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-colors ${preview.is_published ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
@@ -413,6 +425,35 @@ export default function Profile() {
                   </div>
                 </div>
               )}
+
+              {/* Publish Confirmation Modal */}
+              {showPublishConfirm && (
+                <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPublishConfirm(false) }}>
+                  <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-bold text-white">Публикация в ленту</h3>
+                      <p className="text-sm text-zinc-400">
+                        Ваши фото-референсы станут публичными при использовании ремиксов другими пользователями. Вы уверены?
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowPublishConfirm(false)}
+                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={handlePublish}
+                        className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
+                      >
+                        Опубликовать
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {isFullScreen && preview && (
                 <div className="fixed inset-0 z-[200] bg-black flex flex-col">
                   <div className={`absolute top-0 right-0 z-50 p-4 ${platform === 'android' ? 'pt-[calc(5rem+env(safe-area-inset-top))]' : 'pt-[calc(3rem+env(safe-area-inset-top))]'}`}>
