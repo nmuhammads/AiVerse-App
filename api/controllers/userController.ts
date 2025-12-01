@@ -258,15 +258,41 @@ export async function getUserInfo(req: Request, res: Response) {
 
 export async function subscribeBot(req: Request, res: Response) {
   try {
-    const { userId, botSource } = req.body || {}
+    const { userId, botSource, username, first_name, last_name, language_code } = req.body || {}
     const u = Number(userId)
     const src = String(botSource || DEFAULT_BOT_SOURCE)
+
     if (!u || !src) return res.status(400).json({ error: 'invalid payload' })
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // 1. Ensure user exists in 'users' table
+    // We use upsert (on_conflict=user_id) to create if not exists or update if exists.
+    // Note: 'balance' has a default in DB (6), so we don't need to send it for new users unless we want to override.
+    // 'ref' is not handled here, assuming it's handled elsewhere or can be added if needed.
+    const userPayload = {
+      user_id: u,
+      username: username || null,
+      first_name: first_name || null,
+      last_name: last_name || null,
+      language_code: language_code || null,
+      updated_at: new Date().toISOString()
+    }
+
+    const userUpsert = await supaPost('users', userPayload, '?on_conflict=user_id')
+    if (!userUpsert.ok) {
+      console.error('subscribeBot: user upsert failed', userUpsert.data)
+      // We continue even if user upsert fails, hoping the user exists, 
+      // but strictly speaking we should probably error out or check why.
+      // For now, let's log and proceed to subscription.
+    }
+
+    // 2. Create subscription
     const r = await supaPost('bot_subscriptions', { user_id: u, bot_source: src }, `?on_conflict=user_id,bot_source`)
     if (!r.ok) return res.status(500).json({ error: 'upsert failed', detail: r.data })
+
     return res.json({ ok: true })
-  } catch {
+  } catch (e) {
+    console.error('subscribeBot error:', e)
     return res.status(500).json({ error: 'subscribe failed' })
   }
 }

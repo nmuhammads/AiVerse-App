@@ -54,7 +54,15 @@ export function useTelegram() {
     try {
       const uid = (WebApp as unknown as { initDataUnsafe?: { user?: { id?: number } } }).initDataUnsafe?.user?.id
       if (uid) {
-        fetch('/api/user/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid, botSource: 'AiVerseAppBot' }) }).catch(() => { })
+        const payload = {
+          userId: uid,
+          botSource: 'AiVerseAppBot',
+          username: WebApp.initDataUnsafe.user?.username,
+          first_name: WebApp.initDataUnsafe.user?.first_name,
+          last_name: WebApp.initDataUnsafe.user?.last_name,
+          language_code: WebApp.initDataUnsafe.user?.language_code
+        }
+        fetch('/api/user/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => { })
       }
     } catch { /* noop */ }
 
