@@ -11,6 +11,7 @@ interface PaymentModalProps {
 type PaymentMethod = 'stars' | 'card' | 'sbp'
 
 const PACKAGES_STARS = [
+    { id: 'test_1', tokens: 1, price: 1, label: 'TEST' },
     { id: 'star_20', tokens: 10, price: 20 },
     { id: 'star_50', tokens: 25, price: 50 },
     { id: 'star_100', tokens: 50, price: 100 },

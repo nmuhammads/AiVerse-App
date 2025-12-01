@@ -1,71 +1,17 @@
 import { Request, Response } from 'express'
+import {
+  supaSelect,
+  supaPost,
+  supaPatch,
+  supaStorageUpload,
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  SUPABASE_BUCKET,
+  supaHeaders
+} from '../services/supabaseService.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
-
-function stripQuotes(s: string) { return s.trim().replace(/^['"`]+|['"`]+$/g, '') }
-
-const SUPABASE_URL = stripQuotes(process.env.SUPABASE_URL || '')
-const SUPABASE_KEY = stripQuotes(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '')
-const SUPABASE_BUCKET = stripQuotes(process.env.SUPABASE_USER_AVATARS_BUCKET || 'avatars')
 const DEFAULT_BOT_SOURCE = process.env.TELEGRAM_BOT_USERNAME || 'AiVerseAppBot'
-
-function supaHeaders() {
-  return {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
-  } as Record<string, string>
-}
-
-async function supaSelect(table: string, query: string) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
-  const r = await fetch(url, { headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'count=exact' } })
-  const data = await r.json().catch(() => null)
-  return { ok: r.ok, data, headers: Object.fromEntries(r.headers.entries()) }
-}
-
-async function supaPost(table: string, body: unknown, params = '') {
-  const url = `${SUPABASE_URL}/rest/v1/${table}${params}`
-  const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) })
-  const data = await r.json().catch(() => null)
-  return { ok: r.ok, data }
-}
-
-async function supaPatch(table: string, filter: string, body: unknown) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-  const r = await fetch(url, { method: 'PATCH', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const data = await r.json().catch(() => null)
-  return { ok: r.ok, data }
-}
-
-async function supaStorageUpload(pathname: string, buf: Buffer, contentType = 'image/jpeg') {
-  const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_BUCKET)}/${pathname}`
-  console.log(`[Avatar] Uploading to ${url}, size: ${buf.length} bytes`)
-
-  // Pass Buffer directly to fetch (Node.js environment)
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
-    body: buf as any
-  })
-
-  const data = await r.json().catch(() => null)
-  console.log(`[Avatar] Upload response: ${r.status}`, data)
-  return { ok: r.ok, data }
-}
-
-async function supaStorageSignedUrl(pathname: string, expiresIn = Number(process.env.SUPABASE_SIGNED_URL_TTL || 3600)) {
-  const url = `${SUPABASE_URL}/storage/v1/object/sign/${encodeURIComponent(SUPABASE_BUCKET)}/${pathname}`
-  const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn }) })
-  const data = await r.json().catch(() => null)
-  const signed = (data && (data.signedURL || data.signedUrl)) ? String(data.signedURL || data.signedUrl) : null
-  if (!r.ok || !signed) {
-    console.error('avatar:signed-url:fail', { status: r.status, data })
-    return null
-  }
-  const abs = signed.startsWith('http')
-  console.info('avatar:signed-url:ok', { abs, len: signed.length })
-  return abs ? signed : `${SUPABASE_URL}${signed}`
-}
 
 // signed URL helper can be added when bucket is private
 

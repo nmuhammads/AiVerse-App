@@ -21,6 +21,8 @@ async function tg(method: string, payload: Record<string, unknown>) {
   try { return await r.json() } catch { return null }
 }
 
+import { supaSelect, supaPatch } from '../services/supabaseService.js'
+
 export async function webhook(req: Request, res: Response) {
   try {
     if (WEBHOOK_SECRET) {
@@ -30,7 +32,48 @@ export async function webhook(req: Request, res: Response) {
       }
     }
     const update = req.body
+
+    // Handle Pre-Checkout Query (Required for Stars)
+    if (update.pre_checkout_query) {
+      const id = update.pre_checkout_query.id
+      await tg('answerPreCheckoutQuery', { pre_checkout_query_id: id, ok: true })
+      return res.json({ ok: true })
+    }
+
     const msg = update?.message
+
+    // Handle Successful Payment
+    if (msg?.successful_payment) {
+      const payment = msg.successful_payment
+      const userId = msg.from?.id
+      const payload = JSON.parse(payment.invoice_payload || '{}')
+      const tokensToAdd = Number(payload.tokens || 0)
+
+      console.log(`[Payment] Successful payment from ${userId}, tokens: ${tokensToAdd}, payload:`, payload)
+
+      if (userId && tokensToAdd > 0) {
+        // Fetch current balance
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
+        if (userQ.ok && userQ.data?.[0]) {
+          const currentBalance = Number(userQ.data[0].balance || 0)
+          const newBalance = currentBalance + tokensToAdd
+
+          // Update balance
+          const updateRes = await supaPatch('users', `?user_id=eq.${userId}`, { balance: newBalance })
+
+          if (updateRes.ok) {
+            await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.` })
+          } else {
+            console.error('[Payment] Failed to update balance', updateRes)
+            await tg('sendMessage', { chat_id: userId, text: `⚠️ Оплата прошла, но возникла ошибка при начислении. Обратитесь в поддержку.` })
+          }
+        } else {
+          console.error('[Payment] User not found', userId)
+        }
+      }
+      return res.json({ ok: true })
+    }
+
     const chatId = msg?.chat?.id
     const text = String(msg?.text || '').trim()
     if (!chatId || !text) return res.json({ ok: true })
@@ -59,7 +102,8 @@ export async function webhook(req: Request, res: Response) {
       return res.json({ ok: true })
     }
     return res.json({ ok: true })
-  } catch {
+  } catch (e) {
+    console.error('webhook error', e)
     return res.json({ ok: true })
   }
 }
