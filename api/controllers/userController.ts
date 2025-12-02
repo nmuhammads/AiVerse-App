@@ -3,12 +3,11 @@ import {
   supaSelect,
   supaPost,
   supaPatch,
-  supaStorageUpload,
   SUPABASE_URL,
   SUPABASE_KEY,
-  SUPABASE_BUCKET,
   supaHeaders
 } from '../services/supabaseService.js'
+import { uploadImageFromBase64, uploadImageFromUrl } from '../services/r2Service.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const DEFAULT_BOT_SOURCE = process.env.TELEGRAM_BOT_USERNAME || 'AiVerseAppBot'
@@ -22,7 +21,7 @@ function sanitizeUrl(u: unknown): string | null {
   return cleaned || null
 }
 
-// Sync avatar from Telegram to Supabase Storage
+// Sync avatar from Telegram to R2
 export async function syncAvatar(req: Request, res: Response) {
   try {
     const { userId } = req.body
@@ -31,10 +30,18 @@ export async function syncAvatar(req: Request, res: Response) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
     // 1. Check if user already has an avatar_url in users table
+    // Optimization: If it's already an R2 URL, we can skip sync (unless forced)
     const userQuery = await supaSelect('users', `?user_id=eq.${userId}&select=avatar_url`)
-    if (userQuery.ok && Array.isArray(userQuery.data) && userQuery.data[0]?.avatar_url) {
-      // Avatar already exists, no need to sync
-      return res.json({ ok: true, avatar_url: userQuery.data[0].avatar_url })
+    const currentAvatarUrl = (userQuery.ok && Array.isArray(userQuery.data)) ? userQuery.data[0]?.avatar_url : null
+
+    // If we want to force update even if exists, we can remove this check. 
+    // But usually sync is called often, so we should check.
+    // However, user said "users can re-upload". 
+    // Let's assume sync is "get latest from telegram". 
+    // If we want to migrate, we should probably allow updating if it's NOT an R2 url.
+    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
+    if (currentAvatarUrl && currentAvatarUrl.startsWith(R2_PUBLIC_URL)) {
+      return res.json({ ok: true, avatar_url: currentAvatarUrl, message: 'already on R2' })
     }
 
     // 2. Fetch from Telegram
@@ -45,7 +52,6 @@ export async function syncAvatar(req: Request, res: Response) {
     const first = photosJson?.result?.photos?.[0]
 
     if (!first) {
-      // No photos in Telegram, maybe set a default or do nothing
       return res.json({ ok: true, message: 'no telegram photos' })
     }
 
@@ -57,47 +63,14 @@ export async function syncAvatar(req: Request, res: Response) {
 
     if (!filePathTg) return res.status(404).json({ error: 'telegram file path not found' })
 
-    // Download image
+    // Download image URL
     const downloadUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePathTg}`
-    const imgResp = await fetch(downloadUrl)
-    if (!imgResp.ok) return res.status(500).json({ error: 'failed to download from telegram' })
 
-    const buf = Buffer.from(await imgResp.arrayBuffer())
-    if (buf.length < 100) {
-      console.error('[Avatar] File too small from Telegram', buf.length)
-      return res.status(500).json({ error: 'telegram file too small' })
-    }
+    // 3. Upload to R2
+    console.log(`[Avatar] Syncing from Telegram to R2: ${downloadUrl}`)
+    const publicUrl = await uploadImageFromUrl(downloadUrl, 'avatars')
 
-    let contentType = imgResp.headers.get('content-type') || 'image/jpeg'
-    if (contentType === 'application/octet-stream') {
-      contentType = 'image/jpeg' // Force JPEG for Telegram photos if generic type
-    }
-    console.log(`[Avatar] Downloaded from Telegram, size: ${buf.length}, type: ${contentType} (original: ${imgResp.headers.get('content-type')})`)
-
-    // 3. Upload to Supabase Storage
-    // Use fixed filename to save space (overwrite existing)
-    const fileName = `profile.jpg`
-    const uploadPath = `${userId}/${fileName}`
-
-    const upload = await supaStorageUpload(uploadPath, buf, contentType)
-    if (!upload.ok) return res.status(500).json({ error: 'upload failed', detail: upload.data })
-
-    // 4. Get Public URL
-    // Add timestamp to force cache busting on client side
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uploadPath}?t=${Date.now()}`
-
-    // Verify if the public URL is accessible
-    try {
-      const verifyResp = await fetch(publicUrl)
-      console.log(`[Avatar] Verification fetch: ${publicUrl} -> ${verifyResp.status} ${verifyResp.statusText}`)
-      if (!verifyResp.ok) {
-        console.error(`[Avatar] Public URL not accessible! Check bucket permissions.`)
-      }
-    } catch (err) {
-      console.error(`[Avatar] Verification fetch failed:`, err)
-    }
-
-    // 5. Update users table
+    // 4. Update users table
     const update = await supaPatch('users', `?user_id=eq.${userId}`, { avatar_url: publicUrl })
     if (!update.ok) return res.status(500).json({ error: 'db update failed', detail: update.data })
 
@@ -119,14 +92,9 @@ export async function getAvatar(req: Request, res: Response) {
     const row = (q.ok && Array.isArray(q.data)) ? q.data[0] : null
 
     if (row && row.avatar_url) {
-      // Redirect to the actual storage URL
-      // Add timestamp if not present to avoid caching issues if needed, 
-      // but usually the stored URL might already have it or we rely on browser cache.
-      // For now, just redirect.
       return res.redirect(row.avatar_url)
     }
 
-    // If no custom avatar, return 404 or redirect to default
     return res.status(404).json({ error: 'avatar not found' })
   } catch (e) {
     console.error('getAvatar error:', e)
@@ -138,39 +106,18 @@ export async function uploadAvatar(req: Request, res: Response) {
   try {
     const { userId, imageBase64 } = req.body || {}
     if (!userId || !imageBase64) return res.status(400).json({ error: 'invalid payload' })
-    const base64 = String(imageBase64)
-    const commaIdx = base64.indexOf(',')
-    const data = commaIdx >= 0 ? base64.slice(commaIdx + 1) : base64
-    const buf = Buffer.from(data, 'base64')
 
-    if (SUPABASE_URL && SUPABASE_KEY) {
-      const filePath = `${encodeURIComponent(String(userId))}/profile.jpg`
-      const up = await supaStorageUpload(filePath, buf, 'image/jpeg')
-      if (!up.ok) return res.status(500).json({ error: 'upload to storage failed', detail: up.data })
+    // Upload to R2
+    console.log(`[Avatar] Manual upload to R2 for user ${userId}`)
+    const publicUrl = await uploadImageFromBase64(imageBase64, 'avatars')
 
-      // Update user avatar_url if not set (or just always update to be safe)
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filePath}?t=${Date.now()}`
+    // Update DB
+    const upd = await supaPatch('users', `?user_id=eq.${userId}`, { avatar_url: publicUrl })
+    if (!upd.ok) return res.status(500).json({ error: 'db update failed', detail: upd.data })
 
-      // Verify if the public URL is accessible
-      try {
-        const verifyResp = await fetch(publicUrl)
-        console.log(`[Avatar] Manual upload verification: ${publicUrl} -> ${verifyResp.status} ${verifyResp.statusText}`)
-        if (!verifyResp.ok) {
-          console.error(`[Avatar] Manual upload public URL not accessible! Check bucket permissions.`)
-        }
-      } catch (err) {
-        console.error(`[Avatar] Manual upload verification failed:`, err)
-      }
-
-      const upd = await supaPatch('users', `?user_id=eq.${userId}`, { avatar_url: publicUrl })
-
-      return res.json({ ok: true, file_path: filePath, avatar_url: publicUrl })
-    }
-
-    return res.status(500).json({ error: 'Supabase not configured, local storage removed' });
-
-    return res.status(500).json({ error: 'Supabase not configured, local storage removed' });
-  } catch {
+    return res.json({ ok: true, avatar_url: publicUrl })
+  } catch (e) {
+    console.error('uploadAvatar error:', e)
     return res.status(500).json({ error: 'upload failed' })
   }
 }

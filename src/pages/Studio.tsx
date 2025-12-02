@@ -91,6 +91,7 @@ export default function Studio() {
   const [balance, setBalance] = useState<number | null>(null)
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [scale, setScale] = useState(1)
+  const [resolution, setResolution] = useState<'2K' | '4K'>('4K')
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -171,7 +172,8 @@ export default function Studio() {
           aspect_ratio: aspectRatio,
           images: generationMode === 'image' ? uploadedImages : [],
           user_id: user?.id || null,
-          parent_id: parentGenerationId || undefined
+          parent_id: parentGenerationId || undefined,
+          resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined
         })
       })
 
@@ -187,7 +189,10 @@ export default function Studio() {
       setGeneratedImage(data.image)
       setParentGeneration(null, null) // Reset parent after success
       // Update balance after generation
-      if (balance !== null) setBalance(prev => (prev !== null ? prev - MODEL_PRICES[selectedModel] : null))
+      if (balance !== null) {
+        const cost = selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10 : MODEL_PRICES[selectedModel]
+        setBalance(prev => (prev !== null ? prev - cost : null))
+      }
 
       try {
         const item = { id: Date.now(), url: data.image, prompt, model: MODELS.find(m => m.id === selectedModel)?.name, ratio: aspectRatio, date: new Date().toLocaleDateString() }
@@ -466,6 +471,27 @@ export default function Studio() {
           </div>
         )}
 
+        {/* 5.1 Resolution Selector (NanoBanana Pro only) */}
+        {selectedModel === 'nanobanana-pro' && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-4">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">Качество</label>
+            <div className="flex gap-2 p-1 bg-zinc-900/50 rounded-xl border border-white/5">
+              <button
+                onClick={() => { setResolution('2K'); impact('light') }}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${resolution === '2K' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                2K (10 токенов)
+              </button>
+              <button
+                onClick={() => { setResolution('4K'); impact('light') }}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${resolution === '4K' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                4K (15 токенов)
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-center gap-3 text-rose-400 text-sm animate-in fade-in slide-in-from-bottom-2">
@@ -485,7 +511,9 @@ export default function Studio() {
             <div className="relative flex items-center gap-2">
               {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
               <span>{isGenerating ? 'Создание шедевра...' : generationMode === 'image' ? 'Сгенерировать' : 'Сгенерировать'}</span>
-              {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">{MODEL_PRICES[selectedModel]} токена</span>}
+              {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
+                {selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10 : MODEL_PRICES[selectedModel]} токена
+              </span>}
             </div>
           </Button>
         </div>

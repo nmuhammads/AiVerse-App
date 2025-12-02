@@ -25,7 +25,7 @@ function getS3Client() {
     return s3Client
 }
 
-export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
+export async function uploadImageFromUrl(imageUrl: string, folder: string = ''): Promise<string> {
     const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME
     const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL
     const client = getS3Client()
@@ -41,6 +41,12 @@ export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
         return imageUrl
     }
 
+    // Optimization: If image is already on R2, skip re-upload
+    if (imageUrl.startsWith(R2_PUBLIC_URL)) {
+        console.log('Image is already on R2, skipping upload:', imageUrl)
+        return imageUrl
+    }
+
     try {
         // 1. Fetch the image
         const response = await fetch(imageUrl)
@@ -52,7 +58,7 @@ export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
         // 2. Generate unique filename
         const hash = crypto.randomBytes(16).toString('hex')
         const ext = contentType.split('/')[1] || 'png'
-        const fileName = `${hash}.${ext}`
+        const fileName = folder ? `${folder}/${hash}.${ext}` : `${hash}.${ext}`
 
         // 3. Upload to R2
         await client.send(new PutObjectCommand({
@@ -71,7 +77,7 @@ export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
 }
 
 
-export async function uploadImageFromBase64(base64Data: string): Promise<string> {
+export async function uploadImageFromBase64(base64Data: string, folder: string = ''): Promise<string> {
     const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME
     const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL
     const client = getS3Client()
@@ -99,7 +105,7 @@ export async function uploadImageFromBase64(base64Data: string): Promise<string>
         // 2. Generate unique filename
         const hash = crypto.randomBytes(16).toString('hex')
         const ext = contentType.split('/')[1] || 'png'
-        const fileName = `${hash}.${ext}`
+        const fileName = folder ? `${folder}/${hash}.${ext}` : `${hash}.${ext}`
 
         // 3. Upload to R2
         await client.send(new PutObjectCommand({

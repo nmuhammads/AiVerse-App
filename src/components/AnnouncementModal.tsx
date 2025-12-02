@@ -4,12 +4,14 @@ import { useHaptics } from '@/hooks/useHaptics'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_v2.3', // Change this ID to show a new announcement to everyone
-    title: 'Публичные профили!',
-    description: 'Теперь вы можете просматривать профили других авторов и их работы! Также мы исправили отображение имен в ленте и улучшили общую производительность приложения.',
+    id: 'announcement_nanobanana_fix_v2', // Change this ID to show a new announcement to everyone
+    title: 'NanoBanana Pro Исправлен + Скидки!',
+    description: 'Мы исправили ошибки в генерации NanoBanana Pro. Также добавили возможность выбора качества: теперь доступна 2K генерация всего за 10 токенов! Если вы теряли токены из-за ошибок, пишите в поддержку.',
     image: 'https://cdn.midjourney.com/0c609677-440d-4056-a8a2-201804193556/0_0.png', // Placeholder image
-    buttonText: 'Круто!',
-    link: '' // Optional link
+    buttonText: 'Попробовать',
+    link: '', // Close modal on click
+    secondaryButtonText: 'Написать в поддержку',
+    secondaryLink: 'https://t.me/aiversebots'
 }
 
 export function AnnouncementModal() {
@@ -42,6 +44,13 @@ export function AnnouncementModal() {
             window.open(ANNOUNCEMENT.link, '_blank')
         }
         handleClose()
+    }
+
+    const handleSecondaryAction = () => {
+        impact('medium')
+        if (ANNOUNCEMENT.secondaryLink) {
+            window.open(ANNOUNCEMENT.secondaryLink, '_blank')
+        }
     }
 
     if (!isOpen) return null
@@ -88,12 +97,23 @@ export function AnnouncementModal() {
                         {ANNOUNCEMENT.description}
                     </p>
 
-                    <button
-                        onClick={handleAction}
-                        className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5 active:scale-[0.98] transition-transform"
-                    >
-                        {ANNOUNCEMENT.buttonText}
-                    </button>
+                    <div className="w-full space-y-3">
+                        <button
+                            onClick={handleAction}
+                            className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5 active:scale-[0.98] transition-transform"
+                        >
+                            {ANNOUNCEMENT.buttonText}
+                        </button>
+
+                        {ANNOUNCEMENT.secondaryButtonText && (
+                            <button
+                                onClick={handleSecondaryAction}
+                                className="w-full py-3.5 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors border border-white/5 active:scale-[0.98] transition-transform"
+                            >
+                                {ANNOUNCEMENT.secondaryButtonText}
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

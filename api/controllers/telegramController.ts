@@ -21,7 +21,7 @@ async function tg(method: string, payload: Record<string, unknown>) {
   try { return await r.json() } catch { return null }
 }
 
-import { supaSelect, supaPatch } from '../services/supabaseService.js'
+import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
 
 export async function webhook(req: Request, res: Response) {
   try {
@@ -209,59 +209,67 @@ export async function sendPhoto(req: Request, res: Response) {
     const photo = String(req.body?.photo_url || '')
     const caption = typeof req.body?.caption === 'string' ? String(req.body.caption) : undefined
     if (!API || !chat_id || !photo) return res.status(400).json({ ok: false, error: 'invalid payload' })
+
     const CAPTION_LIMIT = 1024
     const finalCaption = caption ? caption.slice(0, CAPTION_LIMIT) : undefined
     const restCaption = caption && caption.length > CAPTION_LIMIT ? caption.slice(CAPTION_LIMIT) : ''
-    console.info('sendPhoto:start', { chat_id, caption_len: caption ? caption.length : 0, trimmed_len: finalCaption ? finalCaption.length : 0, rest_len: restCaption.length, photo_preview: photo.slice(0, 128) })
+
+    console.info('sendPhoto:start', { chat_id, caption_len: caption ? caption.length : 0, photo_preview: photo.slice(0, 128) })
+
+    // 1. Try sending by URL (Telegram downloads)
+    // This saves backend bandwidth, but still counts as Egress for the storage provider (Supabase/R2)
+    if (photo.startsWith('http')) {
+      console.info('sendPhoto:try_url')
+      const resp = await tg('sendPhoto', { chat_id, photo, caption: finalCaption })
+      if (resp?.ok) {
+        if (restCaption) await sendRestCaption(chat_id, restCaption)
+        return res.json({ ok: true, method: 'url' })
+      }
+      console.warn('sendPhoto:url_failed', resp)
+    }
+
+    // 2. Fallback: Download and Upload
     try {
       const imgResp = await fetch(photo)
       const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
-      const clen = imgResp.headers.get('content-length')
-      console.info('sendPhoto:image_fetch', { status: imgResp.status, ct: contentType, content_length: clen })
-      if (!imgResp.ok) return res.status(400).json({ ok: false, error: 'image fetch failed', status: imgResp.status, ct: contentType })
+      console.info('sendPhoto:image_fetch', { status: imgResp.status, ct: contentType })
+      if (!imgResp.ok) return res.status(400).json({ ok: false, error: 'image fetch failed', status: imgResp.status })
+
       const ab = await imgResp.arrayBuffer()
       const blob = new Blob([ab], { type: contentType })
       const ext = contentType.includes('png') ? 'png' : (contentType.includes('webp') ? 'webp' : 'jpg')
       const filename = `ai-${Date.now()}.${ext}`
+
       const form = new FormData()
       form.append('chat_id', String(chat_id))
       if (finalCaption) form.append('caption', finalCaption)
       form.append('photo', blob, filename)
-      console.info('sendPhoto:upload_post', { filename, ct: contentType })
+
+      console.info('sendPhoto:upload_post', { filename })
       const r = await fetch(`${API}/sendPhoto`, { method: 'POST', body: form })
       const j = await r.json().catch(() => null)
-      console.info('sendPhoto:upload_resp', { ok: j?.ok === true, desc: j?.description, error_code: j?.error_code })
+
       if (!j || j.ok !== true) return res.status(500).json({ ok: false, error: j?.description || 'telegram sendPhoto failed', resp: j })
-      if (restCaption && restCaption.length > 0) {
-        const MAX_MSG = 4096
-        let idx = 0
-        while (idx < restCaption.length) {
-          const part = restCaption.slice(idx, idx + MAX_MSG)
-          idx += MAX_MSG
-          const m = await tg('sendMessage', { chat_id, text: part })
-          console.info('sendPhoto:rest_caption_msg', { ok: m?.ok === true, len: part.length })
-        }
-      }
-      return res.json({ ok: true })
+
+      if (restCaption) await sendRestCaption(chat_id, restCaption)
+      return res.json({ ok: true, method: 'upload' })
     } catch (e) {
-      console.warn('sendPhoto:upload_error', { message: (e as Error)?.message })
-      const resp = await tg('sendPhoto', { chat_id, photo, caption: finalCaption })
-      console.info('sendPhoto:fallback_url_resp', { ok: resp?.ok === true, desc: resp?.description, error_code: resp?.error_code })
-      if (!resp || resp.ok !== true) return res.status(500).json({ ok: false, error: resp?.description || 'telegram sendPhoto failed', resp })
-      if (restCaption && restCaption.length > 0) {
-        const MAX_MSG = 4096
-        let idx = 0
-        while (idx < restCaption.length) {
-          const part = restCaption.slice(idx, idx + MAX_MSG)
-          idx += MAX_MSG
-          const m = await tg('sendMessage', { chat_id, text: part })
-          console.info('sendPhoto:rest_caption_msg', { ok: m?.ok === true, len: part.length })
-        }
-      }
-      return res.json({ ok: true })
+      console.error('sendPhoto:upload_error', e)
+      return res.status(500).json({ ok: false, error: (e as Error).message })
     }
-  } catch {
+  } catch (e) {
+    console.error('sendPhoto:fatal_error', e)
     return res.status(500).json({ ok: false })
+  }
+}
+
+async function sendRestCaption(chat_id: number, text: string) {
+  const MAX_MSG = 4096
+  let idx = 0
+  while (idx < text.length) {
+    const part = text.slice(idx, idx + MAX_MSG)
+    idx += MAX_MSG
+    await tg('sendMessage', { chat_id, text: part })
   }
 }
 

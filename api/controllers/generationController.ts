@@ -208,34 +208,17 @@ const MODEL_PRICES: Record<string, number> = {
   'qwen-edit': 3,
 }
 
-async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: string, model: string, parentId?: number, metadata?: { ratio?: string; imagesCount?: number }, inputImages?: string[]) {
-  if (!SUPABASE_URL || !SUPABASE_KEY || !userId) return
-  const cost = MODEL_PRICES[model] ?? 0
+async function completeGeneration(generationId: number, userId: number, imageUrl: string, model: string, cost: number, parentId?: number) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !userId || !generationId) return
   try {
-    // 1. Construct Metadata String
-    const type = (metadata?.imagesCount && metadata.imagesCount > 0) ? 'text_photo' : 'text'
-    const ratio = metadata?.ratio || '1:1'
-    const photos = metadata?.imagesCount || 0
-    const metaString = ` [type=${type}; ratio=${ratio}; photos=${photos}; avatars=0]`
-
-    // Append to prompt
-    const promptWithMeta = prompt + metaString
-
-    // 2. Save generation
-    const genBody: any = {
-      user_id: userId,
+    // 1. Update generation status
+    await supaPatch('generations', `?id=eq.${generationId}`, {
       image_url: imageUrl,
-      prompt: promptWithMeta,
-      model,
       status: 'completed',
       completed_at: new Date().toISOString()
-    }
-    if (parentId) genBody.parent_id = parentId
-    if (inputImages && inputImages.length > 0) genBody.input_images = inputImages
-    const genRes = await supaPost('generations', genBody)
-    const newGenId = (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) ? genRes.data[0].id : null
+    })
 
-    // 3. Deduct balance
+    // 2. Deduct balance
     const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
     const curr = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : null
     if (typeof curr === 'number') {
@@ -243,8 +226,8 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
       await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: next })
     }
 
-    // 4. Handle Remix Logic
-    if (parentId && newGenId) {
+    // 3. Handle Remix Logic
+    if (parentId) {
       // Increment remix_count for parent generation
       const pGen = await supaSelect('generations', `?id=eq.${parentId}&select=remix_count,user_id`)
       if (pGen.ok && Array.isArray(pGen.data) && pGen.data.length > 0) {
@@ -272,7 +255,7 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
             await supaPost('remix_rewards', {
               user_id: parentGen.user_id,
               source_generation_id: parentId,
-              remix_generation_id: newGenId,
+              remix_generation_id: generationId,
               amount: rewardAmount
             })
           }
@@ -280,7 +263,7 @@ async function recordSuccessAndDeduct(userId: number, imageUrl: string, prompt: 
       }
     }
   } catch (e) {
-    console.error('recordSuccessAndDeduct error:', e)
+    console.error('completeGeneration error:', e)
   }
 }
 
@@ -291,6 +274,12 @@ interface KieAIRequest {
   aspect_ratio?: string
   images?: string[] // Changed from image?: string to images?: string[]
   negative_prompt?: string
+  meta?: {
+    generationId: number
+    tokens: number
+    userId: number
+  }
+  resolution?: string
 }
 
 interface KieAIResponse {
@@ -305,7 +294,7 @@ async function generateImageWithKieAI(
   requestData: KieAIRequest
 ): Promise<KieAIResponse> {
   try {
-    const { model, prompt, aspect_ratio, images, negative_prompt } = requestData
+    const { model, prompt, aspect_ratio, images, negative_prompt, resolution } = requestData
     const cfg = MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]
 
     const hasImages = images && images.length > 0
@@ -351,7 +340,7 @@ async function generateImageWithKieAI(
       const isPro = model === 'nanobanana-pro'
       const modelId = isPro ? 'nano-banana-pro' : (imageUrls.length > 0 ? 'google/nano-banana-edit' : 'google/nano-banana')
 
-      const resolution = isPro ? '4K' : undefined
+      const res = isPro ? (resolution || '4K') : undefined
 
       let image_size: string | undefined
       if (aspect_ratio !== 'Auto') {
@@ -363,8 +352,16 @@ async function generateImageWithKieAI(
         output_format: 'png'
       }
 
+      if (requestData.meta) {
+        input.meta = requestData.meta
+      }
+
       if (imageUrls.length > 0) {
-        input.image_urls = imageUrls
+        if (isPro) {
+          input.image_input = imageUrls
+        } else {
+          input.image_urls = imageUrls
+        }
       }
 
       if (image_size) input.image_size = image_size
@@ -375,7 +372,7 @@ async function generateImageWithKieAI(
           input.aspect_ratio = aspect_ratio
           delete input.image_size
         }
-        if (resolution) input.resolution = resolution
+        if (res) input.resolution = res
 
         const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input)
         const url = await pollJobsTask(apiKey, taskId)
@@ -394,14 +391,17 @@ async function generateImageWithKieAI(
         const input: Record<string, unknown> = {
           prompt,
           image_url: imageUrls[0],
-          strength: 0.8,
-          output_format: 'png',
           acceleration: 'none',
-          enable_safety_checker: false
+          image_size: aspect_ratio === 'Auto' ? 'landscape_4_3' : mapQwenImageSize(aspect_ratio) || 'landscape_4_3',
+          num_inference_steps: 25,
+          guidance_scale: 4,
+          sync_mode: false,
+          enable_safety_checker: true,
+          output_format: 'png'
         }
         if (negative_prompt) input.negative_prompt = negative_prompt
 
-        const taskId = await createJobsTask(apiKey, 'qwen/image-to-image', input)
+        const taskId = await createJobsTask(apiKey, 'qwen/image-edit', input)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: imageUrls }
       } else {
@@ -430,7 +430,7 @@ async function generateImageWithKieAI(
 // Основной контроллер для обработки запросов генерации
 export async function handleGenerateImage(req: Request, res: Response) {
   try {
-    const { prompt, model, aspect_ratio, images, negative_prompt, user_id } = req.body
+    const { prompt, model, aspect_ratio, images, negative_prompt, user_id, resolution } = req.body
 
     // Валидация входных данных
     if (!prompt || typeof prompt !== 'string') {
@@ -500,8 +500,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
     }
 
     // Проверка баланса пользователя
+    let cost = 0
     if (user_id) {
-      const cost = MODEL_PRICES[model] ?? 0
+      cost = MODEL_PRICES[model] ?? 0
+      // Dynamic pricing for NanoBanana Pro
+      if (model === 'nanobanana-pro' && resolution === '2K') {
+        cost = 10
+      }
       const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
       const balance = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : 0
 
@@ -512,45 +517,84 @@ export async function handleGenerateImage(req: Request, res: Response) {
       }
     }
 
+    // Create Pending Generation Record
+    let generationId = 0
+    let r2Images: string[] = []
+
+    if (user_id && Number(user_id)) {
+      // Extract parent_id from request body
+      const parent_id = req.body.parent_id
+
+      // Wait for R2 uploads to complete before saving to DB
+      try {
+        r2Images = await r2ImagesPromise
+      } catch (e) {
+        console.error('Failed to await R2 images:', e)
+        r2Images = images || [] // Fallback to original images
+      }
+
+      // Prepare metadata string
+      const metadata = {
+        ratio: aspect_ratio,
+        imagesCount: images ? images.length : 0
+      }
+      const type = (metadata.imagesCount > 0) ? 'text_photo' : 'text'
+      const ratio = metadata.ratio || '1:1'
+      const photos = metadata.imagesCount
+      const metaString = ` [type=${type}; ratio=${ratio}; photos=${photos}; avatars=0]`
+      const promptWithMeta = prompt + metaString
+
+      // Insert pending record
+      const genBody: any = {
+        user_id: Number(user_id),
+        prompt: promptWithMeta,
+        model,
+        status: 'pending',
+        input_images: r2Images.length > 0 ? r2Images : undefined,
+        parent_id: parent_id
+      }
+
+      const genRes = await supaPost('generations', genBody)
+      if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
+        generationId = genRes.data[0].id
+      } else {
+        console.error('Failed to create pending generation record', genRes)
+        // We continue, but generationId will be 0, so meta won't be sent
+      }
+    }
+
     // Вызов Kie.ai API
     const result = await generateImageWithKieAI(apiKey, {
       model,
       prompt,
       aspect_ratio,
       images,
-      negative_prompt
+      negative_prompt,
+      meta: generationId ? {
+        generationId,
+        tokens: cost,
+        userId: Number(user_id)
+      } : undefined,
+      resolution
     })
 
     if (result.error) {
+      // Mark as failed if we created a record
+      if (generationId) {
+        await supaPatch('generations', `?id=eq.${generationId}`, {
+          status: 'failed',
+          error_message: result.error
+        })
+      }
       return res.status(500).json({ error: result.error })
     }
 
     if (result.images && result.images.length > 0) {
       const imageUrl = result.images[0]
-      if (user_id && Number(user_id)) {
-        // Extract parent_id from request body (it was missed in destructuring above)
-        const parent_id = req.body.parent_id
-
-        // Prepare metadata
-        const metadata = {
-          ratio: aspect_ratio,
-          imagesCount: images ? images.length : 0
-        }
-
-        // Wait for R2 uploads to complete before saving to DB
-        let r2Images: string[] = []
-        try {
-          r2Images = await r2ImagesPromise
-        } catch (e) {
-          console.error('Failed to await R2 images:', e)
-          r2Images = images || [] // Fallback to original images
-        }
-
-        console.log('Saving to DB with images:', r2Images)
-
-        // Pass r2Images (permanent URLs) to DB
-        recordSuccessAndDeduct(Number(user_id), imageUrl, prompt, model, parent_id, metadata, r2Images).catch(err => {
-          console.error('Failed to record success:', err)
+      if (generationId) {
+        // Complete generation (update DB, deduct balance, rewards)
+        completeGeneration(generationId, Number(user_id), imageUrl, model, cost, req.body.parent_id).catch(err => {
+          console.error('Failed to complete generation:', err)
         })
       }
       return res.json({
@@ -559,6 +603,12 @@ export async function handleGenerateImage(req: Request, res: Response) {
         model: model
       })
     } else {
+      if (generationId) {
+        await supaPatch('generations', `?id=eq.${generationId}`, {
+          status: 'failed',
+          error_message: 'No images generated'
+        })
+      }
       return res.status(500).json({
         error: 'No images generated'
       })
