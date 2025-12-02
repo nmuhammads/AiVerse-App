@@ -113,7 +113,11 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                             impact('light')
                             setIsFullScreen(true)
                         }}
-                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`absolute top-3 right-3 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-opacity ${
+                            platform === 'ios' || platform === 'android' 
+                                ? 'opacity-100' 
+                                : 'opacity-0 group-hover:opacity-100'
+                        }`}
                     >
                         <Maximize2 size={20} />
                     </button>
