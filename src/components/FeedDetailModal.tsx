@@ -1,7 +1,8 @@
-import { X, Heart, Repeat, Download, Share2, Sparkles } from 'lucide-react'
+import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2 } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useState, useEffect } from 'react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 interface FeedItem {
     id: number
@@ -44,6 +45,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
     const { impact } = useHaptics()
     const { user, platform } = useTelegram()
     const [isLikeAnimating, setIsLikeAnimating] = useState(false)
+    const [isFullScreen, setIsFullScreen] = useState(false)
 
     // Close on escape
     useEffect(() => {
@@ -99,12 +101,22 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                 </div>
 
                 {/* Main Image */}
-                <div className="relative flex items-center justify-center rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl border border-white/5">
+                <div className="relative flex items-center justify-center rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl border border-white/5 group">
                     <img
                         src={item.image_url}
                         alt={item.prompt}
                         className="max-w-full max-h-[65dvh] object-contain"
                     />
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            impact('light')
+                            setIsFullScreen(true)
+                        }}
+                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        <Maximize2 size={20} />
+                    </button>
                 </div>
 
                 {/* Footer */}
@@ -155,6 +167,37 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                     </div>
                 </div>
             </div>
+
+            {isFullScreen && (
+                <div className="fixed inset-0 z-[200] bg-black flex flex-col" onClick={(e) => e.stopPropagation()}>
+                    <div className={`absolute top-0 right-0 z-50 p-4 ${platform === 'android' ? 'pt-[calc(5rem+env(safe-area-inset-top))]' : 'pt-[calc(3rem+env(safe-area-inset-top))]'}`}>
+                        <button
+                            onClick={() => setIsFullScreen(false)}
+                            className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md border border-white/10"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                        <TransformWrapper
+                            initialScale={1}
+                            minScale={1}
+                            maxScale={4}
+                            centerOnInit
+                            alignmentAnimation={{ sizeX: 0, sizeY: 0 }}
+                        >
+                            <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img
+                                    src={item.image_url}
+                                    alt="Fullscreen"
+                                    className="max-w-full max-h-full object-contain"
+                                />
+                            </TransformComponent>
+                        </TransformWrapper>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
