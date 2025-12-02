@@ -242,7 +242,10 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
             const parentUser = pUser.data[0]
             const newUserCount = (parentUser.remix_count || 0) + 1
 
-            const rewardAmount = model === 'nanobanana-pro' ? 3 : 1
+            let rewardAmount = 1
+            if (model === 'nanobanana-pro') {
+              rewardAmount = cost === 10 ? 2 : 3
+            }
             const newBalance = (parentUser.balance || 0) + rewardAmount
 
             // Update user stats
