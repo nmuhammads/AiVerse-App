@@ -84,7 +84,7 @@ export async function getFeed(req: Request, res: Response) {
                 created_at: it.created_at,
                 author: {
                     id: it.user_id,
-                    username: author.username ? `@${author.username}` : (author.first_name ? `${author.first_name} ${author.last_name || ''}`.trim() : 'User'),
+                    username: author.username ? `@${author.username.replace(/^@+/, '')}` : (author.first_name ? `${author.first_name} ${author.last_name || ''}`.trim() : 'User'),
                     first_name: author.first_name,
                     avatar_url: author.avatar_url || (author.username
                         ? `https://api.dicebear.com/9.x/avataaars/svg?seed=${author.username}`

@@ -11,6 +11,7 @@ import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { useEffect } from "react";
 import WebApp from "@twa-dev/sdk";
+import { AnnouncementModal } from "@/components/AnnouncementModal";
 
 function StartParamRouter() {
   const navigate = useNavigate();
@@ -90,6 +91,7 @@ export default function App() {
         </div>
       </Router>
       <Toaster />
+      <AnnouncementModal />
     </>
   );
 }

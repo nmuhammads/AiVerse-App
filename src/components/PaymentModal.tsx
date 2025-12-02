@@ -120,19 +120,16 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 setLoading(false)
             }
         } else {
-            // Tribute Payment (Card or SBP)
+            // Tribute Payment (Card or SBP) via Bot Hub Deep Link
             const wa = (window as any).Telegram?.WebApp
-            const link = activeMethod === 'card' ? selectedPackage.webLink : selectedPackage.link
+            const method = activeMethod === 'card' ? 'card' : 'sbp'
+            const link = `https://t.me/aiverse_hub_bot?start=pay-${method}-${selectedPackage.tokens}`
 
-            if (link) {
-                if (wa && activeMethod === 'sbp') {
-                    wa.openTelegramLink(link)
-                } else {
-                    window.open(link, '_blank')
-                }
+            if (wa) {
+                wa.openTelegramLink(link)
                 onClose()
             } else {
-                alert('Ссылка на оплату не найдена')
+                window.open(link, '_blank')
             }
         }
     }
