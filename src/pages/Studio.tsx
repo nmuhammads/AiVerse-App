@@ -7,6 +7,7 @@ import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/ge
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
+import { compressImage } from '@/utils/imageCompression'
 
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
   { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/nanobanana.png' },
@@ -132,18 +133,32 @@ export default function Studio() {
       return
     }
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          addUploadedImage(ev.target.result as string)
+    // Process files with compression
+    const processFiles = async () => {
+      const newImages: string[] = []
+
+      for (const file of Array.from(files)) {
+        try {
+          const compressed = await compressImage(file)
+          newImages.push(compressed)
+        } catch (e) {
+          console.error('Compression failed', e)
+          // Fallback to original if compression fails
+          const reader = new FileReader()
+          reader.readAsDataURL(file)
+          reader.onload = (ev) => {
+            if (ev.target?.result) addUploadedImage(ev.target.result as string)
+          }
         }
       }
-      reader.readAsDataURL(file)
-    })
-    impact('light')
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = ''
+
+      newImages.forEach(img => addUploadedImage(img))
+      impact('light')
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    processFiles()
   }
 
   const handleGenerate = async () => {
@@ -161,6 +176,11 @@ export default function Studio() {
     setError(null)
 
     impact('heavy')
+
+    // Create AbortController for client-side timeout (60s)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
     try {
       const res = await fetch('/api/generation/generate', {
         method: 'POST',
@@ -174,8 +194,11 @@ export default function Studio() {
           user_id: user?.id || null,
           parent_id: parentGenerationId || undefined,
           resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined
-        })
+        }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (res.status === 403) {
         setShowBalancePopup(true)
@@ -203,9 +226,20 @@ export default function Studio() {
       setCurrentScreen('result')
       notify('success')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка генерации')
+      let msg = 'Ошибка генерации'
+      if (e instanceof Error) {
+        if (e.name === 'AbortError') {
+          msg = 'Время ожидания истекло. Генерация может завершиться в фоне, проверьте историю позже.'
+        } else if (e.message === 'Failed to fetch' || e.message.includes('Load failed')) {
+          msg = 'Ошибка сети. Проверьте интернет или попробуйте позже.'
+        } else {
+          msg = e.message
+        }
+      }
+      setError(msg)
       notify('error')
     } finally {
+      clearTimeout(timeoutId)
       setIsGenerating(false)
     }
   }

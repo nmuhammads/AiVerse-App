@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Search, X, Heart, Repeat } from 'lucide-react'
+import { Search, X, Heart, Repeat, ChevronDown } from 'lucide-react'
 import { FeedDetailModal } from '@/components/FeedDetailModal'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -17,6 +17,7 @@ export default function Home() {
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<'new' | 'popular'>('new')
+  const [selectedModelFilter, setSelectedModelFilter] = useState<string>('all')
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
@@ -38,7 +39,7 @@ export default function Home() {
       const limit = reset ? LIMIT_INITIAL : LIMIT_MORE
       const userIdParam = user?.id ? `&user_id=${user.id}` : ''
 
-      const res = await fetch(`/api/feed?limit=${limit}&offset=${currentOffset}&sort=${sort}${userIdParam}`)
+      const res = await fetch(`/api/feed?limit=${limit}&offset=${currentOffset}&sort=${sort}${userIdParam}&model=${selectedModelFilter}`)
 
       if (res.ok) {
         const data = await res.json()
@@ -67,11 +68,11 @@ export default function Home() {
       setLoading(false)
       setIsFetchingMore(false)
     }
-  }, [user?.id, sort, offset])
+  }, [user?.id, sort, offset, selectedModelFilter])
 
   useEffect(() => {
     fetchFeed(true)
-  }, [sort, user?.id])
+  }, [sort, user?.id, selectedModelFilter])
 
   // Infinite scroll handler
   useEffect(() => {
@@ -235,10 +236,23 @@ export default function Home() {
         </div>
 
         {/* Month Header */}
-        <div className="px-1 mb-2">
+        <div className="px-1 mb-2 flex items-center justify-between">
           <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
             Лента за {new Date().toLocaleString('ru', { month: 'long' })}
           </h2>
+          <div className="relative">
+            <select
+              value={selectedModelFilter}
+              onChange={(e) => { setSelectedModelFilter(e.target.value); impact('light') }}
+              className="appearance-none bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 rounded-lg py-1.5 pl-3 pr-8 focus:outline-none focus:border-violet-500/50 transition-colors"
+            >
+              <option value="all">Все модели</option>
+              <option value="nanobanana">NanoBanana</option>
+              <option value="nanobanana-pro">NanoBanana Pro</option>
+              <option value="seedream4">SeeDream 4</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+          </div>
         </div>
 
         {loading ? (
