@@ -66,7 +66,9 @@ export async function getFeed(req: Request, res: Response) {
         // We want "2025-12-01 00:00:00" in UTC effectively
         const startOfMonth = new Date(Date.UTC(targetTime.getUTCFullYear(), targetTime.getUTCMonth(), 1)).toISOString()
 
-        const query = `?is_published=eq.true&created_at=gte.${startOfMonth}&order=${order}&limit=${limit}&offset=${offset}&${select}`
+        const model = req.query.model ? String(req.query.model) : null
+
+        const query = `?is_published=eq.true&created_at=gte.${startOfMonth}${model && model !== 'all' ? `&model=eq.${model}` : ''}&order=${order}&limit=${limit}&offset=${offset}&${select}`
 
         const q = await supaSelect('generations', query)
         if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
