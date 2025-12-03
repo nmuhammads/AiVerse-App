@@ -161,6 +161,11 @@ export default function Studio() {
     setError(null)
 
     impact('heavy')
+
+    // Create AbortController for client-side timeout (60s)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
     try {
       const res = await fetch('/api/generation/generate', {
         method: 'POST',
@@ -174,8 +179,11 @@ export default function Studio() {
           user_id: user?.id || null,
           parent_id: parentGenerationId || undefined,
           resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined
-        })
+        }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (res.status === 403) {
         setShowBalancePopup(true)
@@ -203,9 +211,20 @@ export default function Studio() {
       setCurrentScreen('result')
       notify('success')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка генерации')
+      let msg = 'Ошибка генерации'
+      if (e instanceof Error) {
+        if (e.name === 'AbortError') {
+          msg = 'Время ожидания истекло. Генерация может завершиться в фоне, проверьте историю позже.'
+        } else if (e.message === 'Failed to fetch' || e.message.includes('Load failed')) {
+          msg = 'Ошибка сети. Проверьте интернет или попробуйте позже.'
+        } else {
+          msg = e.message
+        }
+      }
+      setError(msg)
       notify('error')
     } finally {
+      clearTimeout(timeoutId)
       setIsGenerating(false)
     }
   }

@@ -7,11 +7,19 @@ interface KieAIRequest {
   model: string
   prompt: string
   aspect_ratio?: string
-  image?: string
+  images?: string[]
+  negative_prompt?: string
+  meta?: {
+    generationId: number
+    tokens: number
+    userId: number
+  }
+  resolution?: string
 }
 
 interface KieAIResponse {
   images?: string[]
+  inputImages?: string[]
   error?: string
 }
 
@@ -104,13 +112,18 @@ async function createFluxTask(apiKey: string, prompt: string, aspectRatio?: stri
     model: 'flux-kontext-pro',
   }
   if (inputImageUrl) body.inputImage = inputImageUrl
+  console.log('[Flux] Creating task:', JSON.stringify(body))
   const resp = await fetch('https://api.kie.ai/api/v1/flux/kontext/generate', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
   const json = await resp.json()
-  if (!resp.ok || json?.code !== 200) throw new Error(json?.msg || 'Flux task create failed')
+  if (!resp.ok || json?.code !== 200) {
+    console.error('[Flux] Task create failed:', json)
+    throw new Error(json?.msg || 'Flux task create failed')
+  }
+  console.log('[Flux] Task created, ID:', json.data?.taskId)
   return String(json.data?.taskId || '')
 }
 
@@ -118,6 +131,7 @@ const DEFAULT_TIMEOUT_MS = (() => { const v = Number(process.env.KIE_TASK_TIMEOU
 
 async function pollFluxTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string> {
   const start = Date.now()
+  console.log(`[Flux] Polling task ${taskId} (timeout: ${timeoutMs}ms)`)
   while (Date.now() - start < timeoutMs) {
     const url = `https://api.kie.ai/api/v1/flux/kontext/record-info?taskId=${encodeURIComponent(taskId)}`
     const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } })
@@ -125,30 +139,39 @@ async function pollFluxTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
     if (json && json.code === 200 && json.data) {
       const s = json.data.successFlag
       if (s === 1 && json.data.response?.resultImageUrl) {
+        console.log(`[Flux] Task ${taskId} success`)
         return String(json.data.response.resultImageUrl)
       }
       if (s === 2 || s === 3) {
+        console.error(`[Flux] Task ${taskId} failed:`, json.data.errorMessage)
         throw new Error(json.data.errorMessage || 'Flux task failed')
       }
     }
     await new Promise(r => setTimeout(r, 2000))
   }
+  console.error(`[Flux] Task ${taskId} timeout`)
   throw new Error('Flux task timeout')
 }
 
 async function createJobsTask(apiKey: string, modelId: string, input: Record<string, unknown>) {
+  console.log(`[Jobs] Creating task for ${modelId}:`, JSON.stringify(input))
   const resp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: modelId, input })
   })
   const json = await resp.json()
-  if (!resp.ok || json?.code !== 200) throw new Error(json?.msg || 'Jobs task create failed')
+  if (!resp.ok || json?.code !== 200) {
+    console.error(`[Jobs] Task create failed for ${modelId}:`, json)
+    throw new Error(json?.msg || 'Jobs task create failed')
+  }
+  console.log(`[Jobs] Task created for ${modelId}, ID:`, json.data?.taskId)
   return String(json.data?.taskId || '')
 }
 
 async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string> {
   const start = Date.now()
+  console.log(`[Jobs] Polling task ${taskId} (timeout: ${timeoutMs}ms)`)
   while (Date.now() - start < timeoutMs) {
     const url = `https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`
     const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } })
@@ -159,15 +182,20 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
         try {
           const r = JSON.parse(json.data.resultJson)
           const first = (r.resultUrls && r.resultUrls[0]) || (Array.isArray(r.result_urls) && r.result_urls[0])
-          if (first) return String(first)
+          if (first) {
+            console.log(`[Jobs] Task ${taskId} success`)
+            return String(first)
+          }
         } catch { /* ignore */ }
       }
       if (state === 'fail') {
+        console.error(`[Jobs] Task ${taskId} failed:`, json.data.failMsg)
         throw new Error(json.data.failMsg || 'Jobs task failed')
       }
     }
     await new Promise(r => setTimeout(r, 2000))
   }
+  console.error(`[Jobs] Task ${taskId} timeout`)
   throw new Error('Jobs task timeout')
 }
 
@@ -210,13 +238,15 @@ const MODEL_PRICES: Record<string, number> = {
 
 async function completeGeneration(generationId: number, userId: number, imageUrl: string, model: string, cost: number, parentId?: number) {
   if (!SUPABASE_URL || !SUPABASE_KEY || !userId || !generationId) return
+  console.log(`[DB] Completing generation ${generationId} for user ${userId}`)
   try {
     // 1. Update generation status
-    await supaPatch('generations', `?id=eq.${generationId}`, {
+    const updateRes = await supaPatch('generations', `?id=eq.${generationId}`, {
       image_url: imageUrl,
       status: 'completed',
       completed_at: new Date().toISOString()
     })
+    console.log(`[DB] Generation ${generationId} status updated:`, updateRes.ok)
 
     // 2. Deduct balance
     const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
@@ -224,6 +254,7 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
     if (typeof curr === 'number') {
       const next = curr - cost
       await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: next })
+      console.log(`[DB] Balance deducted for user ${userId}: ${curr} -> ${next}`)
     }
 
     // 3. Handle Remix Logic
@@ -261,6 +292,7 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
               remix_generation_id: generationId,
               amount: rewardAmount
             })
+            console.log(`[DB] Remix reward given to user ${parentGen.user_id}: +${rewardAmount}`)
           }
         }
       }
@@ -268,27 +300,6 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
   } catch (e) {
     console.error('completeGeneration error:', e)
   }
-}
-
-// Типы для запросов к Kie.ai
-interface KieAIRequest {
-  model: string
-  prompt: string
-  aspect_ratio?: string
-  images?: string[] // Changed from image?: string to images?: string[]
-  negative_prompt?: string
-  meta?: {
-    generationId: number
-    tokens: number
-    userId: number
-  }
-  resolution?: string
-}
-
-interface KieAIResponse {
-  images?: string[]
-  inputImages?: string[]
-  error?: string
 }
 
 // Функция для генерации изображения через Kie.ai
@@ -432,6 +443,12 @@ async function generateImageWithKieAI(
 
 // Основной контроллер для обработки запросов генерации
 export async function handleGenerateImage(req: Request, res: Response) {
+  console.log('[API] /generate request received:', {
+    model: req.body.model,
+    userId: req.body.user_id,
+    hasImages: req.body.images?.length > 0
+  })
+
   try {
     const { prompt, model, aspect_ratio, images, negative_prompt, user_id, resolution } = req.body
 
@@ -497,6 +514,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // Проверка API ключа
     const apiKey = process.env.KIE_API_KEY
     if (!apiKey) {
+      console.error('KIE_API_KEY is missing')
       return res.status(500).json({
         error: 'KIE_API_KEY is not configured'
       })
@@ -514,6 +532,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const balance = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : 0
 
       if (balance < cost) {
+        console.warn(`Insufficient balance for user ${user_id}. Required: ${cost}, Available: ${balance}`)
         return res.status(403).json({
           error: `Insufficient balance. Required: ${cost}, Available: ${balance}`
         })
@@ -557,17 +576,22 @@ export async function handleGenerateImage(req: Request, res: Response) {
         parent_id: parent_id
       }
 
+      console.log('[DB] Creating pending generation record...')
       const genRes = await supaPost('generations', genBody)
       if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
         generationId = genRes.data[0].id
+        console.log('[DB] Pending generation created, ID:', generationId)
       } else {
         console.error('Failed to create pending generation record', genRes)
         // We continue, but generationId will be 0, so meta won't be sent
       }
     }
 
-    // Вызов Kie.ai API
-    const result = await generateImageWithKieAI(apiKey, {
+    // Вызов Kie.ai API с таймаутом
+    // Set a hard timeout for the entire generation process (e.g. 55s) to avoid platform timeouts
+    const GENERATION_TIMEOUT_MS = 55000
+
+    const generationPromise = generateImageWithKieAI(apiKey, {
       model,
       prompt,
       aspect_ratio,
@@ -581,13 +605,22 @@ export async function handleGenerateImage(req: Request, res: Response) {
       resolution
     })
 
+    const timeoutPromise = new Promise<KieAIResponse>((_, reject) => {
+      setTimeout(() => reject(new Error('Generation process timed out')), GENERATION_TIMEOUT_MS)
+    })
+
+    console.log('[API] Starting generation with timeout protection...')
+    const result = await Promise.race([generationPromise, timeoutPromise])
+
     if (result.error) {
+      console.error('[API] Generation failed with error:', result.error)
       // Mark as failed if we created a record
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
           error_message: result.error
         })
+        console.log(`[DB] Generation ${generationId} marked as failed`)
       }
       return res.status(500).json({ error: result.error })
     }
@@ -596,16 +629,17 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const imageUrl = result.images[0]
       if (generationId) {
         // Complete generation (update DB, deduct balance, rewards)
-        completeGeneration(generationId, Number(user_id), imageUrl, model, cost, req.body.parent_id).catch(err => {
-          console.error('Failed to complete generation:', err)
-        })
+        // IMPORTANT: Await this to ensure DB is updated before response
+        await completeGeneration(generationId, Number(user_id), imageUrl, model, cost, req.body.parent_id)
       }
+      console.log('[API] Generation successful, sending response')
       return res.json({
         image: imageUrl,
         prompt: prompt,
         model: model
       })
     } else {
+      console.error('[API] No images generated in result')
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
@@ -619,6 +653,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
   } catch (error) {
     console.error('Generation error:', error)
+    // Try to update DB status if possible (we might not have generationId in scope easily here if it failed early,
+    // but usually we want to catch it inside the main logic. This is a fallback.)
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error'
     })
