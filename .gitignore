@@ -34,3 +34,4 @@ migrations/*
 .env
 scripts/temp_migrate.js
 uploads/*
+logs/*
