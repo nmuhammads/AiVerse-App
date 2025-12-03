@@ -39,6 +39,10 @@ function StartParamRouter() {
       navigate("/profile", { replace: true });
       return;
     }
+    if (p === "admin") {
+      navigate("/admin", { replace: true });
+      return;
+    }
   }, [location.search, navigate]);
   return null;
 }
