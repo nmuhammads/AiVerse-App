@@ -284,16 +284,22 @@ export default function Studio() {
 
   if (currentScreen === 'result' && generatedImage) {
     return (
-      <div className="min-h-dvh bg-black safe-bottom-tabbar flex items-center justify-center">
-        <div className="mx-auto max-w-3xl w-full px-4 py-4">
-          <Card className="bg-zinc-900/50 border-white/10 backdrop-blur-xl">
+      <div className="min-h-dvh bg-black safe-bottom-tabbar flex flex-col justify-end pb-24">
+        <div className="mx-auto max-w-3xl w-full px-4">
+          <Card className="bg-zinc-900/90 border-white/10 backdrop-blur-xl relative">
+            <button
+              onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
             <CardHeader>
               <CardTitle className="text-white">Результат</CardTitle>
               <CardDescription className="text-white/60">{MODELS.find(m => m.id === selectedModel)?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden group">
-                <img src={generatedImage} alt="result" className="w-full shadow-lg" />
+              <div className="relative rounded-lg overflow-hidden group bg-black/20 flex items-center justify-center py-2">
+                <img src={generatedImage} alt="result" className="max-h-[45vh] w-auto object-contain shadow-lg rounded-md" />
                 <button
                   onClick={() => {
                     impact('light')
@@ -332,7 +338,7 @@ export default function Studio() {
                     Отправить в чат
                   </Button>
                 </div>
-                <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">Создать ещё</Button>
+                <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">Закрыть окно</Button>
               </div>
             </CardContent>
           </Card>
