@@ -1,0 +1,174 @@
+/* Studio Button Sparkle Animation */
+.studio-star {
+    position: absolute;
+    fill: #FEF08A;
+    /* yellow-200 */
+    z-index: -1;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Keyframes for each star to loop (expand and retract) */
+@keyframes expand-star-1 {
+    0% {
+        top: 20%;
+        left: 20%;
+        width: 25px;
+        opacity: 0;
+    }
+
+    100% {
+        top: -30%;
+        left: -30%;
+        width: 20px;
+        opacity: 1;
+    }
+}
+
+@keyframes expand-star-2 {
+    0% {
+        top: 45%;
+        left: 45%;
+        width: 15px;
+        opacity: 0;
+    }
+
+    100% {
+        top: 20%;
+        left: -35%;
+        width: 15px;
+        opacity: 1;
+    }
+}
+
+@keyframes expand-star-3 {
+    0% {
+        top: 40%;
+        left: 40%;
+        width: 5px;
+        opacity: 0;
+    }
+
+    100% {
+        top: 85%;
+        left: -20%;
+        width: 10px;
+        opacity: 1;
+    }
+}
+
+@keyframes expand-star-4 {
+    0% {
+        top: 20%;
+        left: 40%;
+        width: 8px;
+        opacity: 0;
+    }
+
+    100% {
+        top: -35%;
+        left: 105%;
+        width: 20px;
+        opacity: 1;
+    }
+}
+
+@keyframes expand-star-5 {
+    0% {
+        top: 25%;
+        left: 45%;
+        width: 15px;
+        opacity: 0;
+    }
+
+    100% {
+        top: 30%;
+        left: 120%;
+        width: 15px;
+        opacity: 1;
+    }
+}
+
+@keyframes expand-star-6 {
+    0% {
+        top: 5%;
+        left: 50%;
+        width: 5px;
+        opacity: 0;
+    }
+
+    100% {
+        top: 90%;
+        left: 110%;
+        width: 10px;
+        opacity: 1;
+    }
+}
+
+/* Default positions (collapsed/hidden) - needed for initial state before animation */
+.star-1 {
+    top: 20%;
+    left: 20%;
+    width: 25px;
+}
+
+.star-2 {
+    top: 45%;
+    left: 45%;
+    width: 15px;
+}
+
+.star-3 {
+    top: 40%;
+    left: 40%;
+    width: 5px;
+}
+
+.star-4 {
+    top: 20%;
+    left: 40%;
+    width: 8px;
+}
+
+.star-5 {
+    top: 25%;
+    left: 45%;
+    width: 15px;
+}
+
+.star-6 {
+    top: 5%;
+    left: 50%;
+    width: 5px;
+}
+
+/* Active state (expanded with loop animation) */
+.studio-btn-active .studio-star {
+    z-index: 20;
+    /* Above the button content */
+    filter: drop-shadow(0 0 10px rgba(254, 240, 138, 0.6));
+}
+
+.studio-btn-active .star-1 {
+    animation: expand-star-1 2s ease-in-out infinite alternate;
+}
+
+.studio-btn-active .star-2 {
+    animation: expand-star-2 2.2s ease-in-out infinite alternate;
+}
+
+.studio-btn-active .star-3 {
+    animation: expand-star-3 1.8s ease-in-out infinite alternate;
+}
+
+.studio-btn-active .star-4 {
+    animation: expand-star-4 2.1s ease-in-out infinite alternate;
+}
+
+.studio-btn-active .star-5 {
+    animation: expand-star-5 1.9s ease-in-out infinite alternate;
+}
+
+.studio-btn-active .star-6 {
+    animation: expand-star-6 2.3s ease-in-out infinite alternate;
+}
