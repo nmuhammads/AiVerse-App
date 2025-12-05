@@ -26,48 +26,54 @@ function StartParamRouter() {
 
     if (!p) return;
 
-    // Handle legacy/simple params
-    if (p === "generate" || p === "studio") {
-      navigate("/studio", { replace: true });
-      return;
-    }
-    if (p === "home") {
-      navigate("/", { replace: true });
-      return;
-    }
-    if (p === "top") {
-      navigate("/top", { replace: true });
-      return;
-    }
-    if (p === "profile") {
-      navigate("/profile", { replace: true });
-      return;
-    }
-    if (p === "settings") {
-      navigate("/settings", { replace: true });
-      return;
-    }
-    if (p === "accumulations") {
-      navigate("/accumulations", { replace: true });
-      return;
-    }
+    console.log("Deep link param:", p);
 
-    // Handle dynamic params
-    if (p.startsWith("contest-")) {
-      const id = p.replace("contest-", "");
-      if (id) {
-        navigate(`/contests/${id}`, { replace: true });
+    // Use setTimeout to ensure navigation happens after initial render cycles
+    setTimeout(() => {
+      // Handle legacy/simple params
+      if (p === "generate" || p === "studio") {
+        navigate("/studio", { replace: true });
         return;
       }
-    }
-
-    if (p.startsWith("profile-")) {
-      const id = p.replace("profile-", "");
-      if (id) {
-        navigate(`/profile/${id}`, { replace: true });
+      if (p === "home") {
+        navigate("/", { replace: true });
         return;
       }
-    }
+      if (p === "top") {
+        navigate("/top", { replace: true });
+        return;
+      }
+      if (p === "profile") {
+        navigate("/profile", { replace: true });
+        return;
+      }
+      if (p === "settings") {
+        navigate("/settings", { replace: true });
+        return;
+      }
+      if (p === "accumulations") {
+        navigate("/accumulations", { replace: true });
+        return;
+      }
+
+      // Handle dynamic params
+      if (p.startsWith("contest-")) {
+        const id = p.replace("contest-", "");
+        if (id) {
+          // toast.info(`Opening contest ${id}`); // Optional debug
+          navigate(`/contests/${id}`, { replace: true });
+          return;
+        }
+      }
+
+      if (p.startsWith("profile-")) {
+        const id = p.replace("profile-", "");
+        if (id) {
+          navigate(`/profile/${id}`, { replace: true });
+          return;
+        }
+      }
+    }, 100);
   }, [location.search, navigate]);
   return null;
 }
