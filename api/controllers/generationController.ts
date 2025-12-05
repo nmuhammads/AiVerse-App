@@ -27,6 +27,7 @@ interface KieAIResponse {
 const MODEL_CONFIGS = {
   flux: { kind: 'flux-kontext' as const, model: 'flux-kontext-pro' },
   seedream4: { kind: 'jobs' as const, model: 'bytedance/seedream-v4-text-to-image' },
+  'seedream4-5': { kind: 'jobs' as const, model: 'bytedance/seedream-4-5-text-to-image' },
   nanobanana: { kind: 'jobs' as const, model: 'google/nano-banana-edit' },
   'nanobanana-pro': { kind: 'jobs' as const, model: 'nano-banana-pro' },
   'qwen-edit': { kind: 'jobs' as const, model: 'qwen/text-or-image' },
@@ -274,8 +275,8 @@ const MODEL_PRICES: Record<string, number> = {
   nanobanana: 3,
   'nanobanana-pro': 15,
   seedream4: 4,
+  'seedream4-5': 7,
   flux: 4,
-  'qwen-edit': 3,
 }
 
 async function completeGeneration(generationId: number, userId: number, imageUrl: string, model: string, cost: number, parentId?: number, contestEntryId?: number) {
@@ -394,18 +395,51 @@ async function generateImageWithKieAI(
       return { images: [url], inputImages: imageUrls }
     }
 
-    if (model === 'seedream4') {
+    if (model === 'seedream4' || model === 'seedream4-5') {
       const image_size = mapSeedreamImageSize(aspect_ratio)
+      // Different prompt key or structure? No, Seedream usually just 'prompt'
       const input: Record<string, unknown> = { prompt }
-      if (image_size) input.image_size = image_size
-      input.image_resolution = '2K'
+
+      // Default quality
+      if (model === 'seedream4-5') {
+        input.quality = 'high'
+      } else {
+        input.image_resolution = '2K' // Seedream 4 specific
+      }
+
+      if (model === 'seedream4' && image_size) {
+        input.image_size = image_size
+      } else if (model === 'seedream4-5') {
+        // Seedream 4.5 uses specific aspect_ratio format if needed, but docs say "aspect_ratio": "1:1" etc
+        // mapSeedreamImageSize returns string like 'square_hd', which might be for Seedream 4.
+        // For 4.5 we might need to pass aspect_ratio directly if defined in docs, 
+        // but let's assume sticking to 'aspect_ratio' field if docs said so.
+        // Docs said: aspect_ratio: "1:1", "16:9" etc.
+        if (aspect_ratio && aspect_ratio !== 'Auto') {
+          input.aspect_ratio = aspect_ratio
+        } else {
+          input.aspect_ratio = '1:1'
+        }
+      }
+
       if (imageUrls.length > 0) {
-        // Seedream supports multiple images
-        const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-edit', { ...input, image_urls: imageUrls }, onTaskCreated)
+        // Edit Mode
+        const mode = model === 'seedream4-5' ? 'seedream/4.5-edit' : 'bytedance/seedream-v4-edit'
+        // For 4.5 Edit
+        if (model === 'seedream4-5') {
+          const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated)
+          const url = await pollJobsTask(apiKey, taskId)
+          return { images: [url], inputImages: imageUrls }
+        }
+
+        // Seedream 4 Edit (preserving old logic just in case, though structure above was slightly different)
+        const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: imageUrls }
       } else {
-        const taskId = await createJobsTask(apiKey, 'bytedance/seedream-v4-text-to-image', input, onTaskCreated)
+        // Text to Image
+        const mode = model === 'seedream4-5' ? 'seedream/4.5-text-to-image' : 'bytedance/seedream-v4-text-to-image'
+        const taskId = await createJobsTask(apiKey, mode, input, onTaskCreated)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: [] }
       }
@@ -460,40 +494,7 @@ async function generateImageWithKieAI(
       }
     }
 
-    if (model === 'qwen-edit') {
-      if (imageUrls.length > 0) {
-        // Qwen Edit supports single image
-        const input: Record<string, unknown> = {
-          prompt,
-          image_url: imageUrls[0],
-          acceleration: 'none',
-          image_size: aspect_ratio === 'Auto' ? 'landscape_4_3' : mapQwenImageSize(aspect_ratio) || 'landscape_4_3',
-          num_inference_steps: 25,
-          guidance_scale: 4,
-          sync_mode: false,
-          enable_safety_checker: true,
-          output_format: 'png'
-        }
-        if (negative_prompt) input.negative_prompt = negative_prompt
 
-        const taskId = await createJobsTask(apiKey, 'qwen/image-edit', input, onTaskCreated)
-        const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url], inputImages: imageUrls }
-      } else {
-        const image_size = mapQwenImageSize(aspect_ratio)
-        const input: Record<string, unknown> = {
-          prompt,
-          output_format: 'png',
-          enable_safety_checker: false
-        }
-        if (negative_prompt) input.negative_prompt = negative_prompt
-        if (image_size) input.image_size = image_size
-
-        const taskId = await createJobsTask(apiKey, 'qwen/text-to-image', input, onTaskCreated)
-        const url = await pollJobsTask(apiKey, taskId)
-        return { images: [url], inputImages: [] }
-      }
-    }
 
     throw new Error('Unsupported model')
   } catch (error) {
@@ -522,7 +523,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     if (!model || !MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]) {
       return res.status(400).json({
-        error: 'Valid model is required. Available models: flux, seedream4, nanobanana, qwen-edit'
+        error: 'Valid model is required. Available models: flux, seedream4, seedream4-5, nanobanana'
       })
     }
 

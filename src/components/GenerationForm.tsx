@@ -10,7 +10,7 @@ const MODELS: { id: ModelType; name: string; description: string }[] = [
   { id: 'nanobanana-pro', name: 'NanoBanana Pro', description: 'Default Text-to-Image' },
   { id: 'seedream4', name: 'Seedream 4', description: 'High Quality' },
   { id: 'nanobanana', name: 'Nanobanana', description: 'Fast Generation' },
-  { id: 'qwen-edit', name: 'Qwen Edit', description: 'Image Editing' }
+  { id: 'seedream4-5', name: 'Seedream 4.5', description: 'Edit & Create' }
 ]
 
 const ASPECT_RATIOS: { id: AspectRatio; name: string }[] = [
@@ -45,7 +45,7 @@ export function GenerationForm() {
   // Управление Telegram MainButton
   useEffect(() => {
     if (currentScreen === 'form') {
-      const buttonText = selectedModel === 'qwen-edit' ? 'Edit Image' : 'Generate Image'
+      const buttonText = selectedModel === 'seedream4-5' ? (uploadedImages.length > 0 ? 'Edit Image' : 'Generate Image') : 'Generate Image'
       showMainButton(buttonText, handleGenerate)
     } else {
       hideMainButton()
@@ -77,14 +77,13 @@ export function GenerationForm() {
       return
     }
 
-    if (selectedModel === 'qwen-edit' && uploadedImages.length === 0) {
-      setError('Please upload an image for editing')
-      return
+    if (selectedModel === 'seedream4-5' && uploadedImages.length > 0 && !prompt.trim()) {
+      // Allow empty prompt for strict image edit? No, usually need prompt. Keeping generic check above.
     }
 
     setIsGenerating(true)
     setError(null)
-    showProgress(selectedModel === 'qwen-edit' ? 'Editing...' : 'Generating...')
+    showProgress(selectedModel === 'seedream4-5' && uploadedImages.length > 0 ? 'Editing...' : 'Generating...')
 
     try {
       const response = await fetch('/api/generation/generate', {
@@ -220,10 +219,10 @@ export function GenerationForm() {
               </Tabs>
             </div>
 
-            {/* Загрузка изображения для Qwen Edit */}
-            {selectedModel === 'qwen-edit' && (
+            {/* Загрузка изображения для Seedream 4.5 (Optional) */}
+            {selectedModel === 'seedream4-5' && (
               <div className="space-y-2">
-                <label className="text-white text-sm font-medium">Upload Image to Edit</label>
+                <label className="text-white text-sm font-medium">Upload Image (Optional for Edit)</label>
                 <div className="border-2 border-dashed border-white/30 rounded-lg p-4 text-center">
                   <input
                     ref={fileInputRef}
@@ -262,8 +261,8 @@ export function GenerationForm() {
               </div>
             )}
 
-            {/* Выбор соотношения сторон (только для text-to-image) */}
-            {selectedModel !== 'qwen-edit' && (
+            {/* Выбор соотношения сторон */}
+            {true && (
               <div className="space-y-2">
                 <label className="text-white text-sm font-medium">Aspect Ratio</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -290,7 +289,7 @@ export function GenerationForm() {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={selectedModel === 'qwen-edit'
+                placeholder={selectedModel === 'seedream4-5' && uploadedImages.length > 0
                   ? "Describe what you want to change in the image..."
                   : "Describe the image you want to create..."
                 }
@@ -319,7 +318,7 @@ export function GenerationForm() {
               ) : (
                 <>
                   <Send className="w-4 h-4 mr-2" />
-                  {selectedModel === 'qwen-edit' ? 'Edit Image' : 'Generate Image'}
+                  {selectedModel === 'seedream4-5' && uploadedImages.length > 0 ? 'Edit Image' : 'Generate Image'}
                 </>
               )}
             </Button>

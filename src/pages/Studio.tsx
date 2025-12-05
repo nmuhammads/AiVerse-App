@@ -11,24 +11,24 @@ import { PaymentModal } from '@/components/PaymentModal'
 import { compressImage } from '@/utils/imageCompression'
 
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
-  { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/nanobanana.png' },
-  { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/nanobanana-pro.png' },
-  { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/seedream.png' },
-  { id: 'qwen-edit', name: 'Qwen Edit', desc: '3 токена', color: 'from-emerald-400 to-teal-500', icon: '/models/qwen.png' },
+  { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/optimized/nanobanana.png' },
+  { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
+  { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/optimized/seedream.png' },
+  { id: 'seedream4-5', name: 'Seedream 4.5', desc: '7 токенов', color: 'from-blue-400 to-indigo-500', icon: '/models/optimized/seedream-4-5.png' },
 ]
 
 const MODEL_PRICES: Record<ModelType, number> = {
   nanobanana: 3,
   'nanobanana-pro': 15,
   seedream4: 4,
-  'qwen-edit': 3,
+  'seedream4-5': 7,
 }
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
   'nanobanana-pro': ['Auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
   seedream4: ['16:9', '4:3', '1:1', '3:4', '9:16'],
   nanobanana: ['Auto', '16:9', '4:3', '1:1', '3:4', '9:16'],
-  'qwen-edit': ['square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
+  'seedream4-5': ['16:9', '4:3', '1:1', '3:4', '9:16'],
 }
 
 const RATIO_EMOJIS: Record<AspectRatio, string> = {
@@ -151,8 +151,8 @@ export default function Studio() {
 
     if (selectedModel === 'seedream4') {
       setAspectRatio('3:4')
-    } else if (selectedModel === 'qwen-edit') {
-      setAspectRatio('square_hd')
+    } else if (selectedModel === 'seedream4-5') {
+      setAspectRatio('3:4')
     } else if (selectedModel === 'nanobanana-pro' && aspectRatio === '16:21') {
       setAspectRatio('Auto')
     }
@@ -163,7 +163,7 @@ export default function Studio() {
     if (!files || files.length === 0) return
 
     // Limit check
-    const maxImages = selectedModel === 'qwen-edit' ? 1 : 8
+    const maxImages = 8
     if (uploadedImages.length + files.length > maxImages) {
       setError(`Максимум ${maxImages} фото для этой модели`)
       notify('error')
@@ -224,7 +224,6 @@ export default function Studio() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
-          negative_prompt: selectedModel === 'qwen-edit' ? negativePrompt : undefined,
           model: selectedModel,
           aspect_ratio: aspectRatio,
           images: generationMode === 'image' ? uploadedImages : [],
@@ -377,8 +376,8 @@ export default function Studio() {
     )
   }
 
-  const ratios = SUPPORTED_RATIOS[selectedModel]
-  const maxImages = selectedModel === 'qwen-edit' ? 1 : 8
+  const ratios = SUPPORTED_RATIOS[selectedModel] || SUPPORTED_RATIOS['seedream4']
+  const maxImages = 8
 
   const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
@@ -469,19 +468,7 @@ export default function Studio() {
           </div>
         </div>
 
-        {/* 3.1 Negative Prompt (Qwen only) */}
-        {selectedModel === 'qwen-edit' && (
-          <div className="animate-in fade-in slide-in-from-top-4">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1 mb-1 block">Negative Prompt</label>
-            <textarea
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value.slice(0, 500))}
-              placeholder="Что исключить (без людей, размыто...)"
-              className="w-full bg-zinc-900/30 border border-red-500/50 rounded-xl p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500 transition-colors min-h-[50px] resize-none"
-            />
-            <div className="text-[10px] text-zinc-600 text-right px-1">{negativePrompt.length}/500</div>
-          </div>
-        )}
+
 
         {/* 4. Reference Image (Multi-Image Support) */}
         {generationMode === 'image' && (
@@ -531,7 +518,7 @@ export default function Studio() {
         )}
 
         {/* 5. Aspect Ratio Selector (Emojis) */}
-        {(selectedModel !== 'qwen-edit' || generationMode === 'text') && (
+        {(true || generationMode === 'text') && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">Соотношение сторон</label>
             <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar -mx-2 px-2">
