@@ -133,6 +133,11 @@ export function useTelegram() {
     WebApp.openTelegramLink(u)
   }
 
+  const openDeepLink = (param: string) => {
+    // Helper to open internal deep links if needed, or just use for generating the param string
+    return param
+  }
+
   const addToHomeScreen = () => {
     const wa = WebApp as any
     if (wa.addToHomeScreen) {

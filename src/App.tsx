@@ -23,7 +23,10 @@ function StartParamRouter() {
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
+
     if (!p) return;
+
+    // Handle legacy/simple params
     if (p === "generate" || p === "studio") {
       navigate("/studio", { replace: true });
       return;
@@ -39,6 +42,31 @@ function StartParamRouter() {
     if (p === "profile") {
       navigate("/profile", { replace: true });
       return;
+    }
+    if (p === "settings") {
+      navigate("/settings", { replace: true });
+      return;
+    }
+    if (p === "accumulations") {
+      navigate("/accumulations", { replace: true });
+      return;
+    }
+
+    // Handle dynamic params
+    if (p.startsWith("contest-")) {
+      const id = p.replace("contest-", "");
+      if (id) {
+        navigate(`/contests/${id}`, { replace: true });
+        return;
+      }
+    }
+
+    if (p.startsWith("profile-")) {
+      const id = p.replace("profile-", "");
+      if (id) {
+        navigate(`/profile/${id}`, { replace: true });
+        return;
+      }
     }
   }, [location.search, navigate]);
   return null;
