@@ -125,7 +125,19 @@ export async function webhook(req: Request, res: Response) {
         const contest = q.data[0]
         const caption = `🏆 <b>${contest.title}</b>\n\n${contest.description}\n\n👇 Жми кнопку ниже, чтобы участвовать!`
         const deepLink = `contest-${contest.id}`
-        const url = `https://t.me/AiVerseAppBot?startapp=${deepLink}`
+
+        // Get bot username dynamically
+        let botUsername = 'AiVerseAppBot'
+        try {
+          const me = await tg('getMe', {})
+          if (me?.ok && me.result?.username) {
+            botUsername = me.result.username
+          }
+        } catch (e) {
+          console.error('Failed to get bot username', e)
+        }
+
+        const url = `https://t.me/${botUsername}?startapp=${deepLink}`
 
         const kb = {
           inline_keyboard: [[

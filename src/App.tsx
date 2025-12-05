@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import Home from "@/pages/Home";
 import Studio from "@/pages/Studio";
 import Leaderboard from "@/pages/Leaderboard";
@@ -24,13 +24,13 @@ function StartParamRouter() {
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
 
+    if (p) {
+      toast.info(`Deep link: ${p}`, { duration: 3000 });
+    }
+
     if (!p) return;
 
-    console.log("Deep link param:", p);
-
-    // Use setTimeout to ensure navigation happens after initial render cycles
-    setTimeout(() => {
-      // Handle legacy/simple params
+    const timer = setTimeout(() => {
       if (p === "generate" || p === "studio") {
         navigate("/studio", { replace: true });
         return;
@@ -56,24 +56,24 @@ function StartParamRouter() {
         return;
       }
 
-      // Handle dynamic params
       if (p.startsWith("contest-")) {
         const id = p.replace("contest-", "");
         if (id) {
-          // toast.info(`Opening contest ${id}`); // Optional debug
           navigate(`/contests/${id}`, { replace: true });
-          return;
         }
+        return;
       }
 
       if (p.startsWith("profile-")) {
         const id = p.replace("profile-", "");
         if (id) {
           navigate(`/profile/${id}`, { replace: true });
-          return;
         }
+        return;
       }
-    }, 100);
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [location.search, navigate]);
   return null;
 }
