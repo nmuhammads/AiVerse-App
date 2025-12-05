@@ -24,15 +24,12 @@ function StartParamRouter() {
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
 
-    if (p) {
-      toast.info(`Deep link: ${p}`, { duration: 3000 });
-    }
-
     if (!p) return;
 
     const timer = setTimeout(() => {
+      // Handle legacy/simple params
       if (p === "generate" || p === "studio") {
-        navigate("/studio", { replace: true });
+        navigate("/studio", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "home") {
@@ -40,34 +37,35 @@ function StartParamRouter() {
         return;
       }
       if (p === "top") {
-        navigate("/top", { replace: true });
+        navigate("/top", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "profile") {
-        navigate("/profile", { replace: true });
+        navigate("/profile", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "settings") {
-        navigate("/settings", { replace: true });
+        navigate("/settings", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "accumulations") {
-        navigate("/accumulations", { replace: true });
+        navigate("/accumulations", { replace: true, state: { fromDeepLink: true } });
         return;
       }
 
+      // Handle dynamic params
       if (p.startsWith("contest-")) {
         const id = p.replace("contest-", "");
         if (id) {
-          navigate(`/contests/${id}`, { replace: true });
+          navigate(`/contests/${id}`, { replace: true, state: { fromDeepLink: true } });
         }
         return;
       }
-
+      
       if (p.startsWith("profile-")) {
         const id = p.replace("profile-", "");
         if (id) {
-          navigate(`/profile/${id}`, { replace: true });
+          navigate(`/profile/${id}`, { replace: true, state: { fromDeepLink: true } });
         }
         return;
       }

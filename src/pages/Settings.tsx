@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -13,12 +13,18 @@ export default function Settings() {
 
     const isMobile = platform === 'ios' || platform === 'android'
 
+    const location = useLocation()
+
     useEffect(() => {
         if (isMobile) {
             tg.BackButton.show()
             const handleBack = () => {
                 impact('light')
-                navigate(-1)
+                if (location.state?.fromDeepLink) {
+                    navigate('/', { replace: true })
+                } else {
+                    navigate(-1)
+                }
             }
             tg.BackButton.onClick(handleBack)
             return () => {
@@ -26,7 +32,7 @@ export default function Settings() {
                 tg.BackButton.offClick(handleBack)
             }
         }
-    }, [isMobile, navigate, tg])
+    }, [isMobile, navigate, tg, location])
 
     useEffect(() => {
         checkHomeScreenStatus((status) => {

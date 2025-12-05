@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Trophy, Calendar, Info, Grid, Medal, Loader2, Clock } from 'lucide-react';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useTelegram } from '@/hooks/useTelegram';
@@ -58,12 +58,18 @@ export default function ContestDetail() {
 
     const isMobile = platform === 'ios' || platform === 'android';
 
+    const location = useLocation();
+
     useEffect(() => {
         if (isMobile) {
             tg.BackButton.show();
             const handleBack = () => {
                 impact('light');
-                navigate(-1);
+                if (location.state?.fromDeepLink) {
+                    navigate('/', { replace: true });
+                } else {
+                    navigate(-1);
+                }
             };
             tg.BackButton.onClick(handleBack);
             return () => {
@@ -71,7 +77,7 @@ export default function ContestDetail() {
                 tg.BackButton.offClick(handleBack);
             };
         }
-    }, [isMobile, navigate, tg]);
+    }, [isMobile, navigate, tg, location]);
 
     // Custom padding for different platforms (consistent with Settings.tsx)
     const getPaddingTop = () => {
@@ -224,19 +230,26 @@ export default function ContestDetail() {
         );
     }
 
+    const getButtonBottom = () => {
+        if (platform === 'ios') return 'calc(6rem + env(safe-area-inset-bottom) + 10px)';
+        if (platform === 'android') return 'calc(7rem + env(safe-area-inset-bottom) + 20px)';
+        return '6rem';
+    };
+
     if (!contest) return <div className="text-white text-center pt-20">Конкурс не найден</div>;
 
     return (
-        <div className="min-h-dvh bg-black pb-24" style={{ paddingTop: getPaddingTop() }}>
+        <div className="min-h-dvh bg-black pb-24">
             {/* Header Image */}
-            <div className="relative h-64 w-full">
+            <div className="relative h-80 w-full">
                 <img src={contest.image_url} alt={contest.title} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
                 {!isMobile && (
                     <button
                         onClick={() => navigate(-1)}
-                        className="absolute top-4 left-4 p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors"
+                        className="absolute top-4 left-4 p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors z-10"
+                        style={{ top: 'calc(env(safe-area-inset-top) + 1rem)' }}
                     >
                         <ArrowLeft size={20} />
                     </button>
@@ -265,7 +278,7 @@ export default function ContestDetail() {
             </div>
 
             {/* Tabs */}
-            <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
+            <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10 pt-[env(safe-area-inset-top)]">
                 <div className="flex">
                     {[
                         { id: 'info', label: 'Инфо', icon: Info },
@@ -408,7 +421,10 @@ export default function ContestDetail() {
 
             {/* Join Button */}
             {contest.status === 'active' && (
-                <div className="fixed bottom-24 left-0 right-0 px-4 flex justify-center z-30 pointer-events-none">
+                <div
+                    className="fixed left-0 right-0 px-4 flex justify-center z-30 pointer-events-none"
+                    style={{ bottom: getButtonBottom() }}
+                >
                     <button
                         onClick={() => setIsSelectorOpen(true)}
                         className="pointer-events-auto bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-transform active:scale-95"

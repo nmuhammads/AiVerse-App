@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useTelegram } from '@/hooks/useTelegram'
 import { ArrowRight, Coins, ChevronLeft } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 
 interface Generation {
@@ -31,13 +31,19 @@ export default function Accumulations() {
 
     const isMobile = platform === 'ios' || platform === 'android'
 
+    const location = useLocation()
+
     // Handle Back Button
     useEffect(() => {
         if (isMobile) {
             tg.BackButton.show()
             const handleBack = () => {
                 impact('light')
-                navigate(-1)
+                if (location.state?.fromDeepLink) {
+                    navigate('/', { replace: true })
+                } else {
+                    navigate(-1)
+                }
             }
             tg.BackButton.onClick(handleBack)
             return () => {
@@ -49,7 +55,7 @@ export default function Accumulations() {
                 tg.BackButton.offClick(handleBack)
             }
         }
-    }, [isMobile, navigate, tg, impact])
+    }, [isMobile, navigate, tg, impact, location])
 
     const fetchRewards = useCallback(async (pageNum: number) => {
         if (!user?.id) return
