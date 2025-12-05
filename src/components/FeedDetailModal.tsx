@@ -1,8 +1,9 @@
-import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2 } from 'lucide-react'
+import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2, Trophy } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useState, useEffect } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import { useNavigate } from 'react-router-dom'
 
 interface FeedItem {
     id: number
@@ -20,6 +21,10 @@ interface FeedItem {
     input_images?: string[]
     is_liked: boolean
     model?: string | null
+    contest?: {
+        id: number
+        title: string
+    } | null
 }
 
 interface Props {
@@ -46,6 +51,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
     const { user, platform } = useTelegram()
     const [isLikeAnimating, setIsLikeAnimating] = useState(false)
     const [isFullScreen, setIsFullScreen] = useState(false)
+    const navigate = useNavigate()
 
     // Close on escape
     useEffect(() => {
@@ -61,6 +67,22 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
         setIsLikeAnimating(true)
         onLike(item)
         setTimeout(() => setIsLikeAnimating(false), 300)
+    }
+
+    const handleProfileClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        impact('light')
+        onClose()
+        navigate(`/profile/${item.author.id}`)
+    }
+
+    const handleContestClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (item.contest) {
+            impact('light')
+            onClose()
+            navigate(`/contests/${item.contest.id}`)
+        }
     }
 
     const modelName = getModelDisplayName(item.model || null)
@@ -132,19 +154,37 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                     {/* User & Date */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-zinc-800 border border-white/10 overflow-hidden">
-                                {item.author.avatar_url ? (
-                                    <img src={item.author.avatar_url} alt={item.author.username} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold">
-                                        {item.author.username[0].toUpperCase()}
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={handleProfileClick}>
+                                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-white/10 overflow-hidden">
+                                    {item.author.avatar_url ? (
+                                        <img src={item.author.avatar_url} alt={item.author.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold">
+                                            {item.author.username[0].toUpperCase()}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="text-white font-semibold text-sm">{item.author.username}</div>
+                                    <div className="text-zinc-500 text-xs">{date}</div>
+                                </div>
+                            </div>
+
+                            {item.contest && (
+                                <>
+                                    <div className="w-px h-8 bg-white/10 mx-1"></div>
+                                    <div
+                                        className="flex flex-col gap-0.5 cursor-pointer group"
+                                        onClick={handleContestClick}
+                                    >
+                                        <span className="text-[10px] text-zinc-500 font-medium ml-1">Участвует в конкурсе</span>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 group-hover:bg-yellow-500/20 transition-colors">
+                                            <Trophy size={14} />
+                                            <span className="text-xs font-medium max-w-[120px] truncate">{item.contest.title}</span>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-white font-semibold text-sm">{item.author.username}</div>
-                                <div className="text-zinc-500 text-xs">{date}</div>
-                            </div>
+                                </>
+                            )}
                         </div>
                     </div>
 

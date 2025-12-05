@@ -1,43 +1,83 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import Home from "@/pages/Home";
 import Studio from "@/pages/Studio";
 import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import PublicProfile from '@/pages/PublicProfile';
 import Settings from "@/pages/Settings";
+import Contests from "@/pages/Contests";
+import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import WebApp from "@twa-dev/sdk";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 
 function StartParamRouter() {
   const navigate = useNavigate();
   const location = useLocation();
+  const processedRef = useRef(false);
+
   useEffect(() => {
+    if (processedRef.current) return;
+
     const qs = new URLSearchParams(location.search);
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
+
     if (!p) return;
-    if (p === "generate" || p === "studio") {
-      navigate("/studio", { replace: true });
-      return;
-    }
-    if (p === "home") {
-      navigate("/", { replace: true });
-      return;
-    }
-    if (p === "top") {
-      navigate("/top", { replace: true });
-      return;
-    }
-    if (p === "profile") {
-      navigate("/profile", { replace: true });
-      return;
-    }
+
+    processedRef.current = true;
+
+    const timer = setTimeout(() => {
+      // Handle legacy/simple params
+      if (p === "generate" || p === "studio") {
+        navigate("/studio", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "home") {
+        navigate("/", { replace: true });
+        return;
+      }
+      if (p === "top") {
+        navigate("/top", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "profile") {
+        navigate("/profile", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "settings") {
+        navigate("/settings", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "accumulations") {
+        navigate("/accumulations", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+
+      // Handle dynamic params
+      if (p.startsWith("contest-")) {
+        const id = p.replace("contest-", "");
+        if (id) {
+          navigate(`/contests/${id}`, { replace: true, state: { fromDeepLink: true } });
+        }
+        return;
+      }
+
+      if (p.startsWith("profile-")) {
+        const id = p.replace("profile-", "");
+        if (id) {
+          navigate(`/profile/${id}`, { replace: true, state: { fromDeepLink: true } });
+        }
+        return;
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [location.search, navigate]);
   return null;
 }
@@ -83,15 +123,17 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<PublicProfile />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/contests" element={<Contests />} />
+              <Route path="/contests/:id" element={<ContestDetail />} />
               <Route path="/accumulations" element={<Accumulations />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
           <TabBar />
+          <AnnouncementModal />
         </div>
       </Router>
       <Toaster />
-      <AnnouncementModal />
     </>
   );
 }

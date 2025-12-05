@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react'
 import { X, Zap } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_nanobanana_fix_v2', // Change this ID to show a new announcement to everyone
-    title: 'NanoBanana Pro Исправлен + Скидки!',
-    description: 'Мы исправили ошибки в генерации NanoBanana Pro. Также добавили возможность выбора качества: теперь доступна 2K генерация всего за 10 токенов! Если вы теряли токены из-за ошибок, пишите в поддержку.',
+    id: 'announcement_v2_7_contests', // Change this ID to show a new announcement to everyone
+    title: '🏆 Конкурсы уже здесь!',
+    description: 'Участвуйте в тематических челленджах, создавайте креативные работы и выигрывайте призы! Также мы обновили Студию, добавили новые анимации и улучшили стабильность генерации.',
     image: 'https://cdn.midjourney.com/0c609677-440d-4056-a8a2-201804193556/0_0.png', // Placeholder image
-    buttonText: 'Попробовать',
-    link: '', // Close modal on click
-    secondaryButtonText: 'Написать в поддержку',
-    secondaryLink: 'https://t.me/aiversebots'
+    buttonText: 'Перейти к конкурсам',
+    link: '/contests', // Internal link
+    secondaryButtonText: 'Закрыть',
+    secondaryLink: ''
 }
 
 export function AnnouncementModal() {
     const [isOpen, setIsOpen] = useState(false)
     const { impact } = useHaptics()
+    const navigate = useNavigate()
 
     useEffect(() => {
         // Check if this specific announcement has been seen
@@ -41,7 +43,11 @@ export function AnnouncementModal() {
     const handleAction = () => {
         impact('medium')
         if (ANNOUNCEMENT.link) {
-            window.open(ANNOUNCEMENT.link, '_blank')
+            if (ANNOUNCEMENT.link.startsWith('/')) {
+                navigate(ANNOUNCEMENT.link)
+            } else {
+                window.open(ANNOUNCEMENT.link, '_blank')
+            }
         }
         handleClose()
     }

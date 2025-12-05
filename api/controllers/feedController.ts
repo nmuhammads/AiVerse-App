@@ -50,8 +50,8 @@ export async function getFeed(req: Request, res: Response) {
 
         // Select generations where is_published is true
         // Embed users to get author info
-        // Embed generation_likes to calculate likes count and check if current user liked
-        const select = `select=id,image_url,prompt,created_at,likes_count,remix_count,input_images,model,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
+        // Embed contest_entries to check if it's a contest entry and get contest details
+        const select = `select=id,image_url,prompt,created_at,likes_count,remix_count,input_images,model,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id),contest_entries(contest_id, contests(title))`
 
         let order = 'created_at.desc'
         if (sort === 'popular') {
@@ -67,8 +67,34 @@ export async function getFeed(req: Request, res: Response) {
         const startOfMonth = new Date(Date.UTC(targetTime.getUTCFullYear(), targetTime.getUTCMonth(), 1)).toISOString()
 
         const model = req.query.model ? String(req.query.model) : null
+        const includeUnpublished = req.query.include_unpublished === 'true'
 
-        const query = `?is_published=eq.true&created_at=gte.${startOfMonth}${model && model !== 'all' ? `&model=eq.${model}` : ''}&order=${order}&limit=${limit}&offset=${offset}&${select}`
+        let baseQuery = ''
+        if (currentUserId && includeUnpublished) {
+            // If fetching user history, filter by user_id and ignore date/published status
+            // BUT we must only show completed generations
+            baseQuery = `user_id=eq.${currentUserId}&status=eq.completed`
+        } else {
+            baseQuery = `is_published=eq.true&created_at=gte.${startOfMonth}`
+        }
+
+        let queryParts = []
+        if (baseQuery) {
+            queryParts.push(baseQuery)
+        }
+        if (model && model !== 'all') {
+            queryParts.push(`model=eq.${model}`)
+        } else {
+            // Exclude seedream4.5 if no specific model is requested (or 'all' is requested)
+            // We want to show everything EXCEPT seedream4.5
+            queryParts.push(`model=neq.seedream4.5`)
+        }
+        queryParts.push(`order=${order}`)
+        queryParts.push(`limit=${limit}`)
+        queryParts.push(`offset=${offset}`)
+        queryParts.push(select)
+
+        const query = `?${queryParts.join('&')}`
 
         const q = await supaSelect('generations', query)
         if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
@@ -78,6 +104,9 @@ export async function getFeed(req: Request, res: Response) {
         const items = itemsRaw.map((it: any) => {
             const likes = Array.isArray(it.generation_likes) ? it.generation_likes : []
             const author = it.users || {}
+            const contestEntry = Array.isArray(it.contest_entries) && it.contest_entries.length > 0 ? it.contest_entries[0] : null
+            const isContestEntry = !!contestEntry
+            const contest = contestEntry ? { id: contestEntry.contest_id, title: contestEntry.contests?.title } : null
 
             return {
                 id: it.id,
@@ -96,7 +125,9 @@ export async function getFeed(req: Request, res: Response) {
                 remix_count: it.remix_count || 0,
                 input_images: it.input_images || [],
                 is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false,
-                model: it.model || null
+                model: it.model || null,
+                is_contest_entry: isContestEntry,
+                contest: contest
             }
         })
 

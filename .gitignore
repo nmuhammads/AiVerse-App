@@ -25,6 +25,7 @@ dist-ssr
 .vite
 .agent/rules/answerlanguage.md
 docs/
+new ui/
 buildlogs.txt
 deploylogs.txt
 mcp.txt

@@ -7,9 +7,7 @@ export function Header() {
   const { user, platform } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
   useEffect(() => { }, [])
-  const displayName = (user?.first_name && user?.last_name)
-    ? `${user.first_name} ${user.last_name}`
-    : (user?.first_name || user?.username || 'Гость')
+  const displayName = user?.first_name || user?.username || 'Гость'
   const avatarSeed = user?.username || String(user?.id || 'guest')
   const avatarUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`
   useEffect(() => {

@@ -100,6 +100,13 @@ export default function Profile() {
         ; (async () => {
           setLoading(true)
           try {
+            // Check pending status first
+            await fetch('/api/generation/check-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: user.id })
+            }).catch(() => { })
+
             const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=0`)
             const j = await r.json().catch(() => null)
             if (r.ok && j) { setItems(j.items || []); setTotal(j.total) }

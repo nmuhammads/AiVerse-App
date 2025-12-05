@@ -101,6 +101,71 @@ export async function webhook(req: Request, res: Response) {
       }
       return res.json({ ok: true })
     }
+
+    if (text.startsWith('/mycontest')) {
+      const parts = text.split(/\s+/)
+      let organizerName = parts.length > 1 ? parts.slice(1).join(' ') : ''
+
+      if (!organizerName && msg.from?.username) {
+        organizerName = msg.from.username
+      }
+
+      if (!organizerName) {
+        await tg('sendMessage', { chat_id: chatId, text: 'Пожалуйста, укажите имя организатора: /mycontest <name> или установите username в Telegram.' })
+        return res.json({ ok: true })
+      }
+
+      // Remove @ if present
+      organizerName = organizerName.replace('@', '')
+
+      // Find active contest
+      const q = await supaSelect('contests', `?status=eq.active&organizer_name=ilike.${organizerName}&select=*`)
+
+      if (q.ok && q.data && q.data.length > 0) {
+        const contest = q.data[0]
+        const caption = `🏆 <b>${contest.title}</b>\n\n${contest.description}\n\nЧтобы поставить лайк перейдите на гелерею\n\n👇 Жми кнопку ниже, чтобы участвовать или поставить лайк!`
+        const deepLink = `contest-${contest.id}`
+
+        // Get bot username dynamically
+        let botUsername = 'AiVerseAppBot'
+        try {
+          const me = await tg('getMe', {})
+          if (me?.ok && me.result?.username) {
+            botUsername = me.result.username
+          }
+        } catch (e) {
+          console.error('Failed to get bot username', e)
+        }
+
+        const url = `https://t.me/${botUsername}?startapp=${deepLink}`
+
+        const kb = {
+          inline_keyboard: [[
+            { text: 'Участвовать🚀/Оценить❤️', url: url }
+          ]]
+        }
+
+        if (contest.image_url) {
+          await tg('sendPhoto', {
+            chat_id: chatId,
+            photo: contest.image_url,
+            caption: caption,
+            parse_mode: 'HTML',
+            reply_markup: kb
+          })
+        } else {
+          await tg('sendMessage', {
+            chat_id: chatId,
+            text: caption,
+            parse_mode: 'HTML',
+            reply_markup: kb
+          })
+        }
+      } else {
+        await tg('sendMessage', { chat_id: chatId, text: `Активный конкурс от организатора "${organizerName}" не найден.` })
+      }
+      return res.json({ ok: true })
+    }
     return res.json({ ok: true })
   } catch (e) {
     console.error('webhook error', e)

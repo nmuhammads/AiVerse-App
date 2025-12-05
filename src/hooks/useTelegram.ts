@@ -133,6 +133,11 @@ export function useTelegram() {
     WebApp.openTelegramLink(u)
   }
 
+  const openDeepLink = (param: string) => {
+    // Helper to open internal deep links if needed, or just use for generating the param string
+    return param
+  }
+
   const addToHomeScreen = () => {
     const wa = WebApp as any
     if (wa.addToHomeScreen) {
@@ -156,9 +161,9 @@ export function useTelegram() {
 
   const user = (import.meta.env.DEV && !WebApp.initDataUnsafe.user) ? {
     id: 817308975,
-    first_name: 'Mock',
-    last_name: 'User',
-    username: 'mock_user',
+    first_name: 'Muhammad',
+    last_name: 'Nuriddinov',
+    username: 'mortymn',
     language_code: 'en',
     is_premium: true
   } : WebApp.initDataUnsafe.user

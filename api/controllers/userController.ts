@@ -203,7 +203,7 @@ export async function listGenerations(req: Request, res: Response) {
 
     // Enhanced query to get full details
     let select = `select=id,image_url,prompt,created_at,is_published,model,likes_count,remix_count,input_images,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
-    let query = `?user_id=eq.${encodeURIComponent(userId)}&image_url=ilike.http%25&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
+    let query = `?user_id=eq.${encodeURIComponent(userId)}&image_url=ilike.http%25&model=neq.seedream4.5&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
 
     if (publishedOnly) {
       query += `&is_published=eq.true`

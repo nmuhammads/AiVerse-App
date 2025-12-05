@@ -1,6 +1,6 @@
 import { Share2, History as HistoryIcon, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { FeedImage, type FeedItem } from '@/components/FeedImage'
@@ -20,18 +20,26 @@ export default function PublicProfile() {
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(false)
 
+    const location = useLocation()
+
     // Native Back Button for Mobile
     useEffect(() => {
         if (platform === 'ios' || platform === 'android') {
             tg.BackButton.show()
-            const handleBack = () => navigate(-1)
+            const handleBack = () => {
+                if (location.state?.fromDeepLink) {
+                    navigate('/', { replace: true })
+                } else {
+                    navigate(-1)
+                }
+            }
             tg.BackButton.onClick(handleBack)
             return () => {
                 tg.BackButton.offClick(handleBack)
                 tg.BackButton.hide()
             }
         }
-    }, [platform, navigate, tg])
+    }, [platform, navigate, tg, location])
 
     const {
         setPrompt,

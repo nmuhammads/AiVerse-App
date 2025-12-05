@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info } from 'lucide-react'
@@ -12,14 +13,14 @@ import { compressImage } from '@/utils/imageCompression'
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
   { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/nanobanana.png' },
   { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/nanobanana-pro.png' },
-  { id: 'seedream4', name: 'Seedream 4', desc: '3 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/seedream.png' },
+  { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/seedream.png' },
   { id: 'qwen-edit', name: 'Qwen Edit', desc: '3 токена', color: 'from-emerald-400 to-teal-500', icon: '/models/qwen.png' },
 ]
 
 const MODEL_PRICES: Record<ModelType, number> = {
   nanobanana: 3,
   'nanobanana-pro': 15,
-  seedream4: 3,
+  seedream4: 4,
   'qwen-edit': 3,
 }
 
@@ -93,6 +94,8 @@ export default function Studio() {
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [scale, setScale] = useState(1)
   const [resolution, setResolution] = useState<'2K' | '4K'>('4K')
+  const [searchParams] = useSearchParams()
+  const [contestEntryId, setContestEntryId] = useState<number | null>(null)
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -107,6 +110,40 @@ export default function Studio() {
       })
     }
   }, [user?.id, isPaymentModalOpen]) // Refresh when payment modal closes
+
+  // Handle Remix & Contest Entry
+  useEffect(() => {
+    const remixId = searchParams.get('remix')
+    const contestEntry = searchParams.get('contest_entry')
+
+    if (contestEntry) {
+      setContestEntryId(Number(contestEntry))
+    }
+
+    if (remixId) {
+      fetch(`/api/generations/${remixId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) {
+            setPrompt(data.prompt)
+            if (data.model) setSelectedModel(data.model as ModelType)
+            // Try to infer aspect ratio or use default
+            // If data has aspect_ratio, use it. Otherwise default.
+            // Assuming the API returns aspect_ratio if stored, or we infer from dimensions if available.
+            // For now, let's stick to model defaults unless we store ratio.
+            // If we want to be precise, we should store aspect_ratio in DB.
+            // Let's assume we might not have it, so we rely on user or default.
+
+            setParentGeneration(data.id, data.users?.username || 'Unknown')
+
+            // If it's image-to-image and has input images, we might want to load them?
+            // Usually remix implies using the prompt. If it was img2img, maybe we don't load the original source image to avoid confusion/privacy issues, 
+            // or we do. Let's stick to prompt for now as per standard remix behavior.
+          }
+        })
+        .catch(err => console.error('Failed to load remix data', err))
+    }
+  }, [searchParams, setPrompt, setSelectedModel, setParentGeneration])
 
   // Default ratio logic
   useEffect(() => {
@@ -193,7 +230,8 @@ export default function Studio() {
           images: generationMode === 'image' ? uploadedImages : [],
           user_id: user?.id || null,
           parent_id: parentGenerationId || undefined,
-          resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined
+          resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined,
+          contest_entry_id: contestEntryId || undefined
         }),
         signal: controller.signal
       })
@@ -246,16 +284,22 @@ export default function Studio() {
 
   if (currentScreen === 'result' && generatedImage) {
     return (
-      <div className="min-h-dvh bg-black safe-bottom-tabbar flex items-center justify-center">
-        <div className="mx-auto max-w-3xl w-full px-4 py-4">
-          <Card className="bg-zinc-900/50 border-white/10 backdrop-blur-xl">
+      <div className="min-h-dvh bg-black safe-bottom-tabbar flex flex-col justify-end pb-24">
+        <div className="mx-auto max-w-3xl w-full px-4">
+          <Card className="bg-zinc-900/90 border-white/10 backdrop-blur-xl relative">
+            <button
+              onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
             <CardHeader>
               <CardTitle className="text-white">Результат</CardTitle>
               <CardDescription className="text-white/60">{MODELS.find(m => m.id === selectedModel)?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden group">
-                <img src={generatedImage} alt="result" className="w-full shadow-lg" />
+              <div className="relative rounded-lg overflow-hidden group bg-black/20 flex items-center justify-center py-2">
+                <img src={generatedImage} alt="result" className="max-h-[45vh] w-auto object-contain shadow-lg rounded-md" />
                 <button
                   onClick={() => {
                     impact('light')
@@ -294,7 +338,7 @@ export default function Studio() {
                     Отправить в чат
                   </Button>
                 </div>
-                <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">Создать ещё</Button>
+                <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">Закрыть окно</Button>
               </div>
             </CardContent>
           </Card>
@@ -539,9 +583,13 @@ export default function Studio() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim() || (generationMode === 'image' && uploadedImages.length === 0)}
-            className={`w-full py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
+            className={`w-full py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900/80 text-violet-200 cursor-wait border border-violet-500/20' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
           >
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            {isGenerating ? (
+              <div className="absolute inset-0 bg-violet-500/10 animate-pulse" />
+            ) : (
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            )}
             <div className="relative flex items-center gap-2">
               {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
               <span>{isGenerating ? 'Создание шедевра...' : generationMode === 'image' ? 'Сгенерировать' : 'Сгенерировать'}</span>
@@ -550,6 +598,12 @@ export default function Studio() {
               </span>}
             </div>
           </Button>
+          {isGenerating && (
+            <p className="text-[10px] text-zinc-500 text-center mt-3 animate-in fade-in slide-in-from-top-1 px-4 leading-relaxed">
+              Если процесс идет долго, можете свернуть приложение. <br />
+              Результат появится в разделе <span className="text-zinc-400 font-medium">Мои генерации</span> в профиле.
+            </p>
+          )}
         </div>
 
       </div>
