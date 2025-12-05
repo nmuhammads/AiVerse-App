@@ -239,7 +239,7 @@ export default function ContestDetail() {
     if (!contest) return <div className="text-white text-center pt-20">Конкурс не найден</div>;
 
     return (
-        <div className="min-h-dvh bg-black pb-24">
+        <div className="min-h-dvh bg-black pb-40">
             {/* Header Image */}
             <div className="relative h-80 w-full">
                 <img src={contest.image_url} alt={contest.title} className="w-full h-full object-cover" />
@@ -278,7 +278,7 @@ export default function ContestDetail() {
             </div>
 
             {/* Tabs */}
-            <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10 pt-[env(safe-area-inset-top)]">
+            <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
                 <div className="flex">
                     {[
                         { id: 'info', label: 'Инфо', icon: Info },

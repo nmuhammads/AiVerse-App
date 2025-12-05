@@ -11,20 +11,26 @@ import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import WebApp from "@twa-dev/sdk";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 
 function StartParamRouter() {
   const navigate = useNavigate();
   const location = useLocation();
+  const processedRef = useRef(false);
+
   useEffect(() => {
+    if (processedRef.current) return;
+
     const qs = new URLSearchParams(location.search);
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
 
     if (!p) return;
+
+    processedRef.current = true;
 
     const timer = setTimeout(() => {
       // Handle legacy/simple params
@@ -61,7 +67,7 @@ function StartParamRouter() {
         }
         return;
       }
-      
+
       if (p.startsWith("profile-")) {
         const id = p.replace("profile-", "");
         if (id) {
