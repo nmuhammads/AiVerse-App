@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_v2_7_seedream45_v5', // Updated ID to force show again
+    id: 'announcement_v2_7_seedream45_v6', // Updated ID to force show again
     title: '🚀 Seedream 4.5 и Конкурсы!',
     description: 'Встречайте новую модель Seedream 4.5 с улучшенной детализацией и возможностью редактирования изображений! Также участвуйте в тематических челленджах и выигрывайте призы.',
     image: '/models/seedream-4-5.png', // Updated image
