@@ -320,9 +320,9 @@ export default function ContestDetail() {
                             <h3 className="text-lg font-bold text-white mb-2">Призы</h3>
                             <div className="space-y-2">
                                 {contest.prizes && typeof contest.prizes === 'object' && Object.entries(contest.prizes).map(([place, prize]: [string, any]) => (
-                                    <div key={place} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                                        <span className="font-bold text-yellow-500">#{place} Место</span>
-                                        <span className="text-white font-medium">{String(prize)}</span>
+                                    <div key={place} className="flex items-start justify-between bg-white/5 p-3 rounded-lg">
+                                        <span className="font-bold text-yellow-500 shrink-0 mr-4">#{place} Место</span>
+                                        <span className="text-white font-medium text-right whitespace-pre-wrap">{String(prize)}</span>
                                     </div>
                                 ))}
                             </div>
