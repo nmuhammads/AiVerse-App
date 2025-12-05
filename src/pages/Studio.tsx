@@ -214,9 +214,9 @@ export default function Studio() {
 
     impact('heavy')
 
-    // Create AbortController for client-side timeout (60s)
+    // Create AbortController for client-side timeout (300s)
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
+    const timeoutId = setTimeout(() => controller.abort(), 300000)
 
     try {
       const res = await fetch('/api/generation/generate', {
@@ -559,8 +559,8 @@ export default function Studio() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-center gap-3 text-rose-400 text-sm animate-in fade-in slide-in-from-bottom-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <div className={`${error.includes('Время ожидания') ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} border rounded-xl p-3 flex items-center gap-3 text-sm animate-in fade-in slide-in-from-bottom-2`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${error.includes('Время ожидания') ? 'bg-amber-500' : 'bg-rose-500'}`} />
             {error}
           </div>
         )}
