@@ -5,14 +5,14 @@ import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_v2_7_contests', // Change this ID to show a new announcement to everyone
-    title: '🏆 Конкурсы уже здесь!',
-    description: 'Участвуйте в тематических челленджах, создавайте креативные работы и выигрывайте призы! Также мы обновили Студию, добавили новые анимации и улучшили стабильность генерации.',
+    id: 'announcement_v2_7_seedream45', // Updated ID to reshow announcement
+    title: '🚀 Seedream 4.5 и Конкурсы!',
+    description: 'Встречайте новую модель Seedream 4.5 с улучшенной детализацией и возможностью редактирования изображений! Также участвуйте в тематических челленджах и выигрывайте призы.',
     image: 'https://cdn.midjourney.com/0c609677-440d-4056-a8a2-201804193556/0_0.png', // Placeholder image
-    buttonText: 'Перейти к конкурсам',
-    link: '/contests', // Internal link
-    secondaryButtonText: 'Закрыть',
-    secondaryLink: ''
+    buttonText: 'Попробовать Seedream 4.5',
+    link: '/studio', // Redirect to studio page
+    secondaryButtonText: 'К конкурсам',
+    secondaryLink: '/contests' // Internal link
 }
 
 export function AnnouncementModal() {
@@ -57,6 +57,7 @@ export function AnnouncementModal() {
         if (ANNOUNCEMENT.secondaryLink) {
             window.open(ANNOUNCEMENT.secondaryLink, '_blank')
         }
+        handleClose()
     }
 
     if (!isOpen) return null

@@ -13,6 +13,8 @@ function getModelDisplayName(model: string | null): string {
     case 'nanobanana': return 'NanoBanana'
     case 'nanobanana-pro': return 'NanoBanana Pro'
     case 'seedream4': return 'Seedream 4'
+    case 'seedream4-5': return 'Seedream 4.5'
+    case 'seedream4.5': return 'Seedream 4.5'
     case 'qwen-edit': return 'Qwen Edit'
     case 'flux': return 'Flux'
     default: return model
@@ -183,7 +185,9 @@ export default function Profile() {
         'nanobanana': 'nanobanana',
         'nanobanana-pro': 'nanobanana-pro',
         'seedream4': 'seedream4',
-        'seedream4-5': 'seedream4-5'
+        'seedream4-5': 'seedream4-5',
+        'seedream4.5': 'seedream4-5',
+        'qwen-edit': 'seedream4-5'
       }
       if (modelMap[item.model]) {
         setSelectedModel(modelMap[item.model])

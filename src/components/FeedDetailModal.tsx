@@ -40,6 +40,8 @@ function getModelDisplayName(model: string | null): string {
         case 'nanobanana': return 'NanoBanana'
         case 'nanobanana-pro': return 'NanoBanana Pro'
         case 'seedream4': return 'Seedream 4'
+        case 'seedream4-5': return 'Seedream 4.5'
+        case 'seedream4.5': return 'Seedream 4.5'
         case 'qwen-edit': return 'Qwen Edit'
         case 'flux': return 'Flux'
         default: return model

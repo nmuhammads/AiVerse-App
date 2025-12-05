@@ -685,15 +685,22 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     if (result.error) {
       console.error('[API] Generation failed with error:', result.error)
+
+      // Localization (Backup for frontend)
+      let finalError = result.error
+      if (finalError.toLowerCase().includes('text length') || finalError.toLowerCase().includes('limit')) {
+        finalError = 'Длина текста превышает максимально допустимый лимит'
+      }
+
       // Mark as failed if we created a record
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
-          error_message: result.error
+          error_message: finalError
         })
         console.log(`[DB] Generation ${generationId} marked as failed`)
       }
-      return res.status(500).json({ error: result.error })
+      return res.status(500).json({ error: finalError })
     }
 
     if (result.images && result.images.length > 0) {

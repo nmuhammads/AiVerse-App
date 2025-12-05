@@ -108,7 +108,15 @@ export function GenerationForm() {
       setGeneratedImage(data.image)
       setCurrentScreen('result')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed')
+      let errorMessage = err instanceof Error ? err.message : 'Generation failed'
+      
+      // Localization
+      const lowerError = errorMessage.toLowerCase()
+      if (lowerError.includes('text length') && lowerError.includes('maximum limit')) {
+        errorMessage = 'Длина текста превышает максимально допустимый лимит'
+      }
+
+      setError(errorMessage)
     } finally {
       setIsGenerating(false)
       hideProgress()
