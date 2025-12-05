@@ -130,10 +130,10 @@ export default function App() {
             </Routes>
           </div>
           <TabBar />
+          <AnnouncementModal />
         </div>
       </Router>
       <Toaster />
-      <AnnouncementModal />
     </>
   );
 }
