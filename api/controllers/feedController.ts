@@ -85,9 +85,7 @@ export async function getFeed(req: Request, res: Response) {
         if (model && model !== 'all') {
             queryParts.push(`model=eq.${model}`)
         } else {
-            // Exclude seedream4.5 if no specific model is requested (or 'all' is requested)
-            // We want to show everything EXCEPT seedream4.5
-            queryParts.push(`model=neq.seedream4.5`)
+            // Previously excluded seedream4.5, now enabled.
         }
         queryParts.push(`order=${order}`)
         queryParts.push(`limit=${limit}`)

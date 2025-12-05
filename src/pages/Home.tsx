@@ -126,7 +126,9 @@ export default function Home() {
         'nanobanana': 'nanobanana',
         'nanobanana-pro': 'nanobanana-pro',
         'seedream4': 'seedream4',
-        'qwen-edit': 'qwen-edit'
+        'seedream4-5': 'seedream4-5',
+        'seedream4.5': 'seedream4-5', // Fallback for potential legacy/dot notation
+        'qwen-edit': 'seedream4-5' // Legacy handling (just in case)
       }
       if (modelMap[item.model]) {
         setSelectedModel(modelMap[item.model])

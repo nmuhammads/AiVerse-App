@@ -5,14 +5,14 @@ import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_v2_7_contests', // Change this ID to show a new announcement to everyone
-    title: '🏆 Конкурсы уже здесь!',
-    description: 'Участвуйте в тематических челленджах, создавайте креативные работы и выигрывайте призы! Также мы обновили Студию, добавили новые анимации и улучшили стабильность генерации.',
-    image: 'https://cdn.midjourney.com/0c609677-440d-4056-a8a2-201804193556/0_0.png', // Placeholder image
-    buttonText: 'Перейти к конкурсам',
-    link: '/contests', // Internal link
-    secondaryButtonText: 'Закрыть',
-    secondaryLink: ''
+    id: 'announcement_v2_7_seedream45_v6', // Updated ID to force show again
+    title: '🚀 Seedream 4.5 и Конкурсы!',
+    description: 'Встречайте новую модель Seedream 4.5 с улучшенной детализацией и возможностью редактирования изображений! Также участвуйте в тематических челленджах и выигрывайте призы.',
+    image: '/models/seedream-4-5.png', // Updated image
+    buttonText: 'Попробовать Seedream 4.5',
+    link: '/studio', // Redirect to studio page
+    secondaryButtonText: 'К конкурсам',
+    secondaryLink: '/contests' // Internal link
 }
 
 export function AnnouncementModal() {
@@ -55,8 +55,13 @@ export function AnnouncementModal() {
     const handleSecondaryAction = () => {
         impact('medium')
         if (ANNOUNCEMENT.secondaryLink) {
-            window.open(ANNOUNCEMENT.secondaryLink, '_blank')
+             if (ANNOUNCEMENT.secondaryLink.startsWith('/')) {
+                navigate(ANNOUNCEMENT.secondaryLink)
+            } else {
+                window.open(ANNOUNCEMENT.secondaryLink, '_blank')
+            }
         }
+        handleClose()
     }
 
     if (!isOpen) return null
@@ -73,12 +78,24 @@ export function AnnouncementModal() {
             <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 fade-in duration-300 flex flex-col">
 
                 {/* Image Header */}
-                <div className="relative h-48 bg-zinc-800 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent z-10" />
+                <div className="relative h-90 bg-zinc-600 overflow-hidden">
+                    {/* Blurred Background */}
+                    <div className="absolute inset-0">
+                        <img
+                            src={ANNOUNCEMENT.image}
+                            className="w-full h-full object-cover blur-md opacity-60 scale-110"
+                            alt=""
+                        />
+                    </div>
+
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-800 via-zinc-800/10 to-transparent z-10" />
+
+                    {/* Main Image */}
                     <img
-                        src="/announcement_bg.png"
+                        src={ANNOUNCEMENT.image}
                         alt="Announcement"
-                        className="w-full h-full object-cover"
+                        className="relative z-10 w-full h-full object-contain"
                     />
 
                     <button

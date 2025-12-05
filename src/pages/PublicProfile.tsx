@@ -100,7 +100,9 @@ export default function PublicProfile() {
                 'nanobanana': 'nanobanana',
                 'nanobanana-pro': 'nanobanana-pro',
                 'seedream4': 'seedream4',
-                'qwen-edit': 'qwen-edit'
+                'seedream4-5': 'seedream4-5',
+                'seedream4.5': 'seedream4-5',
+                'qwen-edit': 'seedream4-5'
             }
             if (modelMap[item.model]) {
                 setSelectedModel(modelMap[item.model])

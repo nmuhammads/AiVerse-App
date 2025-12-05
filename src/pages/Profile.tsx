@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
+import { useGenerationStore } from '@/store/generationStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 function getModelDisplayName(model: string | null): string {
@@ -12,6 +13,8 @@ function getModelDisplayName(model: string | null): string {
     case 'nanobanana': return 'NanoBanana'
     case 'nanobanana-pro': return 'NanoBanana Pro'
     case 'seedream4': return 'Seedream 4'
+    case 'seedream4-5': return 'Seedream 4.5'
+    case 'seedream4.5': return 'Seedream 4.5'
     case 'qwen-edit': return 'Qwen Edit'
     case 'flux': return 'Flux'
     default: return model
@@ -146,6 +149,77 @@ export default function Profile() {
   useEffect(() => {
     setShowPrompt(false)
   }, [preview])
+
+  const {
+    setPrompt,
+    setSelectedModel,
+    setParentGeneration,
+    setCurrentScreen,
+    setAspectRatio,
+    setGenerationMode,
+    setUploadedImages
+  } = useGenerationStore()
+
+  const handleRemix = (item: any) => {
+    impact('medium')
+
+    // Parse metadata from prompt
+    let cleanPrompt = item.prompt
+    let metadata: Record<string, string> = {}
+
+    const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
+    if (match) {
+      const metaString = match[1]
+      cleanPrompt = item.prompt.replace(match[0], '').trim()
+
+      metaString.split(';').forEach((part: string) => {
+        const [key, val] = part.split('=').map((s: string) => s.trim())
+        if (key && val) metadata[key] = val
+      })
+    }
+
+    setPrompt(cleanPrompt)
+
+    if (item.model) {
+      const modelMap: Record<string, any> = {
+        'nanobanana': 'nanobanana',
+        'nanobanana-pro': 'nanobanana-pro',
+        'seedream4': 'seedream4',
+        'seedream4-5': 'seedream4-5',
+        'seedream4.5': 'seedream4-5',
+        'qwen-edit': 'seedream4-5'
+      }
+      if (modelMap[item.model]) {
+        setSelectedModel(modelMap[item.model])
+      }
+    }
+
+    if (metadata.ratio) {
+      const validRatios = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '16:21', 'Auto', 'square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']
+      if (validRatios.includes(metadata.ratio)) {
+        setAspectRatio(metadata.ratio as any)
+      }
+    }
+
+    if (metadata.type) {
+      if (metadata.type === 'text_photo') {
+        setGenerationMode('image')
+      } else {
+        setGenerationMode('text')
+      }
+    }
+
+    if (item.input_images && item.input_images.length > 0) {
+      setUploadedImages(item.input_images)
+      setGenerationMode('image')
+    } else {
+      setUploadedImages([])
+    }
+
+    setParentGeneration(item.id, item.author?.username || user?.username)
+    setCurrentScreen('form')
+    navigate('/studio')
+  }
 
   const stats = [
     { label: 'Генерации', value: typeof total === 'number' ? total : items.length },
