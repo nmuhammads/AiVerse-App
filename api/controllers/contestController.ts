@@ -79,7 +79,7 @@ export async function getContestEntries(req: Request, res: Response) {
         // Join with generations to get image details and users to get author info
         // NOW using contest_entries.likes_count instead of generations.likes_count
         // Also check contest_entry_likes for is_liked
-        const select = `select=id,final_rank,prize_awarded,created_at,likes_count,remix_count,generation_id,generations!inner(id,image_url,prompt,model),users(username,first_name,last_name,avatar_url),contest_entry_likes(user_id)`
+        const select = `select=id,user_id,final_rank,prize_awarded,created_at,likes_count,remix_count,generation_id,generations!inner(id,image_url,prompt,model),users(username,first_name,last_name,avatar_url),contest_entry_likes(user_id)`
 
         let orderQuery = ''
         if (sort === 'popular') {
@@ -111,6 +111,7 @@ export async function getContestEntries(req: Request, res: Response) {
                     is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false
                 },
                 author: {
+                    id: it.user_id,
                     username: author.username ? `@${author.username}` : (author.first_name || 'User'),
                     avatar_url: author.avatar_url,
                     first_name: author.first_name

@@ -33,6 +33,7 @@ interface ContestEntry {
         is_liked: boolean;
     };
     author: {
+        id: number;
         username: string;
         avatar_url: string;
         first_name: string;
@@ -346,7 +347,7 @@ export default function ContestDetail() {
                                         prompt: entry.generation.prompt,
                                         created_at: entry.created_at,
                                         author: {
-                                            id: 0, // Not needed for display mostly
+                                            id: entry.author.id,
                                             username: entry.author.username,
                                             avatar_url: entry.author.avatar_url,
                                             first_name: entry.author.first_name
@@ -379,7 +380,7 @@ export default function ContestDetail() {
                                         prompt: entry.generation.prompt,
                                         created_at: entry.created_at,
                                         author: {
-                                            id: 0,
+                                            id: entry.author.id,
                                             username: entry.author.username,
                                             avatar_url: entry.author.avatar_url,
                                             first_name: entry.author.first_name
@@ -453,7 +454,7 @@ export default function ContestDetail() {
                     prompt: entry.generation.prompt,
                     created_at: entry.created_at,
                     author: {
-                        id: 0,
+                        id: entry.author.id,
                         username: entry.author.username,
                         avatar_url: entry.author.avatar_url,
                         first_name: entry.author.first_name
