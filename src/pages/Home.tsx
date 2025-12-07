@@ -317,7 +317,7 @@ export default function Home() {
               {Array.from({ length: viewMode === 'standard' ? 2 : 3 }).map((_, colIndex) => (
                 <div key={colIndex} className={`flex-1 min-w-0 ${viewMode === 'standard' ? 'space-y-4' : 'space-y-2'}`}>
                   {filteredItems.filter((_, i) => i % (viewMode === 'standard' ? 2 : 3) === colIndex).map(item => (
-                    <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={setSelectedItem} />
+                    <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={setSelectedItem} isCompact={viewMode === 'compact'} />
                   ))}
                 </div>
               ))}

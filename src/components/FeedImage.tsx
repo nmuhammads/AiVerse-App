@@ -42,7 +42,7 @@ function getModelDisplayName(model: string | null): string {
     }
 }
 
-export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike, showRemix = true }: { item: FeedItem; priority?: boolean; handleRemix: (item: FeedItem) => void; onClick: (item: FeedItem) => void; onLike?: (id: number, isLiked: boolean) => void; showRemix?: boolean }) => {
+export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike, showRemix = true, isCompact = false }: { item: FeedItem; priority?: boolean; handleRemix: (item: FeedItem) => void; onClick: (item: FeedItem) => void; onLike?: (id: number, isLiked: boolean) => void; showRemix?: boolean; isCompact?: boolean }) => {
     const [loaded, setLoaded] = useState(false)
     const { impact } = useHaptics()
     const { user } = useTelegram()
@@ -178,17 +178,17 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className={`flex items-center ${isCompact ? 'gap-1' : 'gap-2'}`}>
                             {showRemix && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()
                                         handleRemix(item)
                                     }}
-                                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                                    className={`flex items-center ${isCompact ? 'gap-1 px-1.5 py-0.5' : 'gap-1.5 px-2 py-1'} rounded-full bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors`}
                                 >
-                                    <Repeat size={14} />
-                                    {item.remix_count > 0 && <span className="text-xs font-medium">{item.remix_count}</span>}
+                                    <Repeat size={isCompact ? 12 : 14} />
+                                    {item.remix_count > 0 && <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-medium`}>{item.remix_count}</span>}
                                 </button>
                             )}
                             <button
@@ -196,13 +196,13 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                                     e.stopPropagation()
                                     handleLike()
                                 }}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
+                                className={`flex items-center ${isCompact ? 'gap-1 px-1.5 py-0.5' : 'gap-1.5 px-2 py-1'} rounded-full transition-colors ${isLiked ? 'bg-pink-500/20 text-pink-500' : 'bg-white/5 text-zinc-400 hover:bg-white/10'}`}
                             >
                                 <Heart
-                                    size={14}
+                                    size={isCompact ? 12 : 14}
                                     className={`transition-transform ${isLikeAnimating ? 'scale-125' : 'scale-100'} ${isLiked ? 'fill-current' : ''}`}
                                 />
-                                <span className="text-xs font-medium">{likesCount}</span>
+                                <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-medium`}>{likesCount}</span>
                             </button>
                         </div>
                     </div>

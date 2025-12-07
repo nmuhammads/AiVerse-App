@@ -108,11 +108,38 @@ function saveBase64Image(imageBase64: string): { localPath: string; publicUrl: s
   return { localPath, publicUrl }
 }
 
-async function createFluxTask(apiKey: string, prompt: string, aspectRatio?: string, inputImageUrl?: string, onTaskCreated?: (taskId: string) => void) {
+
+interface KieMetaPayload {
+  meta?: {
+    generationId: number
+    tokens: number
+    userId: number
+  }
+  callBackUrl?: string
+}
+
+function prepareKieMeta(meta: { generationId: number; tokens: number; userId: number }): KieMetaPayload {
+  const baseUrl = getPublicBaseUrl()
+
+  // 1. Construct CallBack URL with query params
+  let callBackUrl: string | undefined
+  if (baseUrl) {
+    callBackUrl = `${baseUrl}/api/webhook/kie?generationId=${meta.generationId}&userId=${meta.userId}`
+  }
+
+  // 2. Return payload with both unified meta object and callback
+  return {
+    meta,
+    callBackUrl
+  }
+}
+
+async function createFluxTask(apiKey: string, prompt: string, aspectRatio?: string, inputImageUrl?: string, onTaskCreated?: (taskId: string) => void, metaPayload?: KieMetaPayload) {
   const body: Record<string, unknown> = {
     prompt,
     aspectRatio: aspectRatio || '1:1',
     model: 'flux-kontext-pro',
+    ...metaPayload // Spread unified metadata (meta object + callBackUrl)
   }
   if (inputImageUrl) body.inputImage = inputImageUrl
   console.log('[Flux] Creating task:', JSON.stringify(body))
@@ -196,12 +223,30 @@ async function pollFluxTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
   throw new Error('Flux task timeout')
 }
 
-async function createJobsTask(apiKey: string, modelId: string, input: Record<string, unknown>, onTaskCreated?: (taskId: string) => void) {
-  console.log(`[Jobs] Creating task for ${modelId}:`, JSON.stringify(input))
+async function createJobsTask(apiKey: string, modelId: string, input: Record<string, unknown>, onTaskCreated?: (taskId: string) => void, metaPayload?: KieMetaPayload) {
+  // Merge meta payload into input (for Jobs, meta is usually inside input object or top level? 
+  // Based on user snippet: {"input": "...", "callBackUrl": "...", "meta": {...}, "model": "..."}
+  // The 'createJobsTask' function wraps 'input' inside a body { model: modelId, input }.
+  // Wait, looking at current `createJobsTask` implementation:
+  // body: JSON.stringify({ model: modelId, input })
+  // The user example shows `meta` and `callBackUrl` at the TOP LEVEL of the JSON body, alongside `model`.
+
+  // We need to adjust how `createJobsTask` constructs the body.
+  // It currently takes `input` and puts it in `input`.
+  // If we want `meta` and `callBackUrl` at top level, we need to merge them into the body object, NOT inside `input` usually.
+  // BUT `createJobsTask` signature is `createJobsTask(apiKey, modelId, input, ...)` where `input` is put into `body.input`.
+
+  const body: any = { model: modelId, input }
+  if (metaPayload) {
+    if (metaPayload.meta) body.meta = metaPayload.meta
+    if (metaPayload.callBackUrl) body.callBackUrl = metaPayload.callBackUrl
+  }
+
+  console.log(`[Jobs] Creating task for ${modelId}:`, JSON.stringify(body))
   const resp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: modelId, input })
+    body: JSON.stringify(body)
   })
   const json = await resp.json()
   if (!resp.ok || json?.code !== 200) {
@@ -399,9 +444,15 @@ async function generateImageWithKieAI(
       }).filter(Boolean)
     }
 
+    // Prepare Metadata Payload if available
+    let metaPayload: KieMetaPayload | undefined
+    if (requestData.meta) {
+      metaPayload = prepareKieMeta(requestData.meta)
+    }
+
     if (cfg.kind === 'flux-kontext') {
       // Flux supports single image
-      const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrls[0], onTaskCreated)
+      const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrls[0], onTaskCreated, metaPayload)
       const url = await pollFluxTask(apiKey, taskId)
       return { images: [url], inputImages: imageUrls }
     }
@@ -421,11 +472,6 @@ async function generateImageWithKieAI(
       if (model === 'seedream4' && image_size) {
         input.image_size = image_size
       } else if (model === 'seedream4-5') {
-        // Seedream 4.5 uses specific aspect_ratio format if needed, but docs say "aspect_ratio": "1:1" etc
-        // mapSeedreamImageSize returns string like 'square_hd', which might be for Seedream 4.
-        // For 4.5 we might need to pass aspect_ratio directly if defined in docs, 
-        // but let's assume sticking to 'aspect_ratio' field if docs said so.
-        // Docs said: aspect_ratio: "1:1", "16:9" etc.
         if (aspect_ratio && aspect_ratio !== 'Auto') {
           input.aspect_ratio = aspect_ratio
         } else {
@@ -438,19 +484,19 @@ async function generateImageWithKieAI(
         const mode = model === 'seedream4-5' ? 'seedream/4.5-edit' : 'bytedance/seedream-v4-edit'
         // For 4.5 Edit
         if (model === 'seedream4-5') {
-          const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated)
+          const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated, metaPayload)
           const url = await pollJobsTask(apiKey, taskId)
           return { images: [url], inputImages: imageUrls }
         }
 
         // Seedream 4 Edit (preserving old logic just in case, though structure above was slightly different)
-        const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated)
+        const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: imageUrls }
       } else {
         // Text to Image
         const mode = model === 'seedream4-5' ? 'seedream/4.5-text-to-image' : 'bytedance/seedream-v4-text-to-image'
-        const taskId = await createJobsTask(apiKey, mode, input, onTaskCreated)
+        const taskId = await createJobsTask(apiKey, mode, input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: [] }
       }
@@ -472,9 +518,7 @@ async function generateImageWithKieAI(
         output_format: 'png'
       }
 
-      if (requestData.meta) {
-        input.meta = requestData.meta
-      }
+      // Old manual meta insertion removed, handled by metaPayload in createJobsTask
 
       if (imageUrls.length > 0) {
         if (isPro) {
@@ -494,12 +538,12 @@ async function generateImageWithKieAI(
         }
         if (res) input.resolution = res
 
-        const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input, onTaskCreated)
+        const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: imageUrls }
       } else {
         if (image_size) input.image_size = image_size
-        const taskId = await createJobsTask(apiKey, modelId, input, onTaskCreated)
+        const taskId = await createJobsTask(apiKey, modelId, input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
         return { images: [url], inputImages: imageUrls }
       }
