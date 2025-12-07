@@ -482,7 +482,7 @@ export default function ContestDetail() {
                                     </div>
 
                                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                        <img src={entry.generation.image_url} className="w-full h-full object-cover" />
+                                        <img src={entry.generation.compressed_url || entry.generation.image_url} className="w-full h-full object-cover" />
                                     </div>
 
                                     <div className="flex-1 min-w-0">
