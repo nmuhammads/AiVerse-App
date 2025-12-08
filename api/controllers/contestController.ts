@@ -72,6 +72,7 @@ export async function getContestEntries(req: Request, res: Response) {
         const limit = Number(req.query.limit || 50)
         const offset = Number(req.query.offset || 0)
         const sort = String(req.query.sort || 'popular') // 'popular' | 'new'
+        const model = req.query.model && req.query.model !== 'all' ? String(req.query.model) : null
         const currentUserId = req.query.user_id ? Number(req.query.user_id) : null
 
         if (!id) return res.status(400).json({ error: 'Contest ID required' })
@@ -88,7 +89,11 @@ export async function getContestEntries(req: Request, res: Response) {
             orderQuery = '&order=created_at.desc'
         }
 
-        const query = `?contest_id=eq.${id}${orderQuery}&limit=${limit}&offset=${offset}&${select}&generations.or=(model.neq.seedream4.5,model.is.null)`
+        let query = `?contest_id=eq.${id}${orderQuery}&limit=${limit}&offset=${offset}&${select}&generations.or=(model.neq.seedream4.5,model.is.null)`
+
+        if (model) {
+            query += `&generations.model=eq.${model}`
+        }
 
         const q = await supaSelect('contest_entries', query)
         if (!q.ok) return res.status(500).json({ error: 'Failed to fetch entries', detail: q.data })

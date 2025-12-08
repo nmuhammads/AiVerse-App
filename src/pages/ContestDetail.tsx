@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Trophy, Calendar, Info, Grid, Medal, Loader2, Clock, LayoutGrid, Grid3x3 } from 'lucide-react';
+import { ArrowLeft, Trophy, Calendar, Info, Grid, Medal, Loader2, Clock, LayoutGrid, Grid3x3, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useTelegram } from '@/hooks/useTelegram';
 import { FeedImage, FeedItem } from '@/components/FeedImage';
@@ -44,6 +44,41 @@ interface ContestEntry {
     created_at: string;
 }
 
+const LeaderboardThumbnail = ({ entry }: { entry: ContestEntry }) => {
+    const [imgSrc, setImgSrc] = useState(entry.generation.compressed_url || entry.generation.image_url);
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        setImgSrc(entry.generation.compressed_url || entry.generation.image_url);
+        setHasError(false);
+    }, [entry.generation.compressed_url, entry.generation.image_url]);
+
+    const handleError = () => {
+        if (!hasError && entry.generation.compressed_url && imgSrc !== entry.generation.image_url) {
+            setImgSrc(entry.generation.image_url);
+        } else {
+            setHasError(true);
+        }
+    };
+
+    if (hasError) {
+        return (
+            <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-600">
+                <ImageIcon size={20} />
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={imgSrc}
+            className="w-full h-full object-cover"
+            onError={handleError}
+            alt={entry.generation.prompt}
+        />
+    );
+};
+
 export default function ContestDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -63,6 +98,8 @@ export default function ContestDetail() {
     const [joining, setJoining] = useState(false);
     const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard');
+    const [selectedModelFilter, setSelectedModelFilter] = useState<string>('all');
+    const [sort, setSort] = useState<'new' | 'popular'>('new');
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -103,7 +140,7 @@ export default function ContestDetail() {
             fetchContestDetails();
             fetchEntries(true);
         }
-    }, [id, user?.id]);
+    }, [id, user?.id, selectedModelFilter, sort]);
 
     useEffect(() => {
         // Reset and refetch when viewMode changes to ensure alignment
@@ -158,7 +195,7 @@ export default function ContestDetail() {
             const currentOffset = reset ? 0 : offset;
             const limit = viewMode === 'compact' ? 9 : 6;
 
-            let url = `/api/contests/${id}/entries?limit=${limit}&offset=${currentOffset}`;
+            let url = `/api/contests/${id}/entries?limit=${limit}&offset=${currentOffset}&model=${selectedModelFilter}&sort=${sort}`;
             if (user?.id) {
                 url += `&user_id=${user.id}`;
             }
@@ -408,20 +445,53 @@ export default function ContestDetail() {
                         </div>
                     ) : (
                         <>
-                            <div className="flex justify-end mb-4 px-2">
-                                <div className="bg-[#1c1c1e] p-1 rounded-lg flex gap-1 border border-white/5">
+                            <div className="flex items-center justify-between mb-4 px-2">
+                                <div className="flex items-center gap-3">
                                     <button
-                                        onClick={() => setViewMode('standard')}
-                                        className={`p-2 rounded-md transition-all ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        onClick={() => { setSort('new'); impact('light'); }}
+                                        className={`text-sm font-bold tracking-tight transition-colors ${sort === 'new' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                     >
-                                        <LayoutGrid size={18} />
+                                        Новые
                                     </button>
+                                    <div className="w-[1px] h-3 bg-zinc-800"></div>
                                     <button
-                                        onClick={() => setViewMode('compact')}
-                                        className={`p-2 rounded-md transition-all ${viewMode === 'compact' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        onClick={() => { setSort('popular'); impact('light'); }}
+                                        className={`text-sm font-bold tracking-tight transition-colors ${sort === 'popular' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                     >
-                                        <Grid3x3 size={18} />
+                                        Топ
                                     </button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <div className="relative">
+                                        <select
+                                            value={selectedModelFilter}
+                                            onChange={(e) => { setSelectedModelFilter(e.target.value); impact('light'); }}
+                                            className="appearance-none bg-[#1c1c1e] border border-white/5 text-xs font-medium text-zinc-300 rounded-lg py-0 pl-3 pr-8 focus:outline-none focus:border-violet-500/50 transition-colors h-[30px]"
+                                        >
+                                            <option value="all">Все модели</option>
+                                            <option value="nanobanana">NanoBanana</option>
+                                            <option value="nanobanana-pro">NanoBanana Pro</option>
+                                            <option value="seedream4">SeeDream 4</option>
+                                            <option value="seedream4-5">SeeDream 4.5</option>
+                                        </select>
+                                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                                    </div>
+
+                                    <div className="bg-[#1c1c1e] p-0.5 rounded-lg flex gap-0.5 border border-white/5 h-[30px] items-center">
+                                        <button
+                                            onClick={() => setViewMode('standard')}
+                                            className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            <LayoutGrid size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('compact')}
+                                            className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'compact' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            <Grid3x3 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className={`flex items-start ${viewMode === 'standard' ? 'gap-4' : 'gap-2'} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
@@ -456,72 +526,77 @@ export default function ContestDetail() {
                                     </div>
                                 ))}
                             </div>
-                            {isFetchingMore && (
-                                <div className="text-center text-zinc-500 py-4 w-full">Loading more...</div>
-                            )}
+                            {
+                                isFetchingMore && (
+                                    <div className="text-center text-zinc-500 py-4 w-full">Loading more...</div>
+                                )
+                            }
                         </>
                     )
-                )}
+                )
+                }
 
-                {activeTab === 'leaderboard' && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        {leaderboardLoading ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="animate-spin text-zinc-500" />
-                            </div>
-                        ) : (
-                            leaderboardEntries
-                                .map((entry, index) => (
-                                    <div
-                                        key={entry.id}
-                                        onClick={() => handleImageClick({
-                                            id: entry.generation.id,
-                                            image_url: entry.generation.image_url,
-                                            prompt: entry.generation.prompt,
-                                            created_at: entry.created_at,
-                                            author: {
-                                                id: entry.author.id,
-                                                username: entry.author.username,
-                                                avatar_url: entry.author.avatar_url,
-                                                first_name: entry.author.first_name
-                                            },
-                                            likes_count: entry.generation.likes_count,
-                                            remix_count: entry.generation.remix_count,
-                                            is_liked: entry.generation.is_liked,
-                                            model: entry.generation.model
-                                        })}
-                                        className="flex items-center gap-3 bg-[#1c1c1e] p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/5 transition-colors active:scale-[0.98]"
-                                    >
-                                        <div className={`w-8 h-8 flex items-center justify-center font-bold rounded-full ${index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
-                                            index === 1 ? 'bg-zinc-400/20 text-zinc-400' :
-                                                index === 2 ? 'bg-amber-700/20 text-amber-700' :
-                                                    'bg-white/5 text-zinc-500'
-                                            }`}>
-                                            {index + 1}
-                                        </div>
-
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                            <img src={entry.generation.compressed_url || entry.generation.image_url} className="w-full h-full object-cover" />
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-white font-medium truncate">{entry.author.username}</div>
-                                            <div className="text-xs text-zinc-500 flex items-center gap-2">
-                                                <span className="flex items-center gap-1"><Trophy size={10} /> {entry.generation.likes_count} лайков</span>
+                {
+                    activeTab === 'leaderboard' && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            {leaderboardLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="animate-spin text-zinc-500" />
+                                </div>
+                            ) : (
+                                leaderboardEntries
+                                    .map((entry, index) => (
+                                        <div
+                                            key={entry.id}
+                                            onClick={() => handleImageClick({
+                                                id: entry.generation.id,
+                                                image_url: entry.generation.image_url,
+                                                prompt: entry.generation.prompt,
+                                                created_at: entry.created_at,
+                                                author: {
+                                                    id: entry.author.id,
+                                                    username: entry.author.username,
+                                                    avatar_url: entry.author.avatar_url,
+                                                    first_name: entry.author.first_name
+                                                },
+                                                likes_count: entry.generation.likes_count,
+                                                remix_count: entry.generation.remix_count,
+                                                is_liked: entry.generation.is_liked,
+                                                model: entry.generation.model
+                                            })}
+                                            className="flex items-center gap-3 bg-[#1c1c1e] p-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/5 transition-colors active:scale-[0.98]"
+                                        >
+                                            <div className={`w-8 h-8 flex items-center justify-center font-bold rounded-full ${index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                                                index === 1 ? 'bg-zinc-400/20 text-zinc-400' :
+                                                    index === 2 ? 'bg-amber-700/20 text-amber-700' :
+                                                        'bg-white/5 text-zinc-500'
+                                                }`}>
+                                                {index + 1}
                                             </div>
-                                        </div>
 
-                                        {contest.status === 'completed' && entry.prize_awarded && (
-                                            <div className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
-                                                {entry.prize_awarded}
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
+                                                <LeaderboardThumbnail entry={entry} />
                                             </div>
-                                        )}
-                                    </div>
-                                ))
-                        )}
-                    </div>
-                )}
-            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-white font-medium truncate">{entry.author.username}</div>
+                                                <div className="text-xs text-zinc-500 flex items-center gap-2">
+                                                    <span className="flex items-center gap-1"><Trophy size={10} /> {entry.generation.likes_count} лайков</span>
+                                                </div>
+                                            </div>
+
+                                            {contest.status === 'completed' && entry.prize_awarded && (
+                                                <div className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
+                                                    {entry.prize_awarded}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                            )}
+                        </div>
+                    )
+                }
+            </div >
 
             {/* Join Button */}
             {
