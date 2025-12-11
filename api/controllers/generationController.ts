@@ -412,9 +412,9 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
       if (userId) {
         // Simple caption or based on prompt
         const caption = `✨ Генерация завершена!`
-        await tg('sendPhoto', {
+        await tg('sendDocument', {
           chat_id: userId,
-          photo: imageUrl,
+          document: imageUrl,
           caption: caption
         })
         console.log(`[Notification] Sent photo to user ${userId}`)
@@ -601,9 +601,23 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     // SIMULATION MODE
     if (prompt.trim().toLowerCase() === 'test') {
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 10000)) // Simulate delay
+
+      const mockImage = 'https://placehold.co/1024x1024/png?text=Test+Generation'
+
+      // Simulate Telegram Notification
+      if (user_id) {
+        try {
+          await tg('sendDocument', {
+            chat_id: user_id,
+            document: mockImage,
+            caption: '✨ Тестовая генерация завершена!'
+          })
+        } catch (e) { console.error('Simulated tg error', e) }
+      }
+
       return res.json({
-        image: 'https://placehold.co/1024x1024/png?text=Test+Generation',
+        image: mockImage,
         prompt: prompt,
         model: model
       })
