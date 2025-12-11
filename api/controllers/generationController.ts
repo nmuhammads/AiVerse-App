@@ -4,6 +4,7 @@ import path from 'path'
 
 // Типы для запросов к Kie.ai
 import { uploadImageFromBase64, uploadImageFromUrl, createThumbnail } from '../services/r2Service.js'
+import { tg } from './telegramController.js'
 
 interface KieAIRequest {
   model: string
@@ -406,6 +407,22 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
       }
     }
 
+    // 3.5 Send Telegram Notification
+    try {
+      if (userId) {
+        // Simple caption or based on prompt
+        const caption = `✨ Генерация завершена!`
+        await tg('sendDocument', {
+          chat_id: userId,
+          document: imageUrl,
+          caption: caption
+        })
+        console.log(`[Notification] Sent photo to user ${userId}`)
+      }
+    } catch (e) {
+      console.error('[Notification] Failed to send Telegram notification:', e)
+    }
+
 
     // 4. Generate Thumbnail (Async, don't block response)
     if (imageUrl) {
@@ -584,9 +601,23 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     // SIMULATION MODE
     if (prompt.trim().toLowerCase() === 'test') {
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 10000)) // Simulate delay
+
+      const mockImage = 'https://placehold.co/1024x1024/png?text=Test+Generation'
+
+      // Simulate Telegram Notification
+      if (user_id) {
+        try {
+          await tg('sendDocument', {
+            chat_id: user_id,
+            document: mockImage,
+            caption: '✨ Тестовая генерация завершена!'
+          })
+        } catch (e) { console.error('Simulated tg error', e) }
+      }
+
       return res.json({
-        image: 'https://placehold.co/1024x1024/png?text=Test+Generation',
+        image: mockImage,
         prompt: prompt,
         model: model
       })

@@ -11,7 +11,7 @@ const APP_URL = (
 )
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || ''
 
-async function tg(method: string, payload: Record<string, unknown>) {
+export async function tg(method: string, payload: Record<string, unknown>) {
   if (!API) return null
   const r = await fetch(`${API}/${method}`, {
     method: 'POST',

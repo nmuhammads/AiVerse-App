@@ -734,6 +734,13 @@ export default function Studio() {
 
         {/* 6. Generate Button (Moved Up) */}
         <div className="">
+          {isGenerating && (
+            <p className="text-xs text-zinc-500 text-center mb-3 animate-in fade-in slide-in-from-bottom-1 px-4 leading-relaxed">
+              Если процесс идет долго, можете свернуть приложение. <br />
+              Результат появится в разделе <span className="text-zinc-400 font-medium">Мои генерации</span> в профиле<br />
+              и придет в <span className="text-zinc-400 font-medium">чат Telegram</span>.
+            </p>
+          )}
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim() || (generationMode === 'image' && uploadedImages.length === 0)}
@@ -752,12 +759,6 @@ export default function Studio() {
               </span>}
             </div>
           </Button>
-          {isGenerating && (
-            <p className="text-[10px] text-zinc-500 text-center mt-3 animate-in fade-in slide-in-from-top-1 px-4 leading-relaxed">
-              Если процесс идет долго, можете свернуть приложение. <br />
-              Результат появится в разделе <span className="text-zinc-400 font-medium">Мои генерации</span> в профиле.
-            </p>
-          )}
         </div>
 
       </div>
