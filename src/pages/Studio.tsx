@@ -85,7 +85,7 @@ export default function Studio() {
     setParentGeneration,
   } = useGenerationStore()
 
-  const { shareImage, saveToGallery, user, platform } = useTelegram()
+  const { shareImage, saveToGallery, user, platform, tg } = useTelegram()
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
@@ -96,11 +96,28 @@ export default function Studio() {
   const [resolution, setResolution] = useState<'2K' | '4K'>('4K')
   const [searchParams] = useSearchParams()
   const [contestEntryId, setContestEntryId] = useState<number | null>(null)
+  const [inputKey, setInputKey] = useState(0) // Key for forcing input re-render after Face ID
 
   // Reset scale when closing fullscreen
   useEffect(() => {
     if (!isFullScreen) setScale(1)
   }, [isFullScreen])
+
+  // Handle iOS Face ID / app resume: re-mount the file input
+  useEffect(() => {
+    const handleActivated = () => {
+      // Force re-render of file input by changing its key
+      setInputKey(prev => prev + 1)
+    }
+    try {
+      tg?.onEvent?.('activated', handleActivated)
+    } catch { /* noop */ }
+    return () => {
+      try {
+        tg?.offEvent?.('activated', handleActivated)
+      } catch { /* noop */ }
+    }
+  }, [tg])
 
   useEffect(() => {
     if (user?.id) {
@@ -635,6 +652,7 @@ export default function Studio() {
 
       {/* Persistent File Input - Kept outside conditional rendering to prevent unmounting during OS context switches */}
       <input
+        key={inputKey}
         ref={fileInputRef}
         type="file"
         accept="image/*"
