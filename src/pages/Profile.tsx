@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className }: { src: string, originalUrl: string, alt: string, className?: string }) => {
@@ -394,6 +394,54 @@ export default function Profile() {
                 }
                 reader.readAsDataURL(f)
               }} />
+
+              {/* Paste zone for avatar - for Face ID users */}
+              <div
+                contentEditable
+                suppressContentEditableWarning
+                onPaste={async (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (!user?.id) return
+
+                  const items = e.clipboardData?.items
+                  if (!items) return
+
+                  for (const item of Array.from(items)) {
+                    if (item.type.startsWith('image/')) {
+                      const file = item.getAsFile()
+                      if (!file) continue
+
+                      const reader = new FileReader()
+                      reader.onload = (ev) => {
+                        const base64 = String(ev.target?.result || '')
+                        setAvatarSrc(base64)
+
+                        fetch('/api/user/avatar/upload', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ userId: user.id, imageBase64: base64 })
+                        }).then(async (r) => {
+                          if (r.ok) {
+                            impact('medium')
+                            notify('success')
+                          } else {
+                            notify('error')
+                          }
+                        })
+                      }
+                      reader.readAsDataURL(file)
+                      break
+                    }
+                  }
+                  e.currentTarget.innerHTML = ''
+                }}
+                onInput={(e) => { e.currentTarget.innerHTML = '' }}
+                className="w-full mt-2 py-2 px-3 rounded-xl border border-dashed border-violet-500/30 bg-violet-500/5 flex items-center justify-center gap-2 text-violet-300 text-xs cursor-text focus:outline-none focus:border-violet-500/50"
+              >
+                <Clipboard size={14} />
+                <span>Вставить фото (зажмите)</span>
+              </div>
             </div>
           </div>
         </div>
