@@ -368,6 +368,8 @@ export default function Profile() {
                   if (!user?.id) return
                   const deepLink = `https://t.me/AiVerseAppBot?startapp=profile-${user.id}`
                   const shareText = `Посмотри мой профиль и работы в AiVerse 🎨`
+                  // Force link in text for better compat
+                  const fullShareText = `${shareText}\n${deepLink}`
 
                   if (navigator.share) {
                     navigator.share({
@@ -375,19 +377,17 @@ export default function Profile() {
                       text: shareText,
                       url: deepLink
                     }).catch(() => {
-                      // Fallback if share cancelled/failed
                       const wa = (window as any).Telegram?.WebApp
                       if (wa) {
-                        wa.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(shareText)}`)
+                        wa.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(fullShareText)}`)
                       }
                     })
                   } else {
                     const wa = (window as any).Telegram?.WebApp
                     if (wa) {
-                      wa.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(shareText)}`)
+                      wa.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(fullShareText)}`)
                     } else {
-                      // Browser fallback
-                      window.open(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(shareText)}`, '_blank')
+                      window.open(`https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(fullShareText)}`, '_blank')
                     }
                   }
                 }}
