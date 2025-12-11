@@ -374,8 +374,7 @@ export default function Profile() {
                   if (navigator.share) {
                     navigator.share({
                       title: 'AiVerse Profile',
-                      text: shareText,
-                      url: deepLink
+                      text: fullShareText
                     }).catch(() => {
                       // Share cancelled or failed - do nothing to avoid double popup
                     })
