@@ -15,40 +15,47 @@ export const compressImage = (
     quality = 0.8
 ): Promise<string> => {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(file)
-        reader.onload = (event) => {
-            const img = new Image()
-            img.src = event.target?.result as string
-            img.onload = () => {
-                let width = img.width
-                let height = img.height
+        const img = new Image()
+        const objectUrl = URL.createObjectURL(file)
 
-                // Calculate new dimensions while maintaining aspect ratio
-                if (width > maxWidth || height > maxHeight) {
-                    const ratio = Math.min(maxWidth / width, maxHeight / height)
-                    width *= ratio
-                    height *= ratio
-                }
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl)
 
-                const canvas = document.createElement('canvas')
-                canvas.width = width
-                canvas.height = height
-                const ctx = canvas.getContext('2d')
+            let width = img.width
+            let height = img.height
 
-                if (!ctx) {
-                    reject(new Error('Failed to get canvas context'))
-                    return
-                }
-
-                ctx.drawImage(img, 0, 0, width, height)
-
-                // Compress to JPEG
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
-                resolve(compressedDataUrl)
+            // Calculate new dimensions while maintaining aspect ratio
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height)
+                width *= ratio
+                height *= ratio
             }
-            img.onerror = (error) => reject(error)
+
+            const canvas = document.createElement('canvas')
+            canvas.width = width
+            canvas.height = height
+            const ctx = canvas.getContext('2d')
+
+            if (!ctx) {
+                reject(new Error('Failed to get canvas context'))
+                return
+            }
+
+            ctx.drawImage(img, 0, 0, width, height)
+
+            // Compress to JPEG
+            // Note: toDataURL is synchronous and creates a string. 
+            // For very large images on low memory devices, toBlob might be safer but requires async handling.
+            // Keeping toDataURL for now as it matches the function signature (Promise<string>).
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+            resolve(compressedDataUrl)
         }
-        reader.onerror = (error) => reject(error)
+
+        img.onerror = (error) => {
+            URL.revokeObjectURL(objectUrl)
+            reject(error)
+        }
+
+        img.src = objectUrl
     })
 }

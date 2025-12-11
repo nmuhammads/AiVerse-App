@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -85,9 +85,10 @@ export default function Studio() {
     setParentGeneration,
   } = useGenerationStore()
 
-  const { shareImage, saveToGallery, user, platform } = useTelegram()
+  const { shareImage, saveToGallery, user, platform, tg } = useTelegram()
   const { impact, notify } = useHaptics()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [balance, setBalance] = useState<number | null>(null)
@@ -96,11 +97,29 @@ export default function Studio() {
   const [resolution, setResolution] = useState<'2K' | '4K'>('4K')
   const [searchParams] = useSearchParams()
   const [contestEntryId, setContestEntryId] = useState<number | null>(null)
+  const [inputKey, setInputKey] = useState(0) // Key for forcing input re-render after Face ID
+  const [showSourceMenu, setShowSourceMenu] = useState(false)
 
   // Reset scale when closing fullscreen
   useEffect(() => {
     if (!isFullScreen) setScale(1)
   }, [isFullScreen])
+
+  // Handle iOS Face ID / app resume: re-mount the file input
+  useEffect(() => {
+    const handleActivated = () => {
+      // Force re-render of file input by changing its key
+      setInputKey(prev => prev + 1)
+    }
+    try {
+      tg?.onEvent?.('activated', handleActivated)
+    } catch { /* noop */ }
+    return () => {
+      try {
+        tg?.offEvent?.('activated', handleActivated)
+      } catch { /* noop */ }
+    }
+  }, [tg])
 
   useEffect(() => {
     if (user?.id) {
@@ -196,6 +215,65 @@ export default function Studio() {
     }
 
     processFiles()
+  }
+
+  // Process pasted files from clipboard event
+  const processPastedFiles = async (files: FileList | File[]) => {
+    const maxImages = 8
+    const fileArray = Array.from(files)
+
+    for (const file of fileArray) {
+      if (!file.type.startsWith('image/')) continue
+      if (uploadedImages.length >= maxImages) {
+        setError(`Максимум ${maxImages} фото`)
+        notify('error')
+        break
+      }
+
+      try {
+        const compressed = await compressImage(file)
+        addUploadedImage(compressed)
+        impact('light')
+        notify('success')
+      } catch (e) {
+        console.error('Compression failed', e)
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = (ev) => {
+          if (ev.target?.result) addUploadedImage(ev.target.result as string)
+        }
+      }
+    }
+  }
+
+  // Handle paste button click - try clipboard API, show instructions otherwise
+  const handlePasteClick = async () => {
+    // First try modern Clipboard API
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read()
+        const files: File[] = []
+
+        for (const item of items) {
+          const imageType = item.types.find(type => type.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            files.push(new File([blob], 'pasted-image.png', { type: imageType }))
+          }
+        }
+
+        if (files.length > 0) {
+          await processPastedFiles(files)
+          return
+        }
+      }
+    } catch (e) {
+      console.log('Clipboard API not available:', e)
+    }
+
+    // Show instruction for manual paste
+    setError('Скопируйте фото и нажмите долгим тапом здесь → Вставить')
+    notify('warning')
   }
 
   const handleGenerate = async () => {
@@ -474,37 +552,126 @@ export default function Studio() {
         {generationMode === 'image' && (
           <div className="animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="border-2 border-dashed border-white/10 rounded-xl p-4 bg-zinc-900/20 relative overflow-hidden">
-              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
 
               {uploadedImages.length > 0 ? (
-                <div className="grid grid-cols-4 gap-2">
-                  {uploadedImages.map((img, idx) => (
-                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden group">
-                      <img src={img} alt={`uploaded-${idx}`} className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => removeUploadedImage(idx)}
-                        className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {/* Image grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {uploadedImages.map((img, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-lg overflow-hidden group">
+                        <img src={img} alt={`uploaded-${idx}`} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => removeUploadedImage(idx)}
+                          className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add more buttons */}
                   {uploadedImages.length < maxImages && (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="aspect-square rounded-lg border border-white/10 flex items-center justify-center text-zinc-500 hover:bg-zinc-800 hover:text-white transition-colors"
-                    >
-                      <ImageIcon size={20} />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 py-2 px-3 rounded-lg border border-white/10 flex items-center justify-center gap-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors text-xs"
+                      >
+                        <ImageIcon size={14} />
+                        <span>Ещё</span>
+                      </button>
+                      {/* Paste zone for adding more */}
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        onPaste={async (e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const items = e.clipboardData?.items
+                          if (!items) return
+
+                          const files: File[] = []
+                          for (const item of Array.from(items)) {
+                            if (item.type.startsWith('image/')) {
+                              const file = item.getAsFile()
+                              if (file) files.push(file)
+                            }
+                          }
+
+                          if (files.length > 0) {
+                            await processPastedFiles(files)
+                          }
+                          e.currentTarget.innerHTML = ''
+                        }}
+                        onInput={(e) => { e.currentTarget.innerHTML = '' }}
+                        className="flex-1 py-2 px-3 rounded-lg border border-dashed border-violet-500/30 bg-violet-500/5 flex items-center justify-center gap-2 text-violet-300 text-xs cursor-text focus:outline-none focus:border-violet-500/50"
+                      >
+                        <Clipboard size={14} />
+                        <span>Вставить</span>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer py-4 text-center hover:bg-zinc-900/40 transition-colors rounded-lg">
-                  <div className="w-10 h-10 mx-auto bg-zinc-800 rounded-full flex items-center justify-center mb-2 text-zinc-400">
-                    <ImageIcon size={20} />
+                <div className="space-y-3">
+                  {/* Main upload area - compact */}
+                  <div className="py-2 text-center">
+                    <div className="w-10 h-10 mx-auto bg-zinc-800 rounded-full flex items-center justify-center mb-2 text-zinc-400">
+                      <ImageIcon size={20} />
+                    </div>
+                    <div className="text-xs font-medium text-zinc-300">Добавить референсы (до {maxImages})</div>
                   </div>
-                  <div className="text-sm font-medium text-zinc-300">Загрузить референс</div>
-                  <div className="text-xs text-zinc-500 mt-1">До {maxImages} изображений</div>
+
+                  {/* Source selection */}
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-2.5 px-3 rounded-xl border border-white/10 flex items-center justify-center gap-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors active:scale-95"
+                    >
+                      <ImageIcon size={16} />
+                      <span className="text-xs font-medium">Выбрать фото</span>
+                    </button>
+
+                    {/* Paste zone - contenteditable for iOS long-press paste */}
+                    <div
+                      contentEditable
+                      suppressContentEditableWarning
+                      onPaste={async (e) => {
+                        e.preventDefault()
+                        const items = e.clipboardData?.items
+                        if (!items) return
+
+                        const files: File[] = []
+                        for (const item of Array.from(items)) {
+                          if (item.type.startsWith('image/')) {
+                            const file = item.getAsFile()
+                            if (file) files.push(file)
+                          }
+                        }
+
+                        if (files.length > 0) {
+                          await processPastedFiles(files)
+                        }
+
+                        // Clear the contenteditable
+                        e.currentTarget.innerHTML = ''
+                      }}
+                      onInput={(e) => {
+                        // Clear any text input
+                        e.currentTarget.innerHTML = ''
+                      }}
+                      className="w-full py-3 px-3 rounded-xl border-2 border-dashed border-violet-500/30 bg-violet-500/5 flex items-center justify-center gap-2 text-violet-300 text-xs font-medium cursor-text select-none focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/10"
+                      style={{ minHeight: '44px', WebkitUserSelect: 'none' }}
+                    >
+                      <Clipboard size={16} />
+                      <span>Зажмите здесь → Вставить</span>
+                    </div>
+                  </div>
+
+                  {/* Hint */}
+                  <div className="text-[10px] text-zinc-500 text-center">
+                    Скопируйте фото → зажмите фиолетовую зону → Вставить
+                  </div>
                 </div>
               )}
             </div>
@@ -632,6 +799,37 @@ export default function Studio() {
         )}
 
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+
+      {/* Persistent File Input - Kept outside conditional rendering to prevent unmounting during OS context switches */}
+      <input
+        key={inputKey}
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleImageUpload}
+        className="hidden"
+        onClick={(e) => {
+          e.stopPropagation();
+          // Reset value to allow selecting same file again if needed
+          (e.target as HTMLInputElement).value = '';
+        }}
+      />
+
+      {/* Camera Input - separate input for camera capture */}
+      <input
+        key={`camera-${inputKey}`}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageUpload}
+        className="hidden"
+        onClick={(e) => {
+          e.stopPropagation();
+          (e.target as HTMLInputElement).value = '';
+        }}
+      />
     </div>
   )
 }
