@@ -776,7 +776,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
       let finalError = result.error
       if (finalError.toLowerCase().includes('text length') || finalError.toLowerCase().includes('limit')) {
         finalError = 'Длина текста превышает максимально допустимый лимит'
-      } else if (finalError.toLowerCase().includes('nsfw')) {
+      } else if (finalError.toLowerCase().includes('nsfw') || finalError.toLowerCase().includes('flagged as sensitive')) {
         finalError = 'Из-за политик разработчика нейросети модель вернула ошибку. Попробуйте сгенерировать, выбрав модель Seedream (рекомендуем Seedream 4.5 для лучшего качества).'
       }
 
