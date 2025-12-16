@@ -1,25 +1,59 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Sparkles, ChevronRight } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useTelegram } from '@/hooks/useTelegram'
 
 export default function EventsPage() {
     const navigate = useNavigate()
     const { impact } = useHaptics()
+    const { platform, tg } = useTelegram()
+
+    useEffect(() => {
+        if (platform === 'ios' || platform === 'android') {
+            tg.BackButton.show()
+            tg.BackButton.onClick(() => navigate(-1))
+            return () => {
+                tg.BackButton.hide()
+                tg.BackButton.offClick(() => navigate(-1))
+            }
+        }
+    }, [platform, navigate, tg])
+
+    const getMarginTop = () => {
+        if (platform === 'ios') return 'calc(-1 * env(safe-area-inset-top))'
+        if (platform === 'android') return 'calc(-1 * (env(safe-area-inset-top) + 24px))'
+        return '0px'
+    }
+
+    const getPaddingTop = () => {
+        if (platform === 'ios') return 'calc(env(safe-area-inset-top) + 55px)'
+        if (platform === 'android') return 'calc(env(safe-area-inset-top) + 85px)'
+        return '80px'
+    }
 
     return (
-        <div className="min-h-dvh bg-black safe-bottom-tabbar pt-[calc(env(safe-area-inset-top)+80px)]">
+        <div
+            className="min-h-dvh bg-black safe-bottom-tabbar"
+            style={{
+                marginTop: getMarginTop(),
+                paddingTop: getPaddingTop()
+            }}
+        >
             <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
 
                 {/* Header */}
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => { impact('light'); navigate(-1) }}
-                        className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-white active:scale-95 transition-all"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                    {(platform !== 'ios' && platform !== 'android') && (
+                        <button
+                            onClick={() => { impact('light'); navigate(-1) }}
+                            className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-white active:scale-95 transition-all"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                    )}
+
+                    <h1 className={`text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 ${(platform === 'ios' || platform === 'android') ? 'ml-1' : ''}`}>
                         События
                     </h1>
                 </div>
