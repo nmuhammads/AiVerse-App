@@ -25,7 +25,7 @@ const RAW_SEGMENTS = [
 export default function SpinPage() {
     const navigate = useNavigate()
     const { impact, notify } = useHaptics()
-    const { user } = useTelegram()
+    const { user, platform } = useTelegram()
 
     const [balance, setBalance] = useState<number | null>(null)
     const [spins, setSpins] = useState<number>(0)
@@ -97,15 +97,19 @@ export default function SpinPage() {
         }, 1000)
     }
 
+    const getPaddingTop = () => {
+        if (platform === 'ios') return 'calc(env(safe-area-inset-top) + 60px)'
+        if (platform === 'android') return 'calc(env(safe-area-inset-top) + 85px)'
+        return '80px' // Desktop/Web
+    }
+
     return (
-        <div className="min-h-[100dvh] bg-gradient-to-b from-violet-950/50 via-black to-black flex flex-col overflow-hidden relative">
-            {/* Safe area padding for Telegram */}
-            <div className="h-[env(safe-area-inset-top)]" />
+        <div className="min-h-dvh bg-gradient-to-b from-violet-950/50 via-black to-black flex flex-col overflow-hidden relative safe-bottom-tabbar" style={{ paddingTop: getPaddingTop() }}>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col px-4 pt-16 pb-4">
+            <div className="flex-1 flex flex-col px-4 pb-4">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-24 shrink-0 z-10 relative">
                     <button
                         onClick={() => navigate(-1)}
                         className="w-10 h-10 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/80 active:scale-95 transition-transform"
@@ -120,14 +124,14 @@ export default function SpinPage() {
                 </div>
 
                 {/* Wheel Container - Centered */}
-                <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+                <div className="flex-1 flex flex-col items-center justify-center min-h-0 relative">
                     {/* Ambient Glow */}
                     <div className="absolute inset-x-0 top-1/4 h-1/2 pointer-events-none">
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120%] h-full bg-violet-600/15 blur-[100px] rounded-full" />
                     </div>
 
                     {/* Wheel */}
-                    <div className="relative w-full max-w-[85vw] sm:max-w-sm mx-auto">
+                    <div className="relative w-full max-w-[85vw] sm:max-w-sm mx-auto shrink-0">
                         <Wheel
                             segments={RAW_SEGMENTS}
                             rotation={rotation}
@@ -137,7 +141,7 @@ export default function SpinPage() {
                     </div>
 
                     {/* Controls */}
-                    <div className="w-full max-w-sm mx-auto mt-6 space-y-4">
+                    <div className="w-full max-w-sm mx-auto mt-6 space-y-4 shrink-0 z-10">
                         {/* Spins Badge */}
                         <div className="flex justify-center">
                             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/15">
@@ -179,12 +183,9 @@ export default function SpinPage() {
                 </div>
             </div>
 
-            {/* Safe area padding bottom */}
-            <div className="h-[calc(env(safe-area-inset-bottom)+16px)]" />
-
             {/* Result Modal */}
             {showResultModal && result && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
                     <div
                         className="bg-zinc-900/95 border border-white/10 rounded-3xl p-8 w-full max-w-sm text-center space-y-6 shadow-2xl"
                         style={{
