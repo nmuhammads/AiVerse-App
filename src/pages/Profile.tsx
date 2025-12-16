@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className }: { src: string, originalUrl: string, alt: string, className?: string }) => {
@@ -44,6 +44,7 @@ const GridImage = ({ src, originalUrl, alt, className }: { src: string, original
 }
 
 import { PaymentModal } from '@/components/PaymentModal'
+import { GenerationSelector } from '@/components/GenerationSelector'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -83,8 +84,10 @@ export default function Profile() {
   const { impact, notify } = useHaptics()
   const { user, platform, saveToGallery, shareImage } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
+  const [coverSrc, setCoverSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
+  const [spins, setSpins] = useState<number>(0)
   const [likes, setLikes] = useState<number>(0)
   const [remixCount, setRemixCount] = useState<number>(0)
   const [items, setItems] = useState<{ id: number; image_url: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
@@ -96,6 +99,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [showCoverSelector, setShowCoverSelector] = useState(false)
   const [showAvatarOptions, setShowAvatarOptions] = useState(false)
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name} `
@@ -134,6 +138,14 @@ export default function Profile() {
         }
         if (r.ok && j && typeof j.remix_count === 'number') {
           setRemixCount(j.remix_count)
+        }
+        if (r.ok && j && typeof j.spins === 'number') {
+          setSpins(j.spins)
+        }
+        if (r.ok && j && j.cover_url) {
+          setCoverSrc(j.cover_url)
+        } else {
+          setCoverSrc('')
         }
       })
     }
@@ -308,13 +320,54 @@ export default function Profile() {
     }
   }
 
+
+  const handleCoverSelect = async (generationId: number) => {
+    if (!user?.id) return
+    try {
+      const r = await fetch('/api/user/cover/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, generationId })
+      })
+      const j = await r.json()
+      if (r.ok && j.ok) {
+        setCoverSrc(j.cover_url)
+        notify('success')
+      } else {
+        notify('error')
+      }
+    } catch {
+      notify('error')
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
-        <div className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl">
-          {/* Background Effects */}
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+
+        <div
+          className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl transition-all duration-500"
+          style={coverSrc ? {
+            backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${coverSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          } : {}}
+        >
+          {/* Cover Edit Button */}
+          <button
+            onClick={() => setShowCoverSelector(true)}
+            className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
+          >
+            <Camera size={16} />
+          </button>
+
+          {/* Background Effects (only show if no cover) */}
+          {!coverSrc && (
+            <>
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
+              <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+            </>
+          )}
 
           <div className="relative z-10 flex flex-col items-center text-center">
             {/* Avatar - clickable to open modal */}
@@ -344,9 +397,9 @@ export default function Profile() {
             {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-2 w-full mb-4">
               {stats.filter(s => s.label !== 'Баланс').map(s => (
-                <div key={s.label} className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center gap-0.5">
-                  <span className="text-lg font-bold text-white">{s.value}</span>
-                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">{s.label}</span>
+                <div key={s.label} className="bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+                  <span className="text-lg font-bold text-white shadow-black/80 drop-shadow-lg">{s.value}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-100 font-bold shadow-black/80 drop-shadow-md">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -362,11 +415,29 @@ export default function Profile() {
                 <span className="opacity-70 font-normal text-[10px] ml-0.5">токены</span>
               </button>
               <button
-                onClick={() => { impact('light'); navigate('/events') }}
-                className="w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all relative overflow-hidden group"
+                onClick={() => { impact('light'); navigate('/spin') }}
+                className="relative w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all group overflow-visible"
               >
-                <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/20 to-indigo-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Sparkles size={18} className="text-violet-400" />
+                <div className="relative w-6 h-6" style={{ animation: 'spin-slow 10s linear infinite' }}>
+                  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                    <circle cx="50" cy="50" r="48" fill="#18181b" stroke="#3f3f46" strokeWidth="4" />
+                    <path d="M50 50 L50 4 A46 46 0 0 1 78.5 14 Z" fill="#8b5cf6" />
+                    <path d="M50 50 L78.5 14 A46 46 0 0 1 96 50 Z" fill="#3f3f46" />
+                    <path d="M50 50 L96 50 A46 46 0 0 1 78.5 86 Z" fill="#7c3aed" />
+                    <path d="M50 50 L78.5 86 A46 46 0 0 1 50 96 Z" fill="#27272a" />
+                    <path d="M50 50 L50 96 A46 46 0 0 1 21.5 86 Z" fill="#8b5cf6" />
+                    <path d="M50 50 L21.5 86 A46 46 0 0 1 4 50 Z" fill="#3f3f46" />
+                    <path d="M50 50 L4 50 A46 46 0 0 1 21.5 14 Z" fill="#7c3aed" />
+                    <path d="M50 50 L21.5 14 A46 46 0 0 1 50 4 Z" fill="#27272a" />
+                    <circle cx="50" cy="50" r="12" fill="#18181b" stroke="#52525b" strokeWidth="2" />
+                    <circle cx="50" cy="50" r="6" fill="#fbbf24" />
+                  </svg>
+                </div>
+
+                {/* Badge */}
+                <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[16px] h-4 rounded-full flex items-center justify-center border border-zinc-900 shadow-sm z-10 pointer-events-none">
+                  {spins}
+                </div>
               </button>
               <button
                 className="w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all"
@@ -757,6 +828,12 @@ export default function Profile() {
       }
 
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+
+      <GenerationSelector
+        isOpen={showCoverSelector}
+        onClose={() => setShowCoverSelector(false)}
+        onSelect={handleCoverSelect}
+      />
     </div >
   )
 }

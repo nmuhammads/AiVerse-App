@@ -122,6 +122,39 @@ export async function uploadAvatar(req: Request, res: Response) {
   }
 }
 
+export async function setCover(req: Request, res: Response) {
+  try {
+    const { userId, generationId, imageUrl } = req.body
+    if (!userId || (!generationId && !imageUrl)) return res.status(400).json({ error: 'invalid payload' })
+
+    // If generationId is provided, we could verify it or just use the imageUrl provided by client (assuming it came from a trusted list)
+    // For simplicity and speed per request, we'll trust the imageUrl sent (which comes from a generation object)
+    // Or we could fetch it. Let's rely on imageUrl being passed or fetched if missing.
+
+    let urlToSet = imageUrl
+
+    if (!urlToSet && generationId) {
+      // Fetch generation image url
+      const q = await supaSelect('generations', `?id=eq.${generationId}&select=image_url`)
+      if (q.ok && Array.isArray(q.data) && q.data.length > 0) {
+        urlToSet = q.data[0].image_url
+      }
+    }
+
+    if (!urlToSet) return res.status(400).json({ error: 'image not found' })
+
+    const upd = await supaPatch('users', `?user_id=eq.${userId}`, { cover_url: urlToSet })
+    if (!upd.ok) return res.status(500).json({ error: 'db update failed', detail: upd.data })
+
+    return res.json({ ok: true, cover_url: urlToSet })
+  } catch (e) {
+    console.error('setCover error:', e)
+    return res.status(500).json({ error: 'setCover failed' })
+  }
+}
+
+
+
 export async function getUserInfo(req: Request, res: Response) {
   try {
     const userId = req.params.userId
@@ -129,7 +162,7 @@ export async function getUserInfo(req: Request, res: Response) {
 
     // Parallel fetch: User Info + Likes Count
     const [userQuery, likesQuery] = await Promise.all([
-      supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,remix_count,updated_at,avatar_url,spins`),
+      supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,remix_count,updated_at,avatar_url,cover_url,spins`),
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_likes_count`, {
         method: 'POST',
         headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
