@@ -135,7 +135,7 @@ export default function SpinPage() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col px-4 pb-4">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8 shrink-0 z-10 relative">
+                <div className={`flex items-center justify-between shrink-0 z-10 relative ${(platform === 'ios' || platform === 'android') ? 'mb-20' : 'mb-20'}`}>
                     {(platform !== 'ios' && platform !== 'android') && (
                         <button
                             onClick={() => navigate(-1)}
