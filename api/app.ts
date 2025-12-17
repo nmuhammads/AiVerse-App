@@ -19,6 +19,7 @@ import paymentRoutes from './routes/payment.js'
 import feedRoutes from './routes/feed.js'
 import contestRoutes from './routes/contests.js'
 import spinRoutes from './routes/spin.js'
+import eventsRoutes from './routes/events.js'
 
 
 // load env
@@ -44,6 +45,7 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/feed', feedRoutes)
 app.use('/api/contests', contestRoutes)
 app.use('/api/spin', spinRoutes)
+app.use('/api/events', eventsRoutes)
 
 /**
  * Serve frontend build

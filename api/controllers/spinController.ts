@@ -39,6 +39,25 @@ export async function handleSpin(req: Request, res: Response) {
             return res.status(400).json({ error: 'User ID is required' })
         }
 
+        // 0. Check if spin event is enabled
+        const eventCheck = await supaSelect('event_settings', `?event_key=eq.spin&select=enabled,start_date,end_date`)
+        if (eventCheck.ok && eventCheck.data && eventCheck.data.length > 0) {
+            const event = eventCheck.data[0]
+            const now = new Date()
+
+            let isActive = event.enabled
+            if (event.start_date && new Date(event.start_date) > now) {
+                isActive = false
+            }
+            if (event.end_date && new Date(event.end_date) < now) {
+                isActive = false
+            }
+
+            if (!isActive) {
+                return res.status(403).json({ error: 'Событие временно недоступно', event_disabled: true })
+            }
+        }
+
         // 1. Check User Spins and Balance
         const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=spins,balance`)
 
