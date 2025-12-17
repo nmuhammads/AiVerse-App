@@ -896,3 +896,54 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
 
   return res.json({ checked: pending.length, updated })
 }
+
+// Get generation by ID for remix functionality
+export async function getGenerationById(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    if (!id) {
+      return res.status(400).json({ error: 'Generation ID required' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    // Fetch generation with user info
+    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,users(username,first_name)`
+    const result = await supaSelect('generations', query)
+
+    if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
+      return res.status(404).json({ error: 'Generation not found' })
+    }
+
+    const gen = result.data[0]
+
+    // Parse metadata from prompt to extract ratio, type etc.
+    let cleanPrompt = gen.prompt || ''
+    let ratio = '1:1'
+    let type = 'text'
+
+    // Extract metadata from prompt: [type=text_photo; ratio=3:4; photos=1; avatars=0]
+    const metaMatch = cleanPrompt.match(/\s*\[type=([^;]+);\s*ratio=([^;]+);[^\]]*\]\s*$/)
+    if (metaMatch) {
+      type = metaMatch[1]
+      ratio = metaMatch[2]
+      cleanPrompt = cleanPrompt.replace(/\s*\[type=[^\]]+\]\s*$/, '').trim()
+    }
+
+    return res.json({
+      id: gen.id,
+      prompt: cleanPrompt,
+      model: gen.model,
+      input_images: gen.input_images || [],
+      image_url: gen.image_url,
+      aspect_ratio: ratio,
+      generation_type: type,
+      users: gen.users
+    })
+  } catch (e) {
+    console.error('getGenerationById error:', e)
+    return res.status(500).json({ error: 'Failed to fetch generation' })
+  }
+}

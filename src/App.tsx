@@ -81,6 +81,34 @@ function StartParamRouter() {
         }
         return;
       }
+
+      // Handle ref with optional remix: ref-{username} or ref-{username}-remix-{id}
+      if (p.startsWith("ref-")) {
+        const match = p.match(/^ref-([^-]+)(?:-remix-(\d+))?$/);
+        if (match) {
+          const refValue = match[1];
+          const generationId = match[2];
+          // Store ref in sessionStorage for subscribe call
+          if (refValue) {
+            sessionStorage.setItem('aiverse_ref', refValue);
+          }
+          if (generationId) {
+            navigate(`/studio?remix=${generationId}`, { replace: true, state: { fromDeepLink: true } });
+          } else {
+            navigate("/", { replace: true, state: { fromDeepLink: true } });
+          }
+        }
+        return;
+      }
+
+      // Handle remix without ref: remix-{id}
+      if (p.startsWith("remix-")) {
+        const generationId = p.replace("remix-", "");
+        if (generationId) {
+          navigate(`/studio?remix=${generationId}`, { replace: true, state: { fromDeepLink: true } });
+        }
+        return;
+      }
     }, 150);
 
     return () => clearTimeout(timer);

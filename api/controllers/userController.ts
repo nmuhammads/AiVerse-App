@@ -184,18 +184,34 @@ export async function getUserInfo(req: Request, res: Response) {
 
 export async function subscribeBot(req: Request, res: Response) {
   try {
-    const { userId, botSource, username, first_name, last_name, language_code } = req.body || {}
+    const { userId, botSource, username, first_name, last_name, language_code, ref } = req.body || {}
     const u = Number(userId)
     const src = String(botSource || DEFAULT_BOT_SOURCE)
 
     if (!u || !src) return res.status(400).json({ error: 'invalid payload' })
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
+    // Handle referral: only set if user doesn't have one yet
+    let refToSet: string | undefined = undefined
+    if (ref) {
+      const existingUser = await supaSelect('users', `?user_id=eq.${u}&select=ref`)
+      if (existingUser.ok && Array.isArray(existingUser.data) && existingUser.data[0]) {
+        // User exists, only set ref if they don't have one
+        if (!existingUser.data[0].ref) {
+          refToSet = String(ref)
+          console.log(`[Referral] Setting ref=${refToSet} for existing user ${u}`)
+        } else {
+          console.log(`[Referral] User ${u} already has ref=${existingUser.data[0].ref}, skipping`)
+        }
+      } else {
+        // New user, can set ref
+        refToSet = String(ref)
+        console.log(`[Referral] Setting ref=${refToSet} for new user ${u}`)
+      }
+    }
+
     // 1. Ensure user exists in 'users' table
-    // We use upsert (on_conflict=user_id) to create if not exists or update if exists.
-    // Note: 'balance' has a default in DB (6), so we don't need to send it for new users unless we want to override.
-    // 'ref' is not handled here, assuming it's handled elsewhere or can be added if needed.
-    const userPayload = {
+    const userPayload: Record<string, unknown> = {
       user_id: u,
       username: username || null,
       first_name: first_name || null,
@@ -204,12 +220,14 @@ export async function subscribeBot(req: Request, res: Response) {
       updated_at: new Date().toISOString()
     }
 
+    // Only add ref to payload if we determined it should be set
+    if (refToSet) {
+      userPayload.ref = refToSet
+    }
+
     const userUpsert = await supaPost('users', userPayload, '?on_conflict=user_id')
     if (!userUpsert.ok) {
       console.error('subscribeBot: user upsert failed', userUpsert.data)
-      // We continue even if user upsert fails, hoping the user exists, 
-      // but strictly speaking we should probably error out or check why.
-      // For now, let's log and proceed to subscription.
     }
 
     // 2. Create subscription

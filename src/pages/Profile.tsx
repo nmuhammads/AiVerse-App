@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -304,6 +304,8 @@ export default function Profile() {
   const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+  const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
+  const [remixShareLoading, setRemixShareLoading] = useState(false)
 
   const handlePublish = async () => {
     if (!preview) return
@@ -631,6 +633,16 @@ export default function Profile() {
                         </button>
                       </div>
 
+                      {/* Remix Share Button */}
+                      <button
+                        onClick={() => setShowRemixShareConfirm(true)}
+                        disabled={remixShareLoading}
+                        className="w-full min-h-[48px] h-auto py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {remixShareLoading ? <Loader2 size={16} className="animate-spin" /> : <Repeat size={16} />}
+                        Поделиться с ремиксом
+                      </button>
+
                       <button
                         onClick={() => {
                           if (preview.is_published) {
@@ -704,6 +716,67 @@ export default function Profile() {
                         className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
                       >
                         Опубликовать
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Remix Share Confirmation Modal */}
+              {showRemixShareConfirm && preview && (
+                <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowRemixShareConfirm(false) }}>
+                  <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-bold text-white">Поделиться с ремиксом</h3>
+                      <p className="text-sm text-zinc-400">
+                        Генерация будет отправлена в чат с ботом и станет публичной в ленте. Другие пользователи смогут использовать её для ремикса.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowRemixShareConfirm(false)}
+                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!preview || !user?.id) return
+                          setRemixShareLoading(true)
+                          setShowRemixShareConfirm(false)
+                          try {
+                            impact('medium')
+                            const res = await fetch('/api/telegram/sendRemixShare', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                chat_id: user.id,
+                                photo_url: preview.image_url,
+                                generation_id: preview.id,
+                                owner_username: user.username || null,
+                                owner_user_id: user.id,
+                                model: preview.model || null
+                              })
+                            })
+                            if (res.ok) {
+                              notify('success')
+                              // Update local state to show as published
+                              setPreview(prev => prev ? { ...prev, is_published: true } : null)
+                              setItems(prev => prev.map(item => item.id === preview.id ? { ...item, is_published: true } : item))
+                            } else {
+                              notify('error')
+                            }
+                          } catch (e) {
+                            console.error('Remix share failed', e)
+                            notify('error')
+                          } finally {
+                            setRemixShareLoading(false)
+                          }
+                        }}
+                        disabled={remixShareLoading}
+                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white font-bold text-sm hover:from-fuchsia-700 hover:to-violet-700 transition-colors disabled:opacity-50"
+                      >
+                        {remixShareLoading ? 'Отправка...' : 'Поделиться'}
                       </button>
                     </div>
                   </div>
