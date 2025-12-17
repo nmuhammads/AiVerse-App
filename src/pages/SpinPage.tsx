@@ -183,9 +183,9 @@ export default function SpinPage() {
 
             {/* Main Content - only show if event is not disabled */}
             {!eventDisabled && (
-                <div className="flex-1 flex flex-col px-4 pb-4">
-                    {/* Header */}
-                    <div className={`flex items-center justify-between shrink-0 z-10 relative ${(platform === 'ios' || platform === 'android') ? 'mb-20' : 'mb-20'}`}>
+                <div className="flex-1 flex flex-col px-4 pb-0">
+                    {/* Header - fixed at top */}
+                    <div className={`flex items-center justify-between shrink-0 z-10 relative mb-4`}>
                         {(platform !== 'ios' && platform !== 'android') && (
                             <button
                                 onClick={() => navigate(-1)}
@@ -194,7 +194,7 @@ export default function SpinPage() {
                                 <ArrowLeft size={20} />
                             </button>
                         )}
-                        {(platform === 'ios' || platform === 'android') && <div className="w-4" />} {/* Spacer for native back button alignment if needed, or just standard flex */}
+                        {(platform === 'ios' || platform === 'android') && <div className="w-4" />}
 
                         <h1 className="text-xl font-bold text-white/90 tracking-wide">Fortune</h1>
                         <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full px-3 py-1.5">
@@ -207,15 +207,15 @@ export default function SpinPage() {
                         </div>
                     </div>
 
-                    {/* Wheel Container - Centered */}
-                    <div className="flex-1 flex flex-col items-center justify-center min-h-0 relative">
+                    {/* Game Area - aligned from bottom */}
+                    <div className="flex-1 flex flex-col justify-end min-h-0 relative">
                         {/* Ambient Glow */}
-                        <div className="absolute inset-x-0 top-1/4 h-1/2 pointer-events-none">
+                        <div className="absolute inset-x-0 bottom-1/3 h-1/2 pointer-events-none">
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120%] h-full bg-violet-600/15 blur-[100px] rounded-full" />
                         </div>
 
-                        {/* Wheel */}
-                        <div className="relative w-full max-w-[85vw] sm:max-w-sm mx-auto shrink-0">
+                        {/* Wheel - positioned above controls */}
+                        <div className="relative w-full max-w-[85vw] sm:max-w-sm mx-auto shrink-0 mb-4">
                             <Wheel
                                 segments={RAW_SEGMENTS}
                                 rotation={rotation}
@@ -225,8 +225,8 @@ export default function SpinPage() {
                             />
                         </div>
 
-                        {/* Controls */}
-                        <div className="w-full max-w-sm mx-auto mt-6 space-y-4 shrink-0 z-10">
+                        {/* Controls - at bottom above tab bar */}
+                        <div className="w-full max-w-sm mx-auto space-y-4 shrink-0 z-10">
                             {/* Spins Badge */}
                             <div className="flex justify-center">
                                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/15">
