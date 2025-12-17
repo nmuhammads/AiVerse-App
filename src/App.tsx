@@ -64,6 +64,10 @@ function StartParamRouter() {
         navigate("/events", { replace: true, state: { fromDeepLink: true } });
         return;
       }
+      if (p === "spin" || p === "fortune") {
+        navigate("/spin", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
 
       // Handle dynamic params
       if (p.startsWith("contest-")) {
