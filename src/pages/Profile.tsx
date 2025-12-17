@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock } from 'lucide-react'
 
 // Custom GridImage component for handling load states
-const GridImage = ({ src, originalUrl, alt, className }: { src: string, originalUrl: string, alt: string, className?: string }) => {
+const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const [imgSrc, setImgSrc] = useState(src)
@@ -21,15 +21,26 @@ const GridImage = ({ src, originalUrl, alt, className }: { src: string, original
     }
   }, [imgSrc])
 
+  // Notify parent when image is unavailable
+  useEffect(() => {
+    if (error && onImageError) {
+      onImageError()
+    }
+  }, [error, onImageError])
+
+  // If image is unavailable, return null (hide the element)
+  if (error) {
+    return null
+  }
+
   return (
     <div className={`relative w-full h-full overflow-hidden bg-zinc-800 ${className}`}>
-      {!loaded && !error && (
+      {!loaded && (
         <div
           className="absolute inset-0 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 bg-[length:200%_100%]"
           style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}
         />
       )}
-      {error && <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 text-zinc-600 text-[10px]">Ошибка</div>}
       <img
         ref={imgRef}
         src={imgSrc}
@@ -503,8 +514,17 @@ export default function Profile() {
           </div>
         </div>
         <div>
-          <div className="flex justify-between items-end mb-4 px-1">
+          <div className="flex justify-between items-end mb-2 px-1">
             <div className="text-lg font-bold text-white">Мои генерации</div>
+          </div>
+          {/* Storage Info Banner */}
+          <div className="mb-4 px-1">
+            <div className="flex items-start gap-2 p-3 bg-zinc-900/50 rounded-xl border border-white/5 text-zinc-400">
+              <Clock size={14} className="mt-0.5 flex-shrink-0 text-zinc-500" />
+              <p className="text-[11px] leading-relaxed">
+                Изображения хранятся в приложении <span className="text-zinc-300 font-medium">60 дней</span>. Оригиналы отправляются в чат с ботом и хранятся там <span className="text-emerald-400 font-medium">бессрочно</span> 💾
+              </p>
+            </div>
           </div>
           {loading && items.length === 0 ? (
             <ProfileSkeletonGrid />
