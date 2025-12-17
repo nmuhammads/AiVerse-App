@@ -525,8 +525,9 @@ export async function sendRemixShare(req: Request, res: Response) {
     const ownerUserId = req.body?.owner_user_id ? String(req.body.owner_user_id) : null
     const model = typeof req.body?.model === 'string' ? String(req.body.model) : null
 
-    // Build caption with model name
-    let caption = '✨ AI Verse\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇'
+    // Build caption with model name and author
+    const authorText = ownerUsername ? `\n👤 Автор: @${ownerUsername}` : ''
+    let caption = `✨ AI Verse${authorText}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
     if (model) {
       const modelNames: Record<string, string> = {
         'flux': 'Flux',
@@ -536,7 +537,7 @@ export async function sendRemixShare(req: Request, res: Response) {
         'nanobanana-pro': 'NanoBanana Pro'
       }
       const displayName = modelNames[model] || model
-      caption = `✨ AI Verse\n\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
+      caption = `✨ AI Verse${authorText}\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
     }
 
     if (!API || !chat_id || !photo || !generationId) {
