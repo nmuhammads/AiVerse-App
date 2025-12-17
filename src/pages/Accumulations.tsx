@@ -18,6 +18,14 @@ interface RewardItem {
     remix_generation: Generation | null
 }
 
+const THUMB_BASE_URL = import.meta.env.VITE_R2_PUBLIC_URL_THUMBNAILS || 'https://pub-40a5e220759a483cbf66bbe98d76d7a1.r2.dev'
+
+// Helper to get thumbnail URL from generation id
+const getThumbnailUrl = (gen: Generation | null): string | null => {
+    if (!gen || !gen.id) return null
+    return `${THUMB_BASE_URL}/gen_${gen.id}_thumb.jpg`
+}
+
 export default function Accumulations() {
     const [items, setItems] = useState<RewardItem[]>([])
     const [loading, setLoading] = useState(false)
@@ -140,8 +148,8 @@ export default function Accumulations() {
                                 <div className="flex items-center gap-3">
                                     {/* Source Image */}
                                     <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10">
-                                        {item.source_generation?.image_url && (
-                                            <img src={item.source_generation.image_url} alt="Source" className="w-full h-full object-cover" />
+                                        {item.source_generation && (
+                                            <img src={getThumbnailUrl(item.source_generation) || item.source_generation.image_url || ''} alt="Source" className="w-full h-full object-cover" />
                                         )}
                                     </div>
 
@@ -149,8 +157,8 @@ export default function Accumulations() {
 
                                     {/* Remix Image */}
                                     <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10">
-                                        {item.remix_generation?.image_url && (
-                                            <img src={item.remix_generation.image_url} alt="Remix" className="w-full h-full object-cover" />
+                                        {item.remix_generation && (
+                                            <img src={getThumbnailUrl(item.remix_generation) || item.remix_generation.image_url || ''} alt="Remix" className="w-full h-full object-cover" />
                                         )}
                                     </div>
                                 </div>

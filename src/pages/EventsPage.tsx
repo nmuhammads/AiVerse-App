@@ -62,12 +62,10 @@ export default function EventsPage() {
         }
     }, [activeTab, contestFilter]);
 
-    // Fetch all events
+    // Fetch all events on mount (for badge display)
     useEffect(() => {
-        if (activeTab === 'events') {
-            fetchAllEvents();
-        }
-    }, [activeTab]);
+        fetchAllEvents();
+    }, []);
 
     const fetchAllEvents = async () => {
         setEventsLoading(true);
