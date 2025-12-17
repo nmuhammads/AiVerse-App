@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Sparkles, Zap } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -24,8 +24,11 @@ const RAW_SEGMENTS = [
 
 export default function SpinPage() {
     const navigate = useNavigate()
+    const location = useLocation()
     const { impact, notify } = useHaptics()
     const { user, platform, tg } = useTelegram()
+
+    const isFromDeepLink = location.state?.fromDeepLink
 
     const [balance, setBalance] = useState<number | null>(null)
     const [spins, setSpins] = useState<number>(0)
@@ -129,7 +132,14 @@ export default function SpinPage() {
     }
 
     useEffect(() => {
+        // При входе через deeplink — не показываем BackButton,
+        // пользователь может закрыть приложение нативной кнопкой закрытия Telegram
         if (platform === 'ios' || platform === 'android') {
+            if (isFromDeepLink) {
+                // Не показываем BackButton при входе через deeplink
+                tg.BackButton.hide()
+                return
+            }
             tg.BackButton.show()
             tg.BackButton.onClick(() => navigate(-1))
             return () => {
@@ -137,7 +147,7 @@ export default function SpinPage() {
                 tg.BackButton.offClick(() => navigate(-1))
             }
         }
-    }, [platform, navigate, tg])
+    }, [platform, navigate, tg, isFromDeepLink])
 
     // Specific Margin to counteract App.tsx padding and fill background
     const getMarginTop = () => {
