@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import sharp from 'sharp'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -602,11 +603,32 @@ export async function sendRemixShare(req: Request, res: Response) {
         return res.status(500).json({ ok: false, error: 'image fetch failed', status: imgResp.status })
       }
 
-      const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
       const ab = await imgResp.arrayBuffer()
-      const blob = new Blob([ab], { type: contentType })
-      const ext = contentType.includes('png') ? 'png' : (contentType.includes('webp') ? 'webp' : 'jpg')
-      const filename = `ai-${Date.now()}.${ext}`
+      const originalSize = ab.byteLength
+      const MAX_PHOTO_SIZE = 8 * 1024 * 1024 // 8MB (leave buffer for Telegram's 10MB limit)
+
+      let imageBuffer: Buffer
+      let filename: string
+      let contentType: string
+
+      if (originalSize > MAX_PHOTO_SIZE) {
+        // Compress large images with sharp
+        console.info('sendRemixShare:compressing', { originalSize })
+        imageBuffer = await sharp(Buffer.from(ab))
+          .jpeg({ quality: 85 })
+          .toBuffer()
+        filename = `ai-${Date.now()}.jpg`
+        contentType = 'image/jpeg'
+        console.info('sendRemixShare:compressed', { newSize: imageBuffer.length })
+      } else {
+        const ct = imgResp.headers.get('content-type') || 'image/jpeg'
+        imageBuffer = Buffer.from(ab)
+        const ext = ct.includes('png') ? 'png' : (ct.includes('webp') ? 'webp' : 'jpg')
+        filename = `ai-${Date.now()}.${ext}`
+        contentType = ct
+      }
+
+      const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType })
 
       const form = new FormData()
       form.append('chat_id', String(chat_id))
