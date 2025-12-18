@@ -38,6 +38,7 @@ export default function SpinPage() {
     const [result, setResult] = useState<any>(null)
     const resultRef = useRef<any>(null) // Ref для хранения актуального результата
     const [showResultModal, setShowResultModal] = useState(false)
+    const [modalResult, setModalResult] = useState<any>(null) // Результат для показа в попапе
     const [eventDisabled, setEventDisabled] = useState(false)
 
     // Fetch Info and check event status
@@ -82,6 +83,9 @@ export default function SpinPage() {
         impact('heavy')
         setSpinning(true)
         setResult(null)
+        // Закрываем попап если он был открыт от предыдущего спина
+        setShowResultModal(false)
+        setModalResult(null)
 
         try {
             const r = await fetch('/api/spin', {
@@ -110,9 +114,16 @@ export default function SpinPage() {
             const randomOffset = (Math.random() - 0.5) * (segmentAngle * 0.8)
             const nextRotation = rotation + 1800 + (360 - (j.prizeIndex * segmentAngle)) + randomOffset
 
+            console.log('🎰 SPIN RESULT:', {
+                prizeIndex: j.prizeIndex,
+                prizeValue: j.prizeValue,
+                newBalance: j.newBalance
+            })
+
             setRotation(nextRotation)
             setResult(j)
             resultRef.current = j // Сохраняем актуальный результат в ref
+            console.log('🎰 resultRef.current set to:', resultRef.current?.prizeValue)
             setSpins(s => Math.max(0, s - 1))
 
         } catch (e) {
@@ -123,12 +134,16 @@ export default function SpinPage() {
 
     const handleSpinEnd = () => {
         setSpinning(false)
+        const currentResult = resultRef.current
+        console.log('🎰 handleSpinEnd called, currentResult:', currentResult?.prizeValue)
+
         setTimeout(() => {
+            console.log('🎰 setTimeout callback, showing modal with:', currentResult?.prizeValue)
             impact('heavy')
             notify('success')
+            // Сохраняем результат для попапа ПЕРЕД открытием
+            setModalResult(currentResult)
             setShowResultModal(true)
-            // Используем ref для получения актуального результата
-            const currentResult = resultRef.current
             if (currentResult) {
                 setBalance(currentResult.newBalance)
             }
@@ -288,8 +303,8 @@ export default function SpinPage() {
             )}
 
             {/* Result Modal */}
-            {showResultModal && result && (() => {
-                const isBigWin = result.prizeValue >= 200
+            {showResultModal && modalResult && (() => {
+                const isBigWin = modalResult.prizeValue >= 200
                 return (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md px-4">
                         {/* Confetti for big wins */}
@@ -361,14 +376,21 @@ export default function SpinPage() {
                                     }`}
                                     style={isBigWin ? { animation: 'value-glow 2s ease-in-out infinite' } : {}}
                                 >
-                                    +{result.prizeValue}
+                                    +{modalResult.prizeValue}
                                 </div>
                                 <p className="text-zinc-500 text-sm font-medium uppercase tracking-wider">токенов</p>
                             </div>
 
                             {/* Button */}
                             <button
-                                onClick={() => setShowResultModal(false)}
+                                onClick={() => {
+                                    setShowResultModal(false)
+                                    setModalResult(null)
+                                    setResult(null)
+                                    resultRef.current = null
+                                    // Сбрасываем колесо в начальное положение
+                                    setRotation(0)
+                                }}
                                 className={`w-full py-4 rounded-xl font-bold text-base active:scale-95 transition-all ${isBigWin
                                     ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-lg shadow-amber-500/30'
                                     : 'bg-white text-black shadow-lg'
