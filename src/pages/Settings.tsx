@@ -76,7 +76,7 @@ export default function Settings() {
             items: [
                 { icon: MessageCircle, label: 'Поддержка', onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
                 { icon: Clock, label: 'Хранение данных', value: '60 дней', onClick: () => toast.info('Изображения хранятся 60 дней. Оригиналы в максимальном качестве отправляются в чат с ботом и хранятся там бессрочно 💾', { duration: 5000 }) },
-                { icon: Info, label: 'Версия', value: 'v2.8.1', onClick: () => { } },
+                { icon: Info, label: 'Версия', value: 'v2.8.2', onClick: () => { } },
             ]
         }
     ]
