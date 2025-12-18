@@ -100,6 +100,7 @@ export default function Studio() {
   const [contestEntryId, setContestEntryId] = useState<number | null>(null)
   const [inputKey, setInputKey] = useState(0) // Key for forcing input re-render after Face ID
   const [showSourceMenu, setShowSourceMenu] = useState(false)
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false)
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function Studio() {
         if (r.ok && j && typeof j.balance === 'number') setBalance(j.balance)
       })
     }
-  }, [user?.id, isPaymentModalOpen]) // Refresh when payment modal closes
+  }, [user?.id, isPaymentModalOpen, isGenerating]) // Refresh when payment modal closes or generation completes
 
   // Handle Remix & Contest Entry
   useEffect(() => {
@@ -336,14 +337,20 @@ export default function Studio() {
       }
 
       const data = await res.json()
+
+      // Обработка таймаута — генерация продолжается на сервере
+      if (data.status === 'pending') {
+        setShowTimeoutModal(true)
+        notify('warning')
+        setIsGenerating(false)
+        return
+      }
+
       if (!res.ok) throw new Error(data.error || 'Ошибка генерации')
       setGeneratedImage(data.image)
       setParentGeneration(null, null) // Reset parent after success
-      // Update balance after generation
-      if (balance !== null) {
-        const cost = selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10 : MODEL_PRICES[selectedModel]
-        setBalance(prev => (prev !== null ? prev - cost : null))
-      }
+      // Баланс уже был списан на сервере при создании генерации
+      // Не обновляем локально чтобы избежать двойного списания
 
       try {
         const item = { id: Date.now(), url: data.image, prompt, model: MODELS.find(m => m.id === selectedModel)?.name, ratio: aspectRatio, date: new Date().toLocaleDateString() }
@@ -824,6 +831,27 @@ export default function Studio() {
         )}
 
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+
+      {/* Timeout Modal */}
+      {showTimeoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full relative shadow-2xl animate-in slide-in-from-bottom-4">
+            <div className="text-4xl text-center mb-4">⏳</div>
+            <h3 className="text-lg font-bold text-white text-center mb-2">
+              Генерация занимает больше времени
+            </h3>
+            <p className="text-zinc-400 text-center text-sm mb-6">
+              Результат появится в профиле или токены вернутся автоматически.
+            </p>
+            <button
+              onClick={() => setShowTimeoutModal(false)}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Persistent File Input - Kept outside conditional rendering to prevent unmounting during OS context switches */}
       <input
