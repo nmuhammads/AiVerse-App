@@ -186,10 +186,11 @@ export default function SpinPage() {
 
     return (
         <div
-            className="min-h-dvh bg-gradient-to-b from-violet-950/50 via-black to-black flex flex-col overflow-hidden relative safe-bottom-tabbar"
+            className="min-h-dvh bg-gradient-to-b from-violet-950/50 via-black to-black flex flex-col overflow-hidden relative"
             style={{
                 marginTop: getMarginTop(),
-                paddingTop: getPaddingTop()
+                paddingTop: getPaddingTop(),
+                paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))'
             }}
         >
             {/* Event Disabled State */}
@@ -213,7 +214,7 @@ export default function SpinPage() {
 
             {/* Main Content - only show if event is not disabled */}
             {!eventDisabled && (
-                <div className="flex-1 flex flex-col px-4 pb-0">
+                <div className="flex-1 flex flex-col px-4 pb-6">
                     {/* Header - fixed at top */}
                     <div className={`flex items-center justify-between shrink-0 z-10 relative mb-4`}>
                         {(platform !== 'ios' && platform !== 'android') && (
