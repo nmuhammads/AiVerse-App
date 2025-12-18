@@ -133,13 +133,16 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
     return (
         <div className="mb-4 break-inside-avoid" onClick={() => onClick(item)}>
             <div className="relative rounded-xl overflow-hidden bg-zinc-900 shadow-sm border border-white/5">
-                <div className="aspect-auto w-full relative">
+                <div className="aspect-auto w-full relative" style={{ minHeight: loaded ? undefined : '200px' }}>
                     {!loaded && !hasError && (
-                        <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
+                        <div
+                            className="absolute inset-0 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 bg-[length:200%_100%]"
+                            style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}
+                        />
                     )}
                     {hasError ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 text-white/40 text-xs">
-                            Image unavailable
+                        <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 text-white/40 text-xs" style={{ minHeight: '200px' }}>
+                            Изображение недоступно
                         </div>
                     ) : (
                         <img
@@ -147,7 +150,7 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                             src={imgSrc}
                             alt={item.prompt}
                             loading={priority ? "eager" : "lazy"}
-                            className="w-full h-auto block"
+                            className={`w-full h-auto block transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
                             onLoad={() => {
                                 // console.log('Image loaded:', imgSrc)
                                 setLoaded(true)

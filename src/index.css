@@ -203,3 +203,13 @@ body {
 .safe-bottom-tabbar {
   padding-bottom: calc(8.5rem + env(safe-area-inset-bottom));
 }
+
+/* Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

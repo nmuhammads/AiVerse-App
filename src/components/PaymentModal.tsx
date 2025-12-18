@@ -11,13 +11,13 @@ interface PaymentModalProps {
 type PaymentMethod = 'stars' | 'card' | 'sbp'
 
 const PACKAGES_STARS = [
-    { id: 'star_20', tokens: 10, price: 20 },
-    { id: 'star_50', tokens: 25, price: 50 },
-    { id: 'star_100', tokens: 50, price: 100 },
-    { id: 'star_200', tokens: 100, price: 200, popular: true },
-    { id: 'star_300', tokens: 150, price: 300 },
-    { id: 'star_600', tokens: 300, price: 600 },
-    { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true },
+    { id: 'star_20', tokens: 10, price: 20, spins: 0 },
+    { id: 'star_50', tokens: 25, price: 50, spins: 0 },
+    { id: 'star_100', tokens: 50, price: 100, spins: 0 },
+    { id: 'star_200', tokens: 100, price: 200, popular: true, spins: 0 },
+    { id: 'star_300', tokens: 150, price: 300, spins: 0 },
+    { id: 'star_600', tokens: 300, price: 600, spins: 1 },
+    { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true, spins: 2 },
 ]
 
 const PACKAGES_FIAT = [
@@ -85,7 +85,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                     body: JSON.stringify({
                         title: `${selectedPackage.tokens} токенов`,
                         description: `Покупка ${selectedPackage.tokens} токенов AiVerse`,
-                        payload: JSON.stringify({ packageId: selectedPackage.id, tokens: selectedPackage.tokens }),
+                        payload: JSON.stringify({ packageId: selectedPackage.id, tokens: selectedPackage.tokens, spins: selectedPackage.spins || 0 }),
                         currency: 'XTR',
                         amount: selectedPackage.price
                     })
@@ -206,6 +206,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                         <div>
                                             <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{pkg.tokens} токенов</div>
                                             {pkg.bonus && <div className="text-[10px] text-emerald-400 font-bold">Бонус {pkg.bonus}</div>}
+                                            {pkg.spins > 0 && <div className="text-[10px] text-violet-400 font-bold">+{pkg.spins} 🎰 спин{pkg.spins > 1 ? 'а' : ''}</div>}
                                         </div>
                                         <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
                                             {pkg.price} {currencySymbol}

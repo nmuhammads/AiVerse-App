@@ -5,14 +5,14 @@ import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
-    id: 'announcement_v2_7_seedream45_v6', // Updated ID to force show again
-    title: '🚀 Seedream 4.5 и Конкурсы!',
-    description: 'Встречайте новую модель Seedream 4.5 с улучшенной детализацией и возможностью редактирования изображений! Также участвуйте в тематических челленджах и выигрывайте призы.',
-    image: '/models/seedream-4-5.png', // Updated image
-    buttonText: 'Попробовать Seedream 4.5',
-    link: '/studio', // Redirect to studio page
-    secondaryButtonText: 'К конкурсам',
-    secondaryLink: '/contests' // Internal link
+    id: 'announcement_fortune_release_v1', // Updated ID to force show again
+    title: 'Колесо Фортуны уже здесь! 🎰',
+    description: 'Встречайте большое обновление: испытывайте удачу в Колесе Фортуны, делитесь Ремиксами генераций и настройте свой профиль с новыми обложками!',
+    image: '/announcements/fortune_modal.png', // Updated image
+    buttonText: 'Крутить колесо',
+    link: '/spin', // Redirect to spin page
+    secondaryButtonText: 'В профиль',
+    secondaryLink: '/profile' // Internal link
 }
 
 export function AnnouncementModal() {
@@ -55,7 +55,7 @@ export function AnnouncementModal() {
     const handleSecondaryAction = () => {
         impact('medium')
         if (ANNOUNCEMENT.secondaryLink) {
-             if (ANNOUNCEMENT.secondaryLink.startsWith('/')) {
+            if (ANNOUNCEMENT.secondaryLink.startsWith('/')) {
                 navigate(ANNOUNCEMENT.secondaryLink)
             } else {
                 window.open(ANNOUNCEMENT.secondaryLink, '_blank')

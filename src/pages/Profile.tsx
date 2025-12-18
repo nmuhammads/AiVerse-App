@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat } from 'lucide-react'
 
 // Custom GridImage component for handling load states
-const GridImage = ({ src, originalUrl, alt, className }: { src: string, originalUrl: string, alt: string, className?: string }) => {
+const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const [imgSrc, setImgSrc] = useState(src)
@@ -21,15 +21,31 @@ const GridImage = ({ src, originalUrl, alt, className }: { src: string, original
     }
   }, [imgSrc])
 
+  // Notify parent when image is unavailable
+  useEffect(() => {
+    if (error && onImageError) {
+      onImageError()
+    }
+  }, [error, onImageError])
+
+  // If image is unavailable, return null (hide the element)
+  if (error) {
+    return null
+  }
+
   return (
     <div className={`relative w-full h-full overflow-hidden bg-zinc-800 ${className}`}>
-      {!loaded && !error && <div className="absolute inset-0 animate-pulse bg-zinc-800" />}
-      {error && <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 text-zinc-600 text-[10px]">Error</div>}
+      {!loaded && (
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 bg-[length:200%_100%]"
+          style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}
+        />
+      )}
       <img
         ref={imgRef}
         src={imgSrc}
         alt={alt}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
         onError={() => {
           if (!error && imgSrc !== originalUrl) {
@@ -44,11 +60,13 @@ const GridImage = ({ src, originalUrl, alt, className }: { src: string, original
 }
 
 import { PaymentModal } from '@/components/PaymentModal'
+import { GenerationSelector } from '@/components/GenerationSelector'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useGenerationStore } from '@/store/generationStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import { ProfileSkeletonGrid } from '@/components/ui/skeleton'
 
 function getModelDisplayName(model: string | null): string {
   if (!model) return ''
@@ -83,8 +101,10 @@ export default function Profile() {
   const { impact, notify } = useHaptics()
   const { user, platform, saveToGallery, shareImage } = useTelegram()
   const [avatarSrc, setAvatarSrc] = useState<string>('')
+  const [coverSrc, setCoverSrc] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [balance, setBalance] = useState<number | null>(null)
+  const [spins, setSpins] = useState<number>(0)
   const [likes, setLikes] = useState<number>(0)
   const [remixCount, setRemixCount] = useState<number>(0)
   const [items, setItems] = useState<{ id: number; image_url: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
@@ -96,6 +116,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [showCoverSelector, setShowCoverSelector] = useState(false)
   const [showAvatarOptions, setShowAvatarOptions] = useState(false)
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name} `
@@ -134,6 +155,14 @@ export default function Profile() {
         }
         if (r.ok && j && typeof j.remix_count === 'number') {
           setRemixCount(j.remix_count)
+        }
+        if (r.ok && j && typeof j.spins === 'number') {
+          setSpins(j.spins)
+        }
+        if (r.ok && j && j.cover_url) {
+          setCoverSrc(j.cover_url)
+        } else {
+          setCoverSrc('')
         }
       })
     }
@@ -275,6 +304,8 @@ export default function Profile() {
   const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+  const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
+  const [remixShareLoading, setRemixShareLoading] = useState(false)
 
   const handlePublish = async () => {
     if (!preview) return
@@ -308,13 +339,54 @@ export default function Profile() {
     }
   }
 
+
+  const handleCoverSelect = async (generationId: number) => {
+    if (!user?.id) return
+    try {
+      const r = await fetch('/api/user/cover/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, generationId })
+      })
+      const j = await r.json()
+      if (r.ok && j.ok) {
+        setCoverSrc(j.cover_url)
+        notify('success')
+      } else {
+        notify('error')
+      }
+    } catch {
+      notify('error')
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
-        <div className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl">
-          {/* Background Effects */}
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+
+        <div
+          className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl transition-all duration-500"
+          style={coverSrc ? {
+            backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${coverSrc})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          } : {}}
+        >
+          {/* Cover Edit Button */}
+          <button
+            onClick={() => setShowCoverSelector(true)}
+            className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
+          >
+            <Camera size={16} />
+          </button>
+
+          {/* Background Effects (only show if no cover) */}
+          {!coverSrc && (
+            <>
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
+              <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+            </>
+          )}
 
           <div className="relative z-10 flex flex-col items-center text-center">
             {/* Avatar - clickable to open modal */}
@@ -344,9 +416,9 @@ export default function Profile() {
             {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-2 w-full mb-4">
               {stats.filter(s => s.label !== 'Баланс').map(s => (
-                <div key={s.label} className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center gap-0.5">
-                  <span className="text-lg font-bold text-white">{s.value}</span>
-                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">{s.label}</span>
+                <div key={s.label} className="bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+                  <span className="text-lg font-bold text-white shadow-black/80 drop-shadow-lg">{s.value}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-100 font-bold shadow-black/80 drop-shadow-md">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -360,6 +432,31 @@ export default function Profile() {
                 <Wallet size={16} />
                 <span>{balance ?? 0}</span>
                 <span className="opacity-70 font-normal text-[10px] ml-0.5">токены</span>
+              </button>
+              <button
+                onClick={() => { impact('light'); navigate('/spin') }}
+                className="relative w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all group overflow-visible"
+              >
+                <div className="relative w-6 h-6" style={{ animation: 'spin-slow 10s linear infinite' }}>
+                  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                    <circle cx="50" cy="50" r="48" fill="#18181b" stroke="#3f3f46" strokeWidth="4" />
+                    <path d="M50 50 L50 4 A46 46 0 0 1 78.5 14 Z" fill="#8b5cf6" />
+                    <path d="M50 50 L78.5 14 A46 46 0 0 1 96 50 Z" fill="#3f3f46" />
+                    <path d="M50 50 L96 50 A46 46 0 0 1 78.5 86 Z" fill="#7c3aed" />
+                    <path d="M50 50 L78.5 86 A46 46 0 0 1 50 96 Z" fill="#27272a" />
+                    <path d="M50 50 L50 96 A46 46 0 0 1 21.5 86 Z" fill="#8b5cf6" />
+                    <path d="M50 50 L21.5 86 A46 46 0 0 1 4 50 Z" fill="#3f3f46" />
+                    <path d="M50 50 L4 50 A46 46 0 0 1 21.5 14 Z" fill="#7c3aed" />
+                    <path d="M50 50 L21.5 14 A46 46 0 0 1 50 4 Z" fill="#27272a" />
+                    <circle cx="50" cy="50" r="12" fill="#18181b" stroke="#52525b" strokeWidth="2" />
+                    <circle cx="50" cy="50" r="6" fill="#fbbf24" />
+                  </svg>
+                </div>
+
+                {/* Badge */}
+                <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[16px] h-4 rounded-full flex items-center justify-center border border-zinc-900 shadow-sm z-10 pointer-events-none">
+                  {spins}
+                </div>
               </button>
               <button
                 className="w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all"
@@ -419,10 +516,21 @@ export default function Profile() {
           </div>
         </div>
         <div>
-          <div className="flex justify-between items-end mb-4 px-1">
+          <div className="flex justify-between items-end mb-2 px-1">
             <div className="text-lg font-bold text-white">Мои генерации</div>
           </div>
-          {items.length === 0 ? (
+          {/* Storage Info Banner */}
+          <div className="mb-4 px-1">
+            <div className="flex items-start gap-2 p-3 bg-zinc-900/50 rounded-xl border border-white/5 text-zinc-400">
+              <Clock size={14} className="mt-0.5 flex-shrink-0 text-zinc-500" />
+              <p className="text-[11px] leading-relaxed">
+                Изображения хранятся в приложении <span className="text-zinc-300 font-medium">60 дней</span>. Оригиналы отправляются в чат с ботом и хранятся там <span className="text-emerald-400 font-medium">бессрочно</span> 💾
+              </p>
+            </div>
+          </div>
+          {loading && items.length === 0 ? (
+            <ProfileSkeletonGrid />
+          ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-600 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800"><HistoryIcon size={32} className="mb-3 opacity-20" /><p className="text-sm font-medium">История пуста</p></div>
           ) : (
             <>
@@ -525,6 +633,16 @@ export default function Profile() {
                         </button>
                       </div>
 
+                      {/* Remix Share Button */}
+                      <button
+                        onClick={() => setShowRemixShareConfirm(true)}
+                        disabled={remixShareLoading}
+                        className="w-full min-h-[48px] h-auto py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {remixShareLoading ? <Loader2 size={16} className="animate-spin" /> : <Repeat size={16} />}
+                        Поделиться с ремиксом
+                      </button>
+
                       <button
                         onClick={() => {
                           if (preview.is_published) {
@@ -598,6 +716,67 @@ export default function Profile() {
                         className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
                       >
                         Опубликовать
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Remix Share Confirmation Modal */}
+              {showRemixShareConfirm && preview && (
+                <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowRemixShareConfirm(false) }}>
+                  <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-bold text-white">Поделиться с ремиксом</h3>
+                      <p className="text-sm text-zinc-400">
+                        Генерация будет отправлена в чат с ботом и станет публичной в ленте. Другие пользователи смогут использовать её для ремикса.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowRemixShareConfirm(false)}
+                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!preview || !user?.id) return
+                          setRemixShareLoading(true)
+                          setShowRemixShareConfirm(false)
+                          try {
+                            impact('medium')
+                            const res = await fetch('/api/telegram/sendRemixShare', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                chat_id: user.id,
+                                photo_url: preview.image_url,
+                                generation_id: preview.id,
+                                owner_username: user.username || null,
+                                owner_user_id: user.id,
+                                model: preview.model || null
+                              })
+                            })
+                            if (res.ok) {
+                              notify('success')
+                              // Update local state to show as published
+                              setPreview(prev => prev ? { ...prev, is_published: true } : null)
+                              setItems(prev => prev.map(item => item.id === preview.id ? { ...item, is_published: true } : item))
+                            } else {
+                              notify('error')
+                            }
+                          } catch (e) {
+                            console.error('Remix share failed', e)
+                            notify('error')
+                          } finally {
+                            setRemixShareLoading(false)
+                          }
+                        }}
+                        disabled={remixShareLoading}
+                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white font-bold text-sm hover:from-fuchsia-700 hover:to-violet-700 transition-colors disabled:opacity-50"
+                      >
+                        {remixShareLoading ? 'Отправка...' : 'Поделиться'}
                       </button>
                     </div>
                   </div>
@@ -750,6 +929,12 @@ export default function Profile() {
       }
 
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+
+      <GenerationSelector
+        isOpen={showCoverSelector}
+        onClose={() => setShowCoverSelector(false)}
+        onSelect={handleCoverSelect}
+      />
     </div >
   )
 }
