@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Sparkles, Zap } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -36,6 +36,7 @@ export default function SpinPage() {
     const [spinning, setSpinning] = useState(false)
     const [rotation, setRotation] = useState(0)
     const [result, setResult] = useState<any>(null)
+    const resultRef = useRef<any>(null) // Ref для хранения актуального результата
     const [showResultModal, setShowResultModal] = useState(false)
     const [eventDisabled, setEventDisabled] = useState(false)
 
@@ -111,6 +112,7 @@ export default function SpinPage() {
 
             setRotation(nextRotation)
             setResult(j)
+            resultRef.current = j // Сохраняем актуальный результат в ref
             setSpins(s => Math.max(0, s - 1))
 
         } catch (e) {
@@ -125,8 +127,10 @@ export default function SpinPage() {
             impact('heavy')
             notify('success')
             setShowResultModal(true)
-            if (result) {
-                setBalance(result.newBalance)
+            // Используем ref для получения актуального результата
+            const currentResult = resultRef.current
+            if (currentResult) {
+                setBalance(currentResult.newBalance)
             }
         }, 1000)
     }
@@ -206,7 +210,7 @@ export default function SpinPage() {
                         )}
                         {(platform === 'ios' || platform === 'android') && <div className="w-4" />}
 
-                        <h1 className="text-xl font-bold text-white/90 tracking-wide">Fortune</h1>
+                        <h1 className="text-xl font-bold text-white/90 tracking-wide">Фортуна</h1>
                         <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full px-3 py-1.5">
                             <Zap size={14} className="text-amber-400 fill-amber-400" />
                             {loading ? (
@@ -268,7 +272,7 @@ export default function SpinPage() {
                                 ) : (
                                     <>
                                         <Sparkles size={18} className="opacity-90" />
-                                        SPIN
+                                        КРУТИТЬ
                                     </>
                                 )}
                             </button>
@@ -284,38 +288,98 @@ export default function SpinPage() {
             )}
 
             {/* Result Modal */}
-            {showResultModal && result && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-                    <div
-                        className="bg-zinc-900/95 border border-white/10 rounded-3xl p-8 w-full max-w-sm text-center space-y-6 shadow-2xl"
-                        style={{
-                            animation: 'modal-appear 0.3s ease-out',
-                        }}
-                    >
-                        {/* Icon */}
-                        <div className="w-20 h-20 mx-auto bg-gradient-to-br from-amber-300 to-yellow-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/30">
-                            <Sparkles size={32} className="text-black" />
-                        </div>
-
-                        {/* Content */}
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-white">Поздравляем!</h2>
-                            <p className="text-zinc-400 font-medium">Вы выиграли:</p>
-                            <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400 py-2">
-                                {result.prizeValue} Токенов
+            {showResultModal && result && (() => {
+                const isBigWin = result.prizeValue >= 200
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md px-4">
+                        {/* Confetti for big wins */}
+                        {isBigWin && (
+                            <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                                {[...Array(50)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="confetti"
+                                        style={{
+                                            left: `${Math.random() * 100}%`,
+                                            animationDelay: `${Math.random() * 3}s`,
+                                            backgroundColor: ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444'][Math.floor(Math.random() * 6)],
+                                        }}
+                                    />
+                                ))}
                             </div>
-                        </div>
+                        )}
 
-                        {/* Button */}
-                        <button
-                            onClick={() => setShowResultModal(false)}
-                            className="w-full py-3.5 bg-white text-black rounded-xl font-bold shadow-lg active:scale-95 transition-transform"
+                        <div
+                            className={`relative border rounded-3xl p-8 w-full max-w-sm text-center space-y-6 shadow-2xl ${isBigWin
+                                ? 'bg-gradient-to-b from-violet-950/95 via-zinc-900/95 to-zinc-900/95 border-violet-500/30'
+                                : 'bg-zinc-900/95 border-white/10'
+                                }`}
+                            style={{
+                                animation: 'modal-appear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            }}
                         >
-                            Отлично!
-                        </button>
+                            {/* Glow effect for big wins */}
+                            {isBigWin && (
+                                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 via-fuchsia-600/20 to-violet-600/20 rounded-3xl blur-xl -z-10" />
+                            )}
+
+                            {/* Icon */}
+                            <div className={`relative w-24 h-24 mx-auto rounded-full flex items-center justify-center ${isBigWin
+                                ? 'bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-500 shadow-xl shadow-amber-500/40'
+                                : 'bg-gradient-to-br from-violet-400 to-fuchsia-500 shadow-lg shadow-violet-500/30'
+                                }`}
+                                style={isBigWin ? { animation: 'icon-pulse 1.5s ease-in-out infinite' } : {}}
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    className={`${isBigWin ? 'w-12 h-12' : 'w-10 h-10'}`}
+                                >
+                                    <path
+                                        d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                        fill={isBigWin ? '#1a1a1a' : '#ffffff'}
+                                        stroke={isBigWin ? '#1a1a1a' : '#ffffff'}
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
+                                {isBigWin && (
+                                    <div className="absolute -inset-2 rounded-full border-2 border-amber-400/50" style={{ animation: 'ring-expand 1.5s ease-out infinite' }} />
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="space-y-3">
+                                <h2 className={`text-2xl font-bold ${isBigWin ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500' : 'text-white'}`}>
+                                    {isBigWin ? '🎉 Джекпот!' : 'Поздравляем!'}
+                                </h2>
+                                <p className="text-zinc-400 font-medium">Вы выиграли:</p>
+                                <div className={`text-5xl font-black py-2 ${isBigWin
+                                    ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-400'
+                                    : 'text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400'
+                                    }`}
+                                    style={isBigWin ? { animation: 'value-glow 2s ease-in-out infinite' } : {}}
+                                >
+                                    +{result.prizeValue}
+                                </div>
+                                <p className="text-zinc-500 text-sm font-medium uppercase tracking-wider">токенов</p>
+                            </div>
+
+                            {/* Button */}
+                            <button
+                                onClick={() => setShowResultModal(false)}
+                                className={`w-full py-4 rounded-xl font-bold text-base active:scale-95 transition-all ${isBigWin
+                                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-lg shadow-amber-500/30'
+                                    : 'bg-white text-black shadow-lg'
+                                    }`}
+                            >
+                                Забрать! ✨
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            })()}
 
             {/* CSS Animations */}
             <style>{`
@@ -330,12 +394,56 @@ export default function SpinPage() {
                 @keyframes modal-appear {
                     from {
                         opacity: 0;
-                        transform: scale(0.9) translateY(20px);
+                        transform: scale(0.8) translateY(30px);
                     }
                     to {
                         opacity: 1;
                         transform: scale(1) translateY(0);
                     }
+                }
+                @keyframes icon-pulse {
+                    0%, 100% { 
+                        transform: scale(1);
+                    }
+                    50% { 
+                        transform: scale(1.05);
+                    }
+                }
+                @keyframes ring-expand {
+                    0% { 
+                        transform: scale(1);
+                        opacity: 1;
+                    }
+                    100% { 
+                        transform: scale(1.4);
+                        opacity: 0;
+                    }
+                }
+                @keyframes value-glow {
+                    0%, 100% { 
+                        filter: brightness(1);
+                    }
+                    50% { 
+                        filter: brightness(1.2);
+                    }
+                }
+                @keyframes confetti-fall {
+                    0% {
+                        transform: translateY(-100vh) rotate(0deg);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: translateY(100vh) rotate(720deg);
+                        opacity: 0;
+                    }
+                }
+                .confetti {
+                    position: absolute;
+                    width: 10px;
+                    height: 10px;
+                    top: -20px;
+                    border-radius: 2px;
+                    animation: confetti-fall 4s linear forwards;
                 }
             `}</style>
         </div>
