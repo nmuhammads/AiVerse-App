@@ -75,7 +75,7 @@ export async function getFeed(req: Request, res: Response) {
             // BUT we must only show completed generations
             baseQuery = `user_id=eq.${currentUserId}&status=eq.completed`
         } else {
-            baseQuery = `is_published=eq.true&created_at=gte.${startOfMonth}`
+            baseQuery = `status=neq.deleted&is_published=eq.true&created_at=gte.${startOfMonth}`
         }
 
         let queryParts = []

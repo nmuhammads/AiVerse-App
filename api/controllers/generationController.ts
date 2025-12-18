@@ -910,7 +910,7 @@ export async function getGenerationById(req: Request, res: Response) {
     }
 
     // Fetch generation with user info
-    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,users(username,first_name)`
+    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,status,users(username,first_name)`
     const result = await supaSelect('generations', query)
 
     if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
@@ -918,6 +918,11 @@ export async function getGenerationById(req: Request, res: Response) {
     }
 
     const gen = result.data[0]
+
+    // Check if generation is deleted
+    if (gen.status === 'deleted') {
+      return res.status(404).json({ error: 'Generation not found' })
+    }
 
     // Parse metadata from prompt to extract ratio, type etc.
     let cleanPrompt = gen.prompt || ''
@@ -947,3 +952,52 @@ export async function getGenerationById(req: Request, res: Response) {
     return res.status(500).json({ error: 'Failed to fetch generation' })
   }
 }
+
+// Soft delete generation by setting status to 'deleted'
+export async function deleteGeneration(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { user_id } = req.body
+
+    if (!id) {
+      return res.status(400).json({ error: 'Generation ID required' })
+    }
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'User ID required' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    // Verify ownership
+    const query = `?id=eq.${id}&user_id=eq.${user_id}&select=id,status`
+    const result = await supaSelect('generations', query)
+
+    if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
+      return res.status(403).json({ error: 'Generation not found or not owned by user' })
+    }
+
+    const gen = result.data[0]
+
+    // Check if already deleted
+    if (gen.status === 'deleted') {
+      return res.json({ ok: true, message: 'Already deleted' })
+    }
+
+    // Soft delete by updating status
+    const updateRes = await supaPatch('generations', `?id=eq.${id}`, { status: 'deleted' })
+
+    if (!updateRes.ok) {
+      return res.status(500).json({ error: 'Failed to delete generation' })
+    }
+
+    console.log(`[Delete] Generation ${id} soft deleted by user ${user_id}`)
+    return res.json({ ok: true })
+  } catch (e) {
+    console.error('deleteGeneration error:', e)
+    return res.status(500).json({ error: 'Failed to delete generation' })
+  }
+}
+

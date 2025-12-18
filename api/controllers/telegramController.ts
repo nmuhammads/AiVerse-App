@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import sharp from 'sharp'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -576,7 +577,7 @@ export async function sendRemixShare(req: Request, res: Response) {
 
     console.info('sendRemixShare:start', { chat_id, generationId, refValue })
 
-    // Try sending photo with inline keyboard
+    // Try sending photo with inline keyboard by URL
     const resp = await tg('sendPhoto', {
       chat_id,
       photo,
@@ -591,8 +592,66 @@ export async function sendRemixShare(req: Request, res: Response) {
       return res.json({ ok: true })
     }
 
-    console.warn('sendRemixShare:failed', resp)
-    return res.status(500).json({ ok: false, error: resp?.description || 'send failed' })
+    console.warn('sendRemixShare:url_failed', resp)
+
+    // Fallback: Download and upload image directly (for expired URLs like tempfile.aiquickdraw.com)
+    try {
+      console.info('sendRemixShare:fallback_upload', { photo: photo.slice(0, 128) })
+      const imgResp = await fetch(photo)
+      if (!imgResp.ok) {
+        console.error('sendRemixShare:image_fetch_failed', { status: imgResp.status })
+        return res.status(500).json({ ok: false, error: 'image fetch failed', status: imgResp.status })
+      }
+
+      const ab = await imgResp.arrayBuffer()
+      const originalSize = ab.byteLength
+      const MAX_PHOTO_SIZE = 8 * 1024 * 1024 // 8MB (leave buffer for Telegram's 10MB limit)
+
+      let imageBuffer: Buffer
+      let filename: string
+      let contentType: string
+
+      if (originalSize > MAX_PHOTO_SIZE) {
+        // Compress large images with sharp
+        console.info('sendRemixShare:compressing', { originalSize })
+        imageBuffer = await sharp(Buffer.from(ab))
+          .jpeg({ quality: 85 })
+          .toBuffer()
+        filename = `ai-${Date.now()}.jpg`
+        contentType = 'image/jpeg'
+        console.info('sendRemixShare:compressed', { newSize: imageBuffer.length })
+      } else {
+        const ct = imgResp.headers.get('content-type') || 'image/jpeg'
+        imageBuffer = Buffer.from(ab)
+        const ext = ct.includes('png') ? 'png' : (ct.includes('webp') ? 'webp' : 'jpg')
+        filename = `ai-${Date.now()}.${ext}`
+        contentType = ct
+      }
+
+      const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType })
+
+      const form = new FormData()
+      form.append('chat_id', String(chat_id))
+      form.append('caption', caption)
+      form.append('photo', blob, filename)
+      form.append('reply_markup', JSON.stringify(kb))
+
+      const r = await fetch(`${API}/sendPhoto`, { method: 'POST', body: form })
+      const j = await r.json().catch(() => null)
+
+      if (j?.ok) {
+        // Auto-publish the generation
+        await supaPatch('generations', `?id=eq.${generationId}`, { is_published: true })
+        console.info('sendRemixShare:fallback_success', { generationId, published: true })
+        return res.json({ ok: true })
+      }
+
+      console.error('sendRemixShare:fallback_failed', j)
+      return res.status(500).json({ ok: false, error: j?.description || 'fallback upload failed' })
+    } catch (uploadError) {
+      console.error('sendRemixShare:fallback_error', uploadError)
+      return res.status(500).json({ ok: false, error: (uploadError as Error).message })
+    }
   } catch (e) {
     console.error('sendRemixShare error', e)
     return res.status(500).json({ ok: false })

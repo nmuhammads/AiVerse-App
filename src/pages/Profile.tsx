@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2 } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -306,6 +306,35 @@ export default function Profile() {
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
   const [remixShareLoading, setRemixShareLoading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  const handleDelete = async () => {
+    if (!preview || !user?.id) return
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/generation/${preview.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id })
+      })
+      if (res.ok) {
+        impact('medium')
+        notify('success')
+        // Remove from local state
+        setItems(prev => prev.filter(item => item.id !== preview.id))
+        setTotal(prev => (prev !== undefined ? prev - 1 : prev))
+        setPreview(null)
+        setShowDeleteConfirm(false)
+      } else {
+        notify('error')
+      }
+    } catch {
+      notify('error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   const handlePublish = async () => {
     if (!preview) return
@@ -682,6 +711,15 @@ export default function Profile() {
                           {isCopied ? <Check size={14} /> : <Copy size={14} />}
                           {isCopied ? 'Скопировано!' : 'Копировать промпт'}
                         </button>
+                        <button
+                          onClick={() => {
+                            impact('light')
+                            setShowDeleteConfirm(true)
+                          }}
+                          className="w-10 h-10 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
 
                       {showPrompt && (
@@ -777,6 +815,36 @@ export default function Profile() {
                         className="flex-1 py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white font-bold text-sm hover:from-fuchsia-700 hover:to-violet-700 transition-colors disabled:opacity-50"
                       >
                         {remixShareLoading ? 'Отправка...' : 'Поделиться'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Confirmation Modal */}
+              {showDeleteConfirm && preview && (
+                <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteConfirm(false) }}>
+                  <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-bold text-white">Удалить генерацию?</h3>
+                      <p className="text-sm text-zinc-400">
+                        Изображение будет удалено из вашего профиля и ленты. Это действие нельзя отменить.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleteLoading}
+                        className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {deleteLoading ? 'Удаление...' : 'Удалить'}
                       </button>
                     </div>
                   </div>
