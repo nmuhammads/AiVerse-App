@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useTelegram } from '@/hooks/useTelegram'
-import { ArrowRight, Coins, ChevronLeft } from 'lucide-react'
+import { ArrowRight, Coins, ChevronLeft, ImageOff } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 
@@ -16,6 +16,14 @@ interface RewardItem {
     created_at: string
     source_generation: Generation | null
     remix_generation: Generation | null
+}
+
+const THUMB_BASE_URL = import.meta.env.VITE_R2_PUBLIC_URL_THUMBNAILS || 'https://pub-40a5e220759a483cbf66bbe98d76d7a1.r2.dev'
+
+// Helper to get thumbnail URL from generation id
+const getThumbnailUrl = (gen: Generation | null): string | null => {
+    if (!gen || !gen.id) return null
+    return `${THUMB_BASE_URL}/gen_${gen.id}_thumb.jpg`
 }
 
 export default function Accumulations() {
@@ -139,19 +147,43 @@ export default function Accumulations() {
                                 <div className="text-xs text-zinc-500 font-medium">{date}</div>
                                 <div className="flex items-center gap-3">
                                     {/* Source Image */}
-                                    <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10">
-                                        {item.source_generation?.image_url && (
-                                            <img src={item.source_generation.image_url} alt="Source" className="w-full h-full object-cover" />
+                                    <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10 flex items-center justify-center">
+                                        {item.source_generation ? (
+                                            <img
+                                                src={getThumbnailUrl(item.source_generation) || item.source_generation.image_url || ''}
+                                                alt="Source"
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.currentTarget;
+                                                    target.style.display = 'none';
+                                                    target.parentElement?.classList.add('show-placeholder');
+                                                }}
+                                            />
+                                        ) : (
+                                            <ImageOff size={16} className="text-zinc-600" />
                                         )}
+                                        <ImageOff size={16} className="text-zinc-600 hidden group-[.show-placeholder]:block" />
                                     </div>
 
                                     <ArrowRight size={16} className="text-zinc-600" />
 
                                     {/* Remix Image */}
-                                    <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10">
-                                        {item.remix_generation?.image_url && (
-                                            <img src={item.remix_generation.image_url} alt="Remix" className="w-full h-full object-cover" />
+                                    <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden border border-white/10 flex items-center justify-center">
+                                        {item.remix_generation ? (
+                                            <img
+                                                src={getThumbnailUrl(item.remix_generation) || item.remix_generation.image_url || ''}
+                                                alt="Remix"
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.currentTarget;
+                                                    target.style.display = 'none';
+                                                    target.parentElement?.classList.add('show-placeholder');
+                                                }}
+                                            />
+                                        ) : (
+                                            <ImageOff size={16} className="text-zinc-600" />
                                         )}
+                                        <ImageOff size={16} className="text-zinc-600 hidden group-[.show-placeholder]:block" />
                                     </div>
                                 </div>
                             </div>

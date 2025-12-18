@@ -10,6 +10,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
 import { compressImage } from '@/utils/imageCompression'
 
+
 const MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
   { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/optimized/nanobanana.png' },
   { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
@@ -140,29 +141,41 @@ export default function Studio() {
     }
 
     if (remixId) {
-      fetch(`/api/generations/${remixId}`)
+      fetch(`/api/generation/${remixId}`)
         .then(res => res.json())
         .then(data => {
           if (data && !data.error) {
-            setPrompt(data.prompt)
-            if (data.model) setSelectedModel(data.model as ModelType)
-            // Try to infer aspect ratio or use default
-            // If data has aspect_ratio, use it. Otherwise default.
-            // Assuming the API returns aspect_ratio if stored, or we infer from dimensions if available.
-            // For now, let's stick to model defaults unless we store ratio.
-            // If we want to be precise, we should store aspect_ratio in DB.
-            // Let's assume we might not have it, so we rely on user or default.
+            // Set prompt
+            setPrompt(data.prompt || '')
 
+            // Set model
+            if (data.model) setSelectedModel(data.model as ModelType)
+
+            // Set aspect ratio if available
+            if (data.aspect_ratio && data.aspect_ratio !== '1:1') {
+              setAspectRatio(data.aspect_ratio as AspectRatio)
+            }
+
+            // Set input images if available (for image-to-image remix)
+            if (data.input_images && Array.isArray(data.input_images) && data.input_images.length > 0) {
+              setUploadedImages(data.input_images)
+              setGenerationMode('image')
+            }
+
+            // Set parent generation for tracking remix chain
             setParentGeneration(data.id, data.users?.username || 'Unknown')
 
-            // If it's image-to-image and has input images, we might want to load them?
-            // Usually remix implies using the prompt. If it was img2img, maybe we don't load the original source image to avoid confusion/privacy issues, 
-            // or we do. Let's stick to prompt for now as per standard remix behavior.
+            console.log('[Remix] Loaded data:', {
+              id: data.id,
+              model: data.model,
+              ratio: data.aspect_ratio,
+              hasInputImages: data.input_images?.length > 0
+            })
           }
         })
         .catch(err => console.error('Failed to load remix data', err))
     }
-  }, [searchParams, setPrompt, setSelectedModel, setParentGeneration])
+  }, [searchParams, setPrompt, setSelectedModel, setParentGeneration, setAspectRatio, setUploadedImages, setGenerationMode])
 
   // Default ratio logic
   useEffect(() => {
@@ -471,25 +484,36 @@ export default function Studio() {
             className="px-3 py-1.5 rounded-full bg-zinc-900 border border-white/10 flex items-center gap-1.5 active:scale-95 transition-transform"
           >
             <Zap size={14} className="text-yellow-500 fill-yellow-500" />
-            <span className="text-xs font-bold text-white">{balance ?? '—'}</span>
+            {balance === null ? (
+              <div className="h-4 w-8 bg-zinc-700 rounded animate-pulse" />
+            ) : (
+              <span className="text-xs font-bold text-white">{balance}</span>
+            )}
           </button>
         </div>
 
         {/* 1. Compact Model Selector (Grid, no scroll) */}
         <div className="grid grid-cols-4 gap-2">
-          {MODELS.map(m => (
-            <button
-              key={m.id}
-              onClick={() => { setSelectedModel(m.id); impact('light') }}
-              className={`relative flex flex-col items-center gap-1.5 py-2 rounded-xl border transition-all duration-300 ${selectedModel === m.id ? 'bg-zinc-900 border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'bg-zinc-900/30 border-transparent hover:bg-zinc-900/50'}`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br ${m.color} shadow-lg transition-transform duration-300 overflow-hidden ${selectedModel === m.id ? 'scale-110' : ''}`}>
-                <img src={m.icon} alt={m.name} className="w-full h-full object-cover" />
-              </div>
-              <span className={`text-[10px] font-semibold text-center leading-tight ${selectedModel === m.id ? 'text-white' : 'text-zinc-500'}`}>{m.name}</span>
-              {selectedModel === m.id && <div className="absolute inset-0 rounded-xl ring-1 ring-white/20 pointer-events-none" />}
-            </button>
-          ))}
+          {MODELS.map(m => {
+            const isSelected = selectedModel === m.id
+            return (
+              <button
+                key={m.id}
+                onClick={() => { setSelectedModel(m.id); impact('light') }}
+                className={`flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all duration-200 ${isSelected
+                  ? 'bg-zinc-800 shadow-lg'
+                  : 'bg-zinc-900/40 hover:bg-zinc-800/60'
+                  }`}
+              >
+                <div className={`w-10 h-10 rounded-xl overflow-hidden shadow-md transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
+                  <img src={m.icon} alt={m.name} className="w-full h-full object-cover" />
+                </div>
+                <span className={`text-[10px] font-semibold text-center leading-tight ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
+                  {m.name}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
         {/* 2. Mode Toggle */}

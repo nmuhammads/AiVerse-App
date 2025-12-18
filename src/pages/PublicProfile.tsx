@@ -6,6 +6,7 @@ import { useTelegram } from '@/hooks/useTelegram'
 import { FeedImage, type FeedItem } from '@/components/FeedImage'
 import { FeedDetailModal } from '@/components/FeedDetailModal'
 import { useGenerationStore, type ModelType } from '@/store/generationStore'
+import { FeedSkeletonGrid } from '@/components/ui/skeleton'
 
 export default function PublicProfile() {
     const { userId } = useParams()
@@ -183,7 +184,14 @@ export default function PublicProfile() {
         <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
             <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
 
-                <div className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl mt-12">
+                <div
+                    className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl mt-12 transition-all duration-500"
+                    style={profileUser?.cover_url ? {
+                        backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${profileUser.cover_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
+                    } : {}}
+                >
                     {/* Close Button for Desktop/Web */}
                     {platform !== 'ios' && platform !== 'android' && (
                         <button
@@ -193,9 +201,13 @@ export default function PublicProfile() {
                             <X size={18} />
                         </button>
                     )}
-                    {/* Background Effects */}
-                    <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
-                    <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+                    {/* Background Effects (only if no cover) */}
+                    {!profileUser?.cover_url && (
+                        <>
+                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-violet-600/20 rounded-full blur-[80px] pointer-events-none" />
+                            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] pointer-events-none" />
+                        </>
+                    )}
 
                     <div className="relative z-10 flex flex-col items-center text-center">
                         {/* Avatar */}
@@ -219,9 +231,9 @@ export default function PublicProfile() {
                         {/* Stats Grid */}
                         <div className="grid grid-cols-3 gap-2 w-full mb-4">
                             {stats.map(s => (
-                                <div key={s.label} className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center gap-0.5">
-                                    <span className="text-lg font-bold text-white">{s.value}</span>
-                                    <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">{s.label}</span>
+                                <div key={s.label} className="bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+                                    <span className="text-lg font-bold text-white shadow-black/80 drop-shadow-lg">{s.value}</span>
+                                    <span className="text-[9px] uppercase tracking-wider text-zinc-100 font-bold shadow-black/80 drop-shadow-md">{s.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -232,7 +244,9 @@ export default function PublicProfile() {
                     <div className="flex justify-between items-end mb-4 px-1">
                         <div className="text-lg font-bold text-white">Публичные генерации</div>
                     </div>
-                    {items.length === 0 ? (
+                    {loading && items.length === 0 ? (
+                        <FeedSkeletonGrid viewMode="standard" />
+                    ) : items.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-zinc-600 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800"><HistoryIcon size={32} className="mb-3 opacity-20" /><p className="text-sm font-medium">Нет публичных работ</p></div>
                     ) : (
                         <>

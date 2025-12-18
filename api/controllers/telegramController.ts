@@ -48,21 +48,28 @@ export async function webhook(req: Request, res: Response) {
       const userId = msg.from?.id
       const payload = JSON.parse(payment.invoice_payload || '{}')
       const tokensToAdd = Number(payload.tokens || 0)
+      const spinsToAdd = Number(payload.spins || 0)
 
-      console.log(`[Payment] Successful payment from ${userId}, tokens: ${tokensToAdd}, payload:`, payload)
+      console.log(`[Payment] Successful payment from ${userId}, tokens: ${tokensToAdd}, spins: ${spinsToAdd}, payload:`, payload)
 
       if (userId && tokensToAdd > 0) {
-        // Fetch current balance
-        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
+        // Fetch current balance and spins
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance,spins`)
         if (userQ.ok && userQ.data?.[0]) {
           const currentBalance = Number(userQ.data[0].balance || 0)
+          const currentSpins = Number(userQ.data[0].spins || 0)
           const newBalance = currentBalance + tokensToAdd
+          const newSpins = currentSpins + spinsToAdd
 
-          // Update balance
-          const updateRes = await supaPatch('users', `?user_id=eq.${userId}`, { balance: newBalance })
+          // Update balance and spins
+          const updateRes = await supaPatch('users', `?user_id=eq.${userId}`, {
+            balance: newBalance,
+            spins: newSpins
+          })
 
           if (updateRes.ok) {
-            await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.` })
+            const spinText = spinsToAdd > 0 ? `\n🎰 Бонус: +${spinsToAdd} ${spinsToAdd === 1 ? 'спин' : 'спина'} для Колеса Фортуны!` : ''
+            await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.${spinText}` })
           } else {
             console.error('[Payment] Failed to update balance', updateRes)
             await tg('sendMessage', { chat_id: userId, text: `⚠️ Оплата прошла, но возникла ошибка при начислении. Обратитесь в поддержку.` })
@@ -80,6 +87,31 @@ export async function webhook(req: Request, res: Response) {
     if (text.startsWith('/start')) {
       const parts = text.split(/\s+/)
       const param = parts.length > 1 ? parts[1] : ''
+
+      // Handle referral: /start ref_username
+      if (param.startsWith('ref_')) {
+        const refValue = param.slice(4) // Remove "ref_"
+        const userId = msg.from?.id
+        if (userId && refValue) {
+          // Check if user exists and has no ref
+          const existing = await supaSelect('users', `?user_id=eq.${userId}&select=ref,user_id`)
+          if (existing.ok && Array.isArray(existing.data) && existing.data[0]) {
+            if (!existing.data[0].ref) {
+              await supaPatch('users', `?user_id=eq.${userId}`, { ref: refValue })
+              console.log(`[Referral/Webhook] Set ref=${refValue} for user ${userId}`)
+            }
+          } else {
+            // New user - create with ref
+            await supaPost('users', { user_id: userId, ref: refValue }, '?on_conflict=user_id')
+            console.log(`[Referral/Webhook] Created user ${userId} with ref=${refValue}`)
+          }
+        }
+        const info = '👋 Добро пожаловать в AI Verse!'
+        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
+        return res.json({ ok: true })
+      }
+
       if (APP_URL && (param === 'home' || param === 'generate' || param === 'studio' || param === 'top' || param === 'profile')) {
         const startVal = param === 'studio' ? 'generate' : param
         const url = startVal === 'home' ? APP_URL : `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startVal)}`
@@ -487,6 +519,82 @@ export async function logDownload(req: Request, res: Response) {
     console.info('webapp:download_log', payload)
     return res.json({ ok: true })
   } catch {
+    return res.status(500).json({ ok: false })
+  }
+}
+
+export async function sendRemixShare(req: Request, res: Response) {
+  try {
+    const chat_id = Number(req.body?.chat_id || 0)
+    const photo = String(req.body?.photo_url || '')
+    const generationId = Number(req.body?.generation_id || 0)
+    const ownerUsername = req.body?.owner_username ? String(req.body.owner_username) : null
+    const ownerUserId = req.body?.owner_user_id ? String(req.body.owner_user_id) : null
+    const model = typeof req.body?.model === 'string' ? String(req.body.model) : null
+
+    // Build caption with model name and author
+    const authorText = ownerUsername ? `\n👤 Автор: @${ownerUsername}` : ''
+    let caption = `✨ AI Verse${authorText}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
+    if (model) {
+      const modelNames: Record<string, string> = {
+        'flux': 'Flux',
+        'seedream4': 'Seedream 4',
+        'seedream4-5': 'Seedream 4.5',
+        'nanobanana': 'NanoBanana',
+        'nanobanana-pro': 'NanoBanana Pro'
+      }
+      const displayName = modelNames[model] || model
+      caption = `✨ AI Verse${authorText}\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
+    }
+
+    if (!API || !chat_id || !photo || !generationId) {
+      return res.status(400).json({ ok: false, error: 'invalid payload' })
+    }
+
+    // Get bot username dynamically
+    let botUsername = 'AiVerseAppBot'
+    try {
+      const me = await tg('getMe', {})
+      if (me?.ok && me.result?.username) {
+        botUsername = me.result.username
+      }
+    } catch (e) {
+      console.error('Failed to get bot username', e)
+    }
+
+    // Use username if available, otherwise use user_id
+    const refValue = ownerUsername || ownerUserId || ''
+    const remixUrl = refValue
+      ? `https://t.me/${botUsername}?startapp=ref-${refValue}-remix-${generationId}`
+      : `https://t.me/${botUsername}?startapp=remix-${generationId}`
+
+    const kb = {
+      inline_keyboard: [[
+        { text: 'Повторить ↻', url: remixUrl }
+      ]]
+    }
+
+    console.info('sendRemixShare:start', { chat_id, generationId, refValue })
+
+    // Try sending photo with inline keyboard
+    const resp = await tg('sendPhoto', {
+      chat_id,
+      photo,
+      caption,
+      reply_markup: kb
+    })
+
+    if (resp?.ok) {
+      // Auto-publish the generation
+      await supaPatch('generations', `?id=eq.${generationId}`, { is_published: true })
+      console.info('sendRemixShare:success', { generationId, published: true })
+      return res.json({ ok: true })
+    }
+
+    console.warn('sendRemixShare:failed', resp)
+    return res.status(500).json({ ok: false, error: resp?.description || 'send failed' })
+  } catch (e) {
+    console.error('sendRemixShare error', e)
     return res.status(500).json({ ok: false })
   }
 }

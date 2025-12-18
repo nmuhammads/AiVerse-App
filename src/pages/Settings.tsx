@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useEffect, useState } from 'react'
@@ -66,7 +66,7 @@ export default function Settings() {
             ]
         },
         {
-            title: 'Реферальная система',
+            title: 'Ремиксы',
             items: [
                 { icon: Users, label: 'Накопления', value: String(remixCount), onClick: () => navigate('/accumulations') },
             ]
@@ -75,7 +75,8 @@ export default function Settings() {
             title: 'О приложении',
             items: [
                 { icon: MessageCircle, label: 'Поддержка', onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
-                { icon: Info, label: 'Версия', value: 'v2.7.8', onClick: () => { } },
+                { icon: Clock, label: 'Хранение данных', value: '60 дней', onClick: () => toast.info('Изображения хранятся 60 дней. Оригиналы в максимальном качестве отправляются в чат с ботом и хранятся там бессрочно 💾', { duration: 5000 }) },
+                { icon: Info, label: 'Версия', value: 'v2.8.0', onClick: () => { } },
             ]
         }
     ]

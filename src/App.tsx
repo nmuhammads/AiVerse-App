@@ -6,9 +6,11 @@ import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import PublicProfile from '@/pages/PublicProfile';
 import Settings from "@/pages/Settings";
-import Contests from "@/pages/Contests";
+// Contests page is now integrated into EventsPage
 import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
+import EventsPage from "@/pages/EventsPage";
+import SpinPage from "@/pages/SpinPage";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { useEffect, useRef } from "react";
@@ -58,6 +60,14 @@ function StartParamRouter() {
         navigate("/accumulations", { replace: true, state: { fromDeepLink: true } });
         return;
       }
+      if (p === "contests" || p === "events") {
+        navigate("/events", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "spin" || p === "fortune") {
+        navigate("/spin", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
 
       // Handle dynamic params
       if (p.startsWith("contest-")) {
@@ -72,6 +82,34 @@ function StartParamRouter() {
         const id = p.replace("profile-", "");
         if (id) {
           navigate(`/profile/${id}`, { replace: true, state: { fromDeepLink: true } });
+        }
+        return;
+      }
+
+      // Handle ref with optional remix: ref-{username} or ref-{username}-remix-{id}
+      if (p.startsWith("ref-")) {
+        const match = p.match(/^ref-([^-]+)(?:-remix-(\d+))?$/);
+        if (match) {
+          const refValue = match[1];
+          const generationId = match[2];
+          // Store ref in sessionStorage for subscribe call
+          if (refValue) {
+            sessionStorage.setItem('aiverse_ref', refValue);
+          }
+          if (generationId) {
+            navigate(`/studio?remix=${generationId}`, { replace: true, state: { fromDeepLink: true } });
+          } else {
+            navigate("/", { replace: true, state: { fromDeepLink: true } });
+          }
+        }
+        return;
+      }
+
+      // Handle remix without ref: remix-{id}
+      if (p.startsWith("remix-")) {
+        const generationId = p.replace("remix-", "");
+        if (generationId) {
+          navigate(`/studio?remix=${generationId}`, { replace: true, state: { fromDeepLink: true } });
         }
         return;
       }
@@ -123,9 +161,11 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<PublicProfile />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/contests" element={<Contests />} />
+              {/* Contests are now part of EventsPage */}
               <Route path="/contests/:id" element={<ContestDetail />} />
               <Route path="/accumulations" element={<Accumulations />} />
+              <Route path="/events" element={<EventsPage />} />
+              <Route path="/spin" element={<SpinPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

@@ -8,6 +8,7 @@ import { useGenerationStore, type ModelType } from '@/store/generationStore'
 import { useNavigate } from 'react-router-dom'
 
 import { FeedImage, type FeedItem } from '@/components/FeedImage'
+import { FeedSkeletonGrid } from '@/components/ui/skeleton'
 
 export default function Home() {
   const { impact } = useHaptics()
@@ -310,7 +311,9 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <div className="text-center text-zinc-500 py-10">Загрузка...</div>
+          <div className="pb-20">
+            <FeedSkeletonGrid viewMode={viewMode} />
+          </div>
         ) : (
           <div className="pb-20">
             <div className={`flex items-start ${viewMode === 'standard' ? 'gap-4' : 'gap-2'}`}>
