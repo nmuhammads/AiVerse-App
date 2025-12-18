@@ -24,6 +24,7 @@ interface KieAIResponse {
   images?: string[]
   inputImages?: string[]
   error?: string
+  timeout?: boolean  // Таймаут без ошибки — генерация продолжается
 }
 
 // Конфигурация моделей
@@ -220,8 +221,8 @@ async function pollFluxTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
     }
     await new Promise(r => setTimeout(r, 2000))
   }
-  console.error(`[Flux] Task ${taskId} timeout`)
-  throw new Error('Flux task timeout')
+  console.log(`[Flux] Task ${taskId} timed out after ${timeoutMs}ms - status stays pending for later check`)
+  return 'TIMEOUT'
 }
 
 async function createJobsTask(apiKey: string, modelId: string, input: Record<string, unknown>, onTaskCreated?: (taskId: string) => void, metaPayload?: KieMetaPayload) {
@@ -286,8 +287,8 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
     }
     await new Promise(r => setTimeout(r, 2000))
   }
-  console.error(`[Jobs] Task ${taskId} timeout`)
-  throw new Error('Jobs task timeout')
+  console.log(`[Jobs] Task ${taskId} timed out after ${timeoutMs}ms - status stays pending for later check`)
+  return 'TIMEOUT'
 }
 
 // --- Supabase helpers for recording generation and deducting balance ---
@@ -347,15 +348,9 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
     })
     console.log(`[DB] Generation ${generationId} status updated:`, updateRes.ok)
 
-    // 2. Deduct balance
-    const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
-    const curr = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : null
-    if (typeof curr === 'number') {
-      let next = curr - cost
-      if (next < 0) next = 0 // Prevent negative balance
-      await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: next })
-      console.log(`[DB] Balance deducted for user ${userId}: ${curr} -> ${next}`)
-    }
+    // Баланс уже списан при создании генерации (в handleGenerateImage)
+    // При успешном завершении не нужно ничего делать с балансом
+    console.log(`[DB] Generation completed, balance was already debited at start`)
 
     // 3. Handle Remix Logic
     if (contestEntryId) {
@@ -468,9 +463,9 @@ async function generateImageWithKieAI(
     }
 
     if (cfg.kind === 'flux-kontext') {
-      // Flux supports single image
       const taskId = await createFluxTask(apiKey, prompt, aspect_ratio, imageUrls[0], onTaskCreated, metaPayload)
       const url = await pollFluxTask(apiKey, taskId)
+      if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
       return { images: [url], inputImages: imageUrls }
     }
 
@@ -499,22 +494,22 @@ async function generateImageWithKieAI(
       if (imageUrls.length > 0) {
         // Edit Mode
         const mode = model === 'seedream4-5' ? 'seedream/4.5-edit' : 'bytedance/seedream-v4-edit'
-        // For 4.5 Edit
         if (model === 'seedream4-5') {
           const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated, metaPayload)
           const url = await pollJobsTask(apiKey, taskId)
+          if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
           return { images: [url], inputImages: imageUrls }
         }
 
-        // Seedream 4 Edit (preserving old logic just in case, though structure above was slightly different)
         const taskId = await createJobsTask(apiKey, mode, { ...input, image_urls: imageUrls }, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
+        if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
         return { images: [url], inputImages: imageUrls }
       } else {
-        // Text to Image
         const mode = model === 'seedream4-5' ? 'seedream/4.5-text-to-image' : 'bytedance/seedream-v4-text-to-image'
         const taskId = await createJobsTask(apiKey, mode, input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
+        if (url === 'TIMEOUT') return { timeout: true, inputImages: [] }
         return { images: [url], inputImages: [] }
       }
     }
@@ -557,11 +552,13 @@ async function generateImageWithKieAI(
 
         const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
+        if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
         return { images: [url], inputImages: imageUrls }
       } else {
         if (image_size) input.image_size = image_size
         const taskId = await createJobsTask(apiKey, modelId, input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
+        if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
         return { images: [url], inputImages: imageUrls }
       }
     }
@@ -732,6 +729,17 @@ export async function handleGenerateImage(req: Request, res: Response) {
       if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
         generationId = genRes.data[0].id
         console.log('[DB] Pending generation created, ID:', generationId)
+
+        // Списать токены СРАЗУ при создании генерации
+        if (cost > 0) {
+          const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : null
+          if (typeof currBal === 'number') {
+            const nextBal = Math.max(0, currBal - cost)
+            await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
+            console.log(`[DB] Balance debited at start for user ${user_id}: ${currBal} -> ${nextBal}`)
+          }
+        }
       } else {
         console.error('Failed to create pending generation record', genRes)
         // We continue, but generationId will be 0, so meta won't be sent
@@ -769,6 +777,16 @@ export async function handleGenerateImage(req: Request, res: Response) {
     console.log('[API] Starting generation with timeout protection...')
     const result = await Promise.race([generationPromise, timeoutPromise])
 
+    // Обработка таймаута — оставляем pending, не помечаем как failed
+    if (result.timeout) {
+      console.log('[API] Generation timed out but staying pending, generationId:', generationId)
+      return res.json({
+        status: 'pending',
+        generationId: generationId,
+        message: 'Генерация занимает больше времени. Результат будет в профиле или токены вернутся.'
+      })
+    }
+
     if (result.error) {
       console.error('[API] Generation failed with error:', result.error)
 
@@ -780,13 +798,22 @@ export async function handleGenerateImage(req: Request, res: Response) {
         finalError = 'Из-за политик разработчика нейросети модель вернула ошибку. Попробуйте сгенерировать, выбрав модель Seedream (рекомендуем Seedream 4.5 для лучшего качества).'
       }
 
-      // Mark as failed if we created a record
+      // Mark as failed and REFUND tokens if we created a record
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
           error_message: finalError
         })
         console.log(`[DB] Generation ${generationId} marked as failed`)
+
+        // Возврат токенов при ошибке
+        if (cost > 0 && user_id) {
+          const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
+          const nextBal = currBal + cost
+          await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
+          console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
+        }
       }
       return res.status(500).json({ error: finalError })
     }
@@ -794,9 +821,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
     if (result.images && result.images.length > 0) {
       const imageUrl = result.images[0]
       if (generationId) {
-        // Complete generation (update DB, deduct balance, rewards)
-        // IMPORTANT: Await this to ensure DB is updated before response
-        // Complete generation (update DB, deduct balance, rewards)
+        // Complete generation (update DB, rewards)
         // IMPORTANT: Await this to ensure DB is updated before response
         await completeGeneration(generationId, Number(user_id), imageUrl, model, cost, req.body.parent_id, req.body.contest_entry_id)
       }
@@ -813,6 +838,15 @@ export async function handleGenerateImage(req: Request, res: Response) {
           status: 'failed',
           error_message: 'No images generated'
         })
+
+        // Возврат токенов при ошибке "No images"
+        if (cost > 0 && user_id) {
+          const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
+          const nextBal = currBal + cost
+          await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
+          console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
+        }
       }
       return res.status(500).json({
         error: 'No images generated'
@@ -851,6 +885,17 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
     // Handle missing task_id
     if (!gen.task_id) {
       console.log(`[CheckStatus] Gen ${gen.id} missing task_id, marking failed`)
+
+      // Возврат токенов при missing task_id
+      const cost = gen.cost || MODEL_PRICES[gen.model] || 0
+      if (cost > 0) {
+        const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
+        const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
+        const nextBal = currBal + cost
+        await supaPatch('users', `?user_id=eq.${gen.user_id}`, { balance: nextBal })
+        console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
+      }
+
       await supaPatch('generations', `?id=eq.${gen.id}`, {
         status: 'failed',
         error_message: 'Missing task ID'
@@ -883,6 +928,16 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         await completeGeneration(gen.id, gen.user_id, result.imageUrl, gen.model, cost, gen.parent_id)
         updated++
       } else if (result.status === 'failed') {
+        // Возврат токенов при fail от провайдера
+        const cost = gen.cost || MODEL_PRICES[gen.model] || 0
+        if (cost > 0) {
+          const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
+          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
+          const nextBal = currBal + cost
+          await supaPatch('users', `?user_id=eq.${gen.user_id}`, { balance: nextBal })
+          console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
+        }
+
         await supaPatch('generations', `?id=eq.${gen.id}`, {
           status: 'failed',
           error_message: result.error
