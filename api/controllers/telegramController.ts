@@ -576,7 +576,7 @@ export async function sendRemixShare(req: Request, res: Response) {
 
     console.info('sendRemixShare:start', { chat_id, generationId, refValue })
 
-    // Try sending photo with inline keyboard
+    // Try sending photo with inline keyboard by URL
     const resp = await tg('sendPhoto', {
       chat_id,
       photo,
@@ -591,8 +591,45 @@ export async function sendRemixShare(req: Request, res: Response) {
       return res.json({ ok: true })
     }
 
-    console.warn('sendRemixShare:failed', resp)
-    return res.status(500).json({ ok: false, error: resp?.description || 'send failed' })
+    console.warn('sendRemixShare:url_failed', resp)
+
+    // Fallback: Download and upload image directly (for expired URLs like tempfile.aiquickdraw.com)
+    try {
+      console.info('sendRemixShare:fallback_upload', { photo: photo.slice(0, 128) })
+      const imgResp = await fetch(photo)
+      if (!imgResp.ok) {
+        console.error('sendRemixShare:image_fetch_failed', { status: imgResp.status })
+        return res.status(500).json({ ok: false, error: 'image fetch failed', status: imgResp.status })
+      }
+
+      const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+      const ab = await imgResp.arrayBuffer()
+      const blob = new Blob([ab], { type: contentType })
+      const ext = contentType.includes('png') ? 'png' : (contentType.includes('webp') ? 'webp' : 'jpg')
+      const filename = `ai-${Date.now()}.${ext}`
+
+      const form = new FormData()
+      form.append('chat_id', String(chat_id))
+      form.append('caption', caption)
+      form.append('photo', blob, filename)
+      form.append('reply_markup', JSON.stringify(kb))
+
+      const r = await fetch(`${API}/sendPhoto`, { method: 'POST', body: form })
+      const j = await r.json().catch(() => null)
+
+      if (j?.ok) {
+        // Auto-publish the generation
+        await supaPatch('generations', `?id=eq.${generationId}`, { is_published: true })
+        console.info('sendRemixShare:fallback_success', { generationId, published: true })
+        return res.json({ ok: true })
+      }
+
+      console.error('sendRemixShare:fallback_failed', j)
+      return res.status(500).json({ ok: false, error: j?.description || 'fallback upload failed' })
+    } catch (uploadError) {
+      console.error('sendRemixShare:fallback_error', uploadError)
+      return res.status(500).json({ ok: false, error: (uploadError as Error).message })
+    }
   } catch (e) {
     console.error('sendRemixShare error', e)
     return res.status(500).json({ ok: false })
