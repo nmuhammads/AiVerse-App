@@ -173,6 +173,51 @@ export async function toggleLike(req: Request, res: Response) {
         } else {
             // Like
             await supaPost('generation_likes', { generation_id: generationId, user_id: userId })
+
+            // Check for likes milestone and notify the author
+            try {
+                // Get generation info to find author and current likes count
+                const genQ = await supaSelect('generations', `?id=eq.${generationId}&select=user_id,likes_count`)
+                if (genQ.ok && Array.isArray(genQ.data) && genQ.data.length > 0) {
+                    const gen = genQ.data[0]
+                    const authorId = gen.user_id
+                    const newLikesCount = (gen.likes_count || 0) + 1
+
+                    // Milestone every 10 likes (10, 20, 30, ...)
+                    if (newLikesCount > 0 && newLikesCount % 10 === 0) {
+                        // Import dynamically to avoid circular deps
+                        const { createNotification, getUserNotificationSettings } = await import('./notificationController.js')
+
+                        // In-app notification (always)
+                        await createNotification(
+                            authorId,
+                            'likes_milestone',
+                            `❤️ ${newLikesCount} лайков!`,
+                            'Вашу работу оценили — продолжайте творить!',
+                            { generation_id: generationId, likes_count: newLikesCount, deep_link: `/profile?gen=${generationId}` }
+                        )
+                        console.log(`[Notification] Likes milestone ${newLikesCount} for user ${authorId}`)
+
+                        // Telegram notification (if enabled)
+                        try {
+                            const settings = await getUserNotificationSettings(authorId)
+                            if (settings.telegram_likes) {
+                                const { tg } = await import('./telegramController.js')
+                                await tg('sendMessage', {
+                                    chat_id: authorId,
+                                    text: `❤️ <b>${newLikesCount} лайков!</b>\n\nВашу работу оценили — продолжайте творить!`,
+                                    parse_mode: 'HTML'
+                                })
+                            }
+                        } catch (tgErr) {
+                            console.error('[Notification] Failed to send likes telegram:', tgErr)
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Notification] Failed to check likes milestone:', e)
+            }
+
             return res.json({ liked: true })
         }
     } catch (e) {

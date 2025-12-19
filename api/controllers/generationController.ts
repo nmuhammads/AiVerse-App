@@ -5,7 +5,7 @@ import path from 'path'
 // Типы для запросов к Kie.ai
 import { uploadImageFromBase64, uploadImageFromUrl, createThumbnail } from '../services/r2Service.js'
 import { tg } from './telegramController.js'
-import { createNotification } from './notificationController.js'
+import { createNotification, getUserNotificationSettings } from './notificationController.js'
 
 interface KieAIRequest {
   model: string
@@ -416,23 +416,27 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
       }
     }
 
-    // 3.5 Send Telegram Notification
+    // 3.5 Send Telegram Notification (if enabled in settings)
     try {
       if (userId) {
-        // Simple caption or based on prompt
-        const caption = `✨ Генерация завершена!`
-        await tg('sendDocument', {
-          chat_id: userId,
-          document: imageUrl,
-          caption: caption
-        })
-        console.log(`[Notification] Sent photo to user ${userId}`)
+        const settings = await getUserNotificationSettings(userId)
+        if (settings.telegram_generation) {
+          const caption = `✨ Генерация завершена!`
+          await tg('sendDocument', {
+            chat_id: userId,
+            document: imageUrl,
+            caption: caption
+          })
+          console.log(`[Notification] Sent photo to user ${userId}`)
+        } else {
+          console.log(`[Notification] Telegram generation disabled for user ${userId}`)
+        }
       }
     } catch (e) {
       console.error('[Notification] Failed to send Telegram notification:', e)
     }
 
-    // 3.6 Create in-app notification
+    // 3.6 Create in-app notification (always)
     try {
       await createNotification(
         userId,
@@ -855,14 +859,19 @@ export async function handleGenerateImage(req: Request, res: Response) {
             console.error('[Notification] Failed to create in-app notification:', e)
           }
 
-          // Telegram уведомление об ошибке
+          // Telegram уведомление об ошибке (if enabled in settings)
           try {
-            await tg('sendMessage', {
-              chat_id: user_id,
-              text: `⚠️ <b>Ошибка генерации</b>\n\nГенерация не удалась. Токены возвращены: <b>+${cost}</b>\n\n<i>Попробуйте другой промпт или модель.</i>`,
-              parse_mode: 'HTML'
-            })
-            console.log(`[Notification] Sent error telegram to user ${user_id}`)
+            const settings = await getUserNotificationSettings(Number(user_id))
+            if (settings.telegram_generation) {
+              await tg('sendMessage', {
+                chat_id: user_id,
+                text: `⚠️ <b>Ошибка генерации</b>\n\nГенерация не удалась. Токены возвращены: <b>+${cost}</b>\n\n<i>Попробуйте другой промпт или модель.</i>`,
+                parse_mode: 'HTML'
+              })
+              console.log(`[Notification] Sent error telegram to user ${user_id}`)
+            } else {
+              console.log(`[Notification] Telegram generation disabled for user ${user_id}`)
+            }
           } catch (e) {
             console.error('[Notification] Failed to send error telegram:', e)
           }
