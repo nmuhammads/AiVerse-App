@@ -22,6 +22,7 @@ interface AppNews {
     image_url?: string
     action_url?: string
     created_at: string
+    read?: boolean
 }
 
 interface Props {
@@ -46,7 +47,7 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
             try {
                 const [notifRes, newsRes] = await Promise.all([
                     fetch(`/api/notifications?user_id=${user.id}`),
-                    fetch('/api/app-news')
+                    fetch(`/api/app-news?user_id=${user.id}`)
                 ])
                 const notifData = await notifRes.json()
                 const newsData = await newsRes.json()
@@ -74,6 +75,21 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
             setNotifications(prev => prev.map(n => ({ ...n, read: true })))
         } catch (e) {
             console.error('Failed to mark all read', e)
+        }
+    }
+
+    const handleReadAllNews = async () => {
+        if (!user?.id) return
+        impact('light')
+        try {
+            await fetch('/api/app-news/read-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id })
+            })
+            setNews(prev => prev.map(n => ({ ...n, read: true })))
+        } catch (e) {
+            console.error('Failed to mark all news read', e)
         }
     }
 
@@ -133,6 +149,15 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
                         {tab === 'personal' && notifications.some(n => !n.read) && (
                             <button
                                 onClick={handleReadAll}
+                                className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                                title="Прочитать всё"
+                            >
+                                <CheckCheck size={16} />
+                            </button>
+                        )}
+                        {tab === 'news' && news.some(n => !n.read) && (
+                            <button
+                                onClick={handleReadAllNews}
                                 className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                                 title="Прочитать всё"
                             >
@@ -226,6 +251,10 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
                                         className="w-full p-4 text-left hover:bg-white/5 transition-colors"
                                     >
                                         <div className="flex items-start gap-3">
+                                            {/* Unread indicator */}
+                                            {!item.read && (
+                                                <div className="w-2 h-2 rounded-full bg-violet-500 shrink-0 mt-1.5" />
+                                            )}
                                             {item.image_url && (
                                                 <img
                                                     src={item.image_url}

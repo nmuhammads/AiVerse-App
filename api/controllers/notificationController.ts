@@ -33,13 +33,30 @@ export async function getNotifications(req: Request, res: Response) {
     return res.json({ items: q.data || [] })
 }
 
-// GET /api/app-news
+// GET /api/app-news?user_id=X
 export async function getAppNews(req: Request, res: Response) {
+    const { user_id } = req.query
     const now = new Date().toISOString()
+
+    // Get active news
     const q = await supaSelect('app_news', `?starts_at=lte.${now}&or=(expires_at.is.null,expires_at.gte.${now})&order=created_at.desc&limit=10`)
     if (!q.ok) return res.status(500).json({ error: 'Failed to fetch' })
 
-    return res.json({ items: q.data || [] })
+    const newsItems = q.data || []
+
+    // If user_id provided, mark which ones are read
+    if (user_id && newsItems.length > 0) {
+        const readQ = await supaSelect('user_read_news', `?user_id=eq.${user_id}&select=news_id`)
+        const readIds = new Set((readQ.data || []).map((r: { news_id: number }) => r.news_id))
+
+        const itemsWithRead = newsItems.map((item: { id: number }) => ({
+            ...item,
+            read: readIds.has(item.id)
+        }))
+        return res.json({ items: itemsWithRead })
+    }
+
+    return res.json({ items: newsItems })
 }
 
 // GET /api/notifications/count?user_id=X
@@ -51,12 +68,17 @@ export async function getUnreadCount(req: Request, res: Response) {
     const personal = await supaSelect('notifications', `?user_id=eq.${user_id}&read=eq.false&select=id`)
     const personalCount = Array.isArray(personal.data) ? personal.data.length : 0
 
-    // Count active news (could track read separately, for now just count active)
+    // Count unread news (total active - already read)
     const now = new Date().toISOString()
     const news = await supaSelect('app_news', `?starts_at=lte.${now}&or=(expires_at.is.null,expires_at.gte.${now})&select=id`)
-    const newsCount = Array.isArray(news.data) ? news.data.length : 0
+    const activeNewsIds = Array.isArray(news.data) ? news.data.map((n: { id: number }) => n.id) : []
 
-    return res.json({ personal: personalCount, news: newsCount, total: personalCount + newsCount })
+    const readNews = await supaSelect('user_read_news', `?user_id=eq.${user_id}&select=news_id`)
+    const readNewsIds = new Set((readNews.data || []).map((r: { news_id: number }) => r.news_id))
+
+    const unreadNewsCount = activeNewsIds.filter((id: number) => !readNewsIds.has(id)).length
+
+    return res.json({ personal: personalCount, news: unreadNewsCount, total: personalCount + unreadNewsCount })
 }
 
 // POST /api/notifications/read-all
@@ -66,6 +88,24 @@ export async function markAllRead(req: Request, res: Response) {
 
     await supaPatch('notifications', `?user_id=eq.${user_id}&read=eq.false`, { read: true })
     return res.json({ ok: true })
+}
+
+// POST /api/app-news/read-all
+export async function markAllNewsRead(req: Request, res: Response) {
+    const { user_id } = req.body
+    if (!user_id) return res.status(400).json({ error: 'user_id required' })
+
+    // Get all active news IDs
+    const now = new Date().toISOString()
+    const news = await supaSelect('app_news', `?starts_at=lte.${now}&or=(expires_at.is.null,expires_at.gte.${now})&select=id`)
+    const newsIds = Array.isArray(news.data) ? news.data.map((n: { id: number }) => n.id) : []
+
+    // Insert read records for each (ignore duplicates)
+    for (const newsId of newsIds) {
+        await supaPost('user_read_news', { user_id, news_id: newsId }, '?on_conflict=user_id,news_id')
+    }
+
+    return res.json({ ok: true, marked: newsIds.length })
 }
 
 // PATCH /api/user/notification-settings
