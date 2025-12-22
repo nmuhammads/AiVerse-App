@@ -6,6 +6,7 @@ import Leaderboard from "@/pages/Leaderboard";
 import Profile from "@/pages/Profile";
 import PublicProfile from '@/pages/PublicProfile';
 import Settings from "@/pages/Settings";
+import SubscriptionsPage from "@/pages/SubscriptionsPage";
 // Contests page is now integrated into EventsPage
 import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
@@ -166,6 +167,7 @@ export default function App() {
               <Route path="/accumulations" element={<Accumulations />} />
               <Route path="/events" element={<EventsPage />} />
               <Route path="/spin" element={<SpinPage />} />
+              <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

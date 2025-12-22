@@ -1,4 +1,4 @@
-import { Share2, History as HistoryIcon, X } from 'lucide-react'
+import { Share2, History as HistoryIcon, X, UserPlus, UserMinus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -20,6 +20,8 @@ export default function PublicProfile() {
     const [total, setTotal] = useState<number | undefined>(undefined)
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(false)
+    const [isFollowing, setIsFollowing] = useState(false)
+    const [isFollowLoading, setIsFollowLoading] = useState(false)
 
     const location = useLocation()
 
@@ -54,18 +56,20 @@ export default function PublicProfile() {
 
     useEffect(() => {
         if (userId) {
-            // Fetch User Info
-            fetch(`/api/user/info/${userId}`).then(async r => {
+            // Fetch User Info with follow status
+            const viewerParam = currentUser?.id ? `?viewer_id=${currentUser.id}` : ''
+            fetch(`/api/user/info/${userId}${viewerParam}`).then(async r => {
                 const j = await r.json().catch(() => null)
                 if (r.ok && j) {
                     setProfileUser(j)
+                    setIsFollowing(j.is_following || false)
                 }
             })
 
             // Fetch Published Generations
             setLoading(true)
-            const viewerParam = currentUser?.id ? `&viewer_id=${currentUser.id}` : ''
-            fetch(`/api/user/generations?user_id=${userId}&limit=6&offset=0&published_only=true${viewerParam}`).then(async r => {
+            const viewerParamGen = currentUser?.id ? `&viewer_id=${currentUser.id}` : ''
+            fetch(`/api/user/generations?user_id=${userId}&limit=6&offset=0&published_only=true${viewerParamGen}`).then(async r => {
                 const j = await r.json().catch(() => null)
                 if (r.ok && j) {
                     setItems(j.items || [])
@@ -163,6 +167,28 @@ export default function PublicProfile() {
         }
     }
 
+    const handleFollowToggle = async () => {
+        if (!currentUser?.id || !userId) return
+        impact('medium')
+        setIsFollowLoading(true)
+
+        try {
+            const res = await fetch('/api/user/follow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ followerId: currentUser.id, followingId: Number(userId) })
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setIsFollowing(data.is_following)
+            }
+        } catch (e) {
+            console.error('Failed to toggle follow:', e)
+        } finally {
+            setIsFollowLoading(false)
+        }
+    }
+
     const displayName = (profileUser?.first_name && profileUser?.last_name)
         ? `${profileUser.first_name} ${profileUser.last_name}`
         : (profileUser?.first_name || profileUser?.username || 'User')
@@ -174,6 +200,7 @@ export default function PublicProfile() {
 
     const stats = [
         { label: 'Генерации', value: typeof total === 'number' ? total : items.length },
+        { label: 'Подписчики', value: profileUser?.followers_count || 0 },
         { label: 'Лайки', value: profileUser?.likes_count || 0 },
         { label: 'Ремиксы', value: profileUser?.remix_count || 0 },
     ]
@@ -229,7 +256,7 @@ export default function PublicProfile() {
                         <p className="text-zinc-400 font-medium text-sm mb-4">{username}</p>
 
                         {/* Stats Grid */}
-                        <div className="grid grid-cols-3 gap-2 w-full mb-4">
+                        <div className="grid grid-cols-4 gap-2 w-full mb-4">
                             {stats.map(s => (
                                 <div key={s.label} className="bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
                                     <span className="text-lg font-bold text-white shadow-black/80 drop-shadow-lg">{s.value}</span>
@@ -237,6 +264,24 @@ export default function PublicProfile() {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Follow Button (only show if not own profile) */}
+                        {currentUser?.id && Number(userId) !== currentUser.id && (
+                            <button
+                                onClick={handleFollowToggle}
+                                disabled={isFollowLoading}
+                                className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${isFollowing
+                                    ? 'bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700'
+                                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500'
+                                    } ${isFollowLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                {isFollowing ? (
+                                    <><UserMinus size={16} /> Отписаться</>
+                                ) : (
+                                    <><UserPlus size={16} /> Подписаться</>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
 

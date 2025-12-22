@@ -158,25 +158,53 @@ export async function setCover(req: Request, res: Response) {
 export async function getUserInfo(req: Request, res: Response) {
   try {
     const userId = req.params.userId
+    const viewerId = req.query.viewer_id ? Number(req.query.viewer_id) : null
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
-    // Parallel fetch: User Info + Likes Count
-    const [userQuery, likesQuery] = await Promise.all([
-      supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,remix_count,updated_at,avatar_url,cover_url,spins`),
+    // Parallel fetch: User Info + Likes Count + Following Count + Followers Count + Follow Status (if viewerId provided)
+    const promises: Promise<any>[] = [
+      supaSelect('users', `?user_id=eq.${encodeURIComponent(userId)}&select=user_id,username,first_name,last_name,is_premium,balance,remix_count,updated_at,avatar_url,cover_url,spins,notification_settings`),
       fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_likes_count`, {
         method: 'POST',
         headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_user_id: userId })
-      })
-    ])
+      }),
+      // Count how many users this user is following
+      supaSelect('user_subscriptions', `?follower_id=eq.${userId}&select=id`),
+      // Count how many followers this user has
+      supaSelect('user_subscriptions', `?following_id=eq.${userId}&select=id`)
+    ]
+
+    // Add follow status check if viewerId is provided
+    if (viewerId && viewerId !== Number(userId)) {
+      promises.push(
+        supaSelect('user_subscriptions', `?follower_id=eq.${viewerId}&following_id=eq.${userId}&select=id`)
+      )
+    }
+
+    const results = await Promise.all(promises)
+    const userQuery = results[0]
+    const likesQuery = results[1]
+    const followingCountQuery = results[2]
+    const followersCountQuery = results[3]
+    const followQuery = results[4] || null
 
     if (!userQuery.ok) return res.status(500).json({ error: 'query failed', detail: userQuery.data })
     const row = Array.isArray(userQuery.data) ? userQuery.data[0] : null
     if (!row) return res.status(404).json({ error: 'user not found' })
 
     const likesCount = await likesQuery.json().catch(() => 0)
+    const followingCount = followingCountQuery.ok && Array.isArray(followingCountQuery.data) ? followingCountQuery.data.length : 0
+    const followersCount = followersCountQuery.ok && Array.isArray(followersCountQuery.data) ? followersCountQuery.data.length : 0
+    const isFollowing = followQuery ? (Array.isArray(followQuery.data) && followQuery.data.length > 0) : false
 
-    return res.json({ ...row, likes_count: typeof likesCount === 'number' ? likesCount : 0 })
+    return res.json({
+      ...row,
+      likes_count: typeof likesCount === 'number' ? likesCount : 0,
+      following_count: followingCount,
+      followers_count: followersCount,
+      is_following: isFollowing
+    })
   } catch {
     return res.status(500).json({ error: 'user info error' })
   }
@@ -248,6 +276,8 @@ export async function listGenerations(req: Request, res: Response) {
     const offset = Number(req.query.offset || 0)
     const publishedOnly = req.query.published_only === 'true'
     const viewerId = req.query.viewer_id ? Number(req.query.viewer_id) : null
+    const modelFilter = req.query.model ? String(req.query.model) : null
+    const visibility = String(req.query.visibility || 'all')
 
     if (!userId) return res.status(400).json({ error: 'user_id required' })
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
@@ -256,8 +286,24 @@ export async function listGenerations(req: Request, res: Response) {
     let select = `select=id,image_url,prompt,created_at,is_published,model,likes_count,remix_count,input_images,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
     let query = `?user_id=eq.${encodeURIComponent(userId)}&status=neq.deleted&image_url=ilike.http%25&model=neq.seedream4.5&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
 
+    // Legacy: published_only support
     if (publishedOnly) {
       query += `&is_published=eq.true`
+    }
+
+    // New: model filter (comma-separated list)
+    if (modelFilter) {
+      const models = modelFilter.split(',').map(m => m.trim()).filter(Boolean)
+      if (models.length > 0) {
+        query += `&model=in.(${models.join(',')})`
+      }
+    }
+
+    // New: visibility filter
+    if (visibility === 'published') {
+      query += `&is_published=eq.true`
+    } else if (visibility === 'private') {
+      query += `&is_published=eq.false`
     }
 
     const q = await supaSelect('generations', query)
@@ -384,5 +430,116 @@ export async function getRemixRewards(req: Request, res: Response) {
   } catch (e) {
     console.error('getRemixRewards error:', e)
     return res.status(500).json({ error: 'internal error' })
+  }
+}
+
+// Toggle follow/unfollow a user
+export async function toggleFollow(req: Request, res: Response) {
+  try {
+    const { followerId, followingId } = req.body
+    if (!followerId || !followingId) return res.status(400).json({ error: 'followerId and followingId required' })
+    if (followerId === followingId) return res.status(400).json({ error: 'cannot follow yourself' })
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // Check if already following
+    const check = await supaSelect('user_subscriptions', `?follower_id=eq.${followerId}&following_id=eq.${followingId}&select=id`)
+    const existing = Array.isArray(check.data) && check.data.length > 0 ? check.data[0] : null
+
+    if (existing) {
+      // Unfollow
+      const url = `${SUPABASE_URL}/rest/v1/user_subscriptions?id=eq.${existing.id}`
+      const r = await fetch(url, {
+        method: 'DELETE',
+        headers: { ...supaHeaders(), 'Content-Type': 'application/json' }
+      })
+      if (!r.ok) return res.status(500).json({ error: 'unfollow failed' })
+      return res.json({ is_following: false })
+    } else {
+      // Follow
+      const result = await supaPost('user_subscriptions', { follower_id: followerId, following_id: followingId })
+      if (!result.ok) return res.status(500).json({ error: 'follow failed', detail: result.data })
+      return res.json({ is_following: true })
+    }
+  } catch (e) {
+    console.error('toggleFollow error:', e)
+    return res.status(500).json({ error: 'toggle follow failed' })
+  }
+}
+
+// Check if a user is following another user
+export async function checkFollowStatus(req: Request, res: Response) {
+  try {
+    const followerId = req.query.follower_id ? Number(req.query.follower_id) : null
+    const followingId = req.params.userId ? Number(req.params.userId) : null
+
+    if (!followerId || !followingId) return res.status(400).json({ error: 'follower_id and userId required' })
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    const check = await supaSelect('user_subscriptions', `?follower_id=eq.${followerId}&following_id=eq.${followingId}&select=id`)
+    const isFollowing = Array.isArray(check.data) && check.data.length > 0
+
+    return res.json({ is_following: isFollowing })
+  } catch (e) {
+    console.error('checkFollowStatus error:', e)
+    return res.status(500).json({ error: 'check follow status failed' })
+  }
+}
+
+// Get list of users that the current user is following
+export async function getFollowing(req: Request, res: Response) {
+  try {
+    const userId = req.params.userId
+    if (!userId) return res.status(400).json({ error: 'userId required' })
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // Get following users with their info
+    const query = `?follower_id=eq.${userId}&select=following_id,created_at,users:following_id(user_id,username,first_name,last_name,avatar_url)&order=created_at.desc`
+    const q = await supaSelect('user_subscriptions', query)
+
+    if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
+
+    const items = Array.isArray(q.data) ? q.data.map((item: any) => ({
+      user_id: item.following_id,
+      username: item.users?.username || null,
+      first_name: item.users?.first_name || null,
+      last_name: item.users?.last_name || null,
+      avatar_url: item.users?.avatar_url || null,
+      followed_at: item.created_at
+    })) : []
+
+    return res.json({ items })
+  } catch (e) {
+    console.error('getFollowing error:', e)
+    return res.status(500).json({ error: 'get following failed' })
+  }
+}
+
+// Get list of users who follow the current user (followers)
+export async function getFollowers(req: Request, res: Response) {
+  try {
+    const userId = req.params.userId
+    if (!userId) return res.status(400).json({ error: 'userId required' })
+    if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // Get followers with their info
+    const query = `?following_id=eq.${userId}&select=follower_id,created_at,users:follower_id(user_id,username,first_name,last_name,avatar_url)&order=created_at.desc`
+    const q = await supaSelect('user_subscriptions', query)
+
+    if (!q.ok) return res.status(500).json({ error: 'query failed', detail: q.data })
+
+    const items = Array.isArray(q.data) ? q.data.map((item: any) => ({
+      user_id: item.follower_id,
+      username: item.users?.username || null,
+      first_name: item.users?.first_name || null,
+      last_name: item.users?.last_name || null,
+      avatar_url: item.users?.avatar_url || null,
+      followed_at: item.created_at
+    })) : []
+
+    return res.json({ items })
+  } catch (e) {
+    console.error('getFollowers error:', e)
+    return res.status(500).json({ error: 'get followers failed' })
   }
 }

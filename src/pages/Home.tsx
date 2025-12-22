@@ -24,6 +24,7 @@ export default function Home() {
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null)
   const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard')
+  const [feedFilter, setFeedFilter] = useState<'all' | 'following'>('all')
 
   const LIMIT_INITIAL = 6
   const LIMIT_MORE = 4
@@ -54,8 +55,9 @@ export default function Home() {
       const currentOffset = reset ? 0 : offset
       const limit = viewMode === 'compact' ? 9 : (reset ? LIMIT_INITIAL : LIMIT_MORE)
       const userIdParam = user?.id ? `&user_id=${user.id}` : ''
+      const filterParam = feedFilter !== 'all' ? `&filter=${feedFilter}` : ''
 
-      const res = await fetch(`/api/feed?limit=${limit}&offset=${currentOffset}&sort=${sort}${userIdParam}&model=${selectedModelFilter}`, { signal })
+      const res = await fetch(`/api/feed?limit=${limit}&offset=${currentOffset}&sort=${sort}${userIdParam}${filterParam}&model=${selectedModelFilter}`, { signal })
 
       if (res.ok) {
         const data = await res.json()
@@ -97,11 +99,11 @@ export default function Home() {
       if (reset) setLoading(false)
       else setIsFetchingMore(false)
     }
-  }, [user?.id, sort, offset, selectedModelFilter, viewMode])
+  }, [user?.id, sort, offset, selectedModelFilter, viewMode, feedFilter])
 
   useEffect(() => {
     fetchFeed(true)
-  }, [sort, user?.id, selectedModelFilter])
+  }, [sort, user?.id, selectedModelFilter, feedFilter])
 
   // Infinite scroll handler
   useEffect(() => {
@@ -236,17 +238,24 @@ export default function Home() {
             <>
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => { setSort('new'); impact('light') }}
-                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'new' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => { setSort('new'); setFeedFilter('all'); impact('light') }}
+                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'new' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   Новое
                 </button>
                 <div className="w-[1px] h-4 bg-zinc-800"></div>
                 <button
-                  onClick={() => { setSort('popular'); impact('light') }}
-                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'popular' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => { setSort('popular'); setFeedFilter('all'); impact('light') }}
+                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'popular' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   Популярное
+                </button>
+                <div className="w-[1px] h-4 bg-zinc-800"></div>
+                <button
+                  onClick={() => { setFeedFilter('following'); impact('light') }}
+                  className={`text-lg font-bold tracking-tight transition-colors ${feedFilter === 'following' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Подписки
                 </button>
               </div>
               <button onClick={() => { setIsSearchOpen(true); impact('light') }} className="flex items-center justify-center w-10 h-10 bg-zinc-900 rounded-full text-zinc-400 hover:text-white border border-white/10 transition-all active:scale-95">

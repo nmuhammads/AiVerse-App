@@ -20,6 +20,8 @@ import feedRoutes from './routes/feed.js'
 import contestRoutes from './routes/contests.js'
 import spinRoutes from './routes/spin.js'
 import eventsRoutes from './routes/events.js'
+import notificationsRoutes from './routes/notifications.js'
+import appNewsRoutes from './routes/app-news.js'
 
 
 // load env
@@ -46,6 +48,8 @@ app.use('/api/feed', feedRoutes)
 app.use('/api/contests', contestRoutes)
 app.use('/api/spin', spinRoutes)
 app.use('/api/events', eventsRoutes)
+app.use('/api/notifications', notificationsRoutes)
+app.use('/api/app-news', appNewsRoutes)
 
 /**
  * Serve frontend build

@@ -5,6 +5,7 @@ import path from 'path'
 // Типы для запросов к Kie.ai
 import { uploadImageFromBase64, uploadImageFromUrl, createThumbnail } from '../services/r2Service.js'
 import { tg } from './telegramController.js'
+import { createNotification, getUserNotificationSettings } from './notificationController.js'
 
 interface KieAIRequest {
   model: string
@@ -397,25 +398,56 @@ async function completeGeneration(generationId: number, userId: number, imageUrl
               amount: rewardAmount
             })
             console.log(`[DB] Remix reward given to user ${parentGen.user_id}: +${rewardAmount}`)
+
+            // Notify parent author about remix
+            try {
+              await createNotification(
+                parentGen.user_id,
+                'remix',
+                'Новый ремикс 🔄',
+                `Кто-то использовал вашу работу! +${rewardAmount} токен${rewardAmount > 1 ? 'а' : ''}`,
+                { generation_id: parentId, deep_link: '/accumulations' }
+              )
+            } catch (e) {
+              console.error('[Notification] Failed to notify about remix:', e)
+            }
           }
         }
       }
     }
 
-    // 3.5 Send Telegram Notification
+    // 3.5 Send Telegram Notification (if enabled in settings)
     try {
       if (userId) {
-        // Simple caption or based on prompt
-        const caption = `✨ Генерация завершена!`
-        await tg('sendDocument', {
-          chat_id: userId,
-          document: imageUrl,
-          caption: caption
-        })
-        console.log(`[Notification] Sent photo to user ${userId}`)
+        const settings = await getUserNotificationSettings(userId)
+        if (settings.telegram_generation) {
+          const caption = `✨ Генерация завершена!`
+          await tg('sendDocument', {
+            chat_id: userId,
+            document: imageUrl,
+            caption: caption
+          })
+          console.log(`[Notification] Sent photo to user ${userId}`)
+        } else {
+          console.log(`[Notification] Telegram generation disabled for user ${userId}`)
+        }
       }
     } catch (e) {
       console.error('[Notification] Failed to send Telegram notification:', e)
+    }
+
+    // 3.6 Create in-app notification (always)
+    try {
+      await createNotification(
+        userId,
+        'generation_completed',
+        'Генерация готова ✨',
+        'Ваше изображение создано',
+        { generation_id: generationId, deep_link: `/profile?gen=${generationId}` }
+      )
+      console.log(`[Notification] In-app notification created for user ${userId}`)
+    } catch (e) {
+      console.error('[Notification] Failed to create in-app notification:', e)
     }
 
 
@@ -813,6 +845,36 @@ export async function handleGenerateImage(req: Request, res: Response) {
           const nextBal = currBal + cost
           await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
           console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
+
+          // Уведомление об ошибке и возврате токенов
+          try {
+            await createNotification(
+              Number(user_id),
+              'generation_failed',
+              'Ошибка генерации ⚠️',
+              `Токены возвращены: +${cost}`,
+              { refunded: cost }
+            )
+          } catch (e) {
+            console.error('[Notification] Failed to create in-app notification:', e)
+          }
+
+          // Telegram уведомление об ошибке (if enabled in settings)
+          try {
+            const settings = await getUserNotificationSettings(Number(user_id))
+            if (settings.telegram_generation) {
+              await tg('sendMessage', {
+                chat_id: user_id,
+                text: `⚠️ <b>Ошибка генерации</b>\n\nГенерация не удалась. Токены возвращены: <b>+${cost}</b>\n\n<i>Попробуйте другой промпт или модель.</i>`,
+                parse_mode: 'HTML'
+              })
+              console.log(`[Notification] Sent error telegram to user ${user_id}`)
+            } else {
+              console.log(`[Notification] Telegram generation disabled for user ${user_id}`)
+            }
+          } catch (e) {
+            console.error('[Notification] Failed to send error telegram:', e)
+          }
         }
       }
       return res.status(500).json({ error: finalError })

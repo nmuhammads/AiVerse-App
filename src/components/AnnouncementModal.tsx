@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
+    enabled: false, // Set to true to enable the announcement
     id: 'announcement_fortune_release_v1', // Updated ID to force show again
     title: 'Колесо Фортуны уже здесь! 🎰',
     description: 'Встречайте большое обновление: испытывайте удачу в Колесе Фортуны, делитесь Ремиксами генераций и настройте свой профиль с новыми обложками!',
@@ -21,6 +22,9 @@ export function AnnouncementModal() {
     const navigate = useNavigate()
 
     useEffect(() => {
+        // Skip if announcement is disabled
+        if (!ANNOUNCEMENT.enabled) return
+
         // Check if this specific announcement has been seen
         const seen = localStorage.getItem(`seen_${ANNOUNCEMENT.id}`)
         if (!seen) {

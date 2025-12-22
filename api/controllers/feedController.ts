@@ -45,6 +45,7 @@ export async function getFeed(req: Request, res: Response) {
         const offset = Number(req.query.offset || 0)
         const sort = String(req.query.sort || 'new') // 'new' | 'popular'
         const currentUserId = req.query.user_id ? Number(req.query.user_id) : null
+        const filter = String(req.query.filter || 'all') // 'all' | 'following'
 
         if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
@@ -69,6 +70,19 @@ export async function getFeed(req: Request, res: Response) {
         const model = req.query.model ? String(req.query.model) : null
         const includeUnpublished = req.query.include_unpublished === 'true'
 
+        // Get following user IDs if filter is 'following'
+        let followingIds: number[] = []
+        if (filter === 'following' && currentUserId) {
+            const followingQuery = await supaSelect('user_subscriptions', `?follower_id=eq.${currentUserId}&select=following_id`)
+            if (followingQuery.ok && Array.isArray(followingQuery.data)) {
+                followingIds = followingQuery.data.map((item: any) => item.following_id)
+            }
+            // If no following, return empty result
+            if (followingIds.length === 0) {
+                return res.json({ items: [] })
+            }
+        }
+
         let baseQuery = ''
         if (currentUserId && includeUnpublished) {
             // If fetching user history, filter by user_id and ignore date/published status
@@ -82,6 +96,12 @@ export async function getFeed(req: Request, res: Response) {
         if (baseQuery) {
             queryParts.push(baseQuery)
         }
+
+        // Add following filter if applicable
+        if (filter === 'following' && followingIds.length > 0) {
+            queryParts.push(`user_id=in.(${followingIds.join(',')})`)
+        }
+
         if (model && model !== 'all') {
             queryParts.push(`model=eq.${model}`)
         } else {
@@ -173,6 +193,51 @@ export async function toggleLike(req: Request, res: Response) {
         } else {
             // Like
             await supaPost('generation_likes', { generation_id: generationId, user_id: userId })
+
+            // Check for likes milestone and notify the author
+            try {
+                // Get generation info to find author and current likes count
+                const genQ = await supaSelect('generations', `?id=eq.${generationId}&select=user_id,likes_count`)
+                if (genQ.ok && Array.isArray(genQ.data) && genQ.data.length > 0) {
+                    const gen = genQ.data[0]
+                    const authorId = gen.user_id
+                    const newLikesCount = (gen.likes_count || 0) + 1
+
+                    // Milestone every 10 likes (10, 20, 30, ...)
+                    if (newLikesCount > 0 && newLikesCount % 10 === 0) {
+                        // Import dynamically to avoid circular deps
+                        const { createNotification, getUserNotificationSettings } = await import('./notificationController.js')
+
+                        // In-app notification (always)
+                        await createNotification(
+                            authorId,
+                            'likes_milestone',
+                            `❤️ ${newLikesCount} лайков!`,
+                            'Вашу работу оценили — продолжайте творить!',
+                            { generation_id: generationId, likes_count: newLikesCount, deep_link: `/profile?gen=${generationId}` }
+                        )
+                        console.log(`[Notification] Likes milestone ${newLikesCount} for user ${authorId}`)
+
+                        // Telegram notification (if enabled)
+                        try {
+                            const settings = await getUserNotificationSettings(authorId)
+                            if (settings.telegram_likes) {
+                                const { tg } = await import('./telegramController.js')
+                                await tg('sendMessage', {
+                                    chat_id: authorId,
+                                    text: `❤️ <b>${newLikesCount} лайков!</b>\n\nВашу работу оценили — продолжайте творить!`,
+                                    parse_mode: 'HTML'
+                                })
+                            }
+                        } catch (tgErr) {
+                            console.error('[Notification] Failed to send likes telegram:', tgErr)
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Notification] Failed to check likes milestone:', e)
+            }
+
             return res.json({ liked: true })
         }
     } catch (e) {

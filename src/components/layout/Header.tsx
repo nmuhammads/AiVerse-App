@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTelegram } from '@/hooks/useTelegram'
+import { NotificationBell } from '@/components/NotificationBell'
 
 export function Header() {
   const { user, platform } = useTelegram()
@@ -44,11 +45,12 @@ export function Header() {
       <div className="backdrop-blur-xl bg-black/50 border-b border-white/10 rounded-full mx-2">
         <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between relative">
           <div className="w-10" />
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
             <span className="text-white font-semibold">{displayName}</span>
             <Link to="/profile" className="h-8 w-8 rounded-full overflow-hidden ring-2 ring-violet-600 bg-white/10">
               <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" />
             </Link>
+            <NotificationBell />
             <Link to="/settings" className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></Link>
           </div>
           <div className="w-10" />

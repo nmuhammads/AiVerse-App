@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2 } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -107,6 +107,8 @@ export default function Profile() {
   const [spins, setSpins] = useState<number>(0)
   const [likes, setLikes] = useState<number>(0)
   const [remixCount, setRemixCount] = useState<number>(0)
+  const [followingCount, setFollowingCount] = useState<number>(0)
+  const [followersCount, setFollowersCount] = useState<number>(0)
   const [items, setItems] = useState<{ id: number; image_url: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
   const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null } | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
@@ -114,6 +116,9 @@ export default function Profile() {
   const [total, setTotal] = useState<number | undefined>(undefined)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(false)
+  // Filters
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const [visibility, setVisibility] = useState<'all' | 'published' | 'private'>('all')
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [showCoverSelector, setShowCoverSelector] = useState(false)
@@ -164,6 +169,12 @@ export default function Profile() {
         } else {
           setCoverSrc('')
         }
+        if (r.ok && j && typeof j.following_count === 'number') {
+          setFollowingCount(j.following_count)
+        }
+        if (r.ok && j && typeof j.followers_count === 'number') {
+          setFollowersCount(j.followers_count)
+        }
       })
     }
   }
@@ -186,7 +197,7 @@ export default function Profile() {
 
             const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=0`)
             const j = await r.json().catch(() => null)
-            if (r.ok && j) { setItems(j.items || []); setTotal(j.total) }
+            if (r.ok && j) { setItems(j.items || []); setTotal(j.total); setOffset(0) }
           } finally { setLoading(false) }
         })()
     }
@@ -223,6 +234,20 @@ export default function Profile() {
   useEffect(() => {
     setShowPrompt(false)
   }, [preview])
+
+  // Reload data when filters change
+  useEffect(() => {
+    if (!user?.id) return
+    const modelParam = selectedModels.length > 0 ? `&model=${selectedModels.join(',')}` : ''
+    const visibilityParam = visibility !== 'all' ? `&visibility=${visibility}` : ''
+    setLoading(true)
+    fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=0${modelParam}${visibilityParam}`)
+      .then(async r => {
+        const j = await r.json().catch(() => null)
+        if (r.ok && j) { setItems(j.items || []); setTotal(j.total); setOffset(0) }
+      })
+      .finally(() => setLoading(false))
+  }, [user?.id, selectedModels, visibility])
 
   const {
     setPrompt,
@@ -297,7 +322,7 @@ export default function Profile() {
 
   const stats = [
     { label: 'Генерации', value: typeof total === 'number' ? total : items.length },
-    { label: 'Баланс', value: balance ?? '—' },
+    { label: 'Подписчики', value: followersCount },
     { label: 'Лайки', value: likes },
     { label: 'Ремиксы', value: remixCount },
   ]
@@ -443,9 +468,18 @@ export default function Profile() {
             <p className="text-zinc-400 font-medium text-sm mb-4">{username}</p>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-2 w-full mb-4">
-              {stats.filter(s => s.label !== 'Баланс').map(s => (
-                <div key={s.label} className="bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+            <div className="grid grid-cols-4 gap-2 w-full mb-4">
+              {stats.map(s => (
+                <div
+                  key={s.label}
+                  className={`bg-black/10 backdrop-blur-xl rounded-xl p-2 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl ${s.label === 'Подписчики' ? 'cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all' : ''}`}
+                  onClick={() => {
+                    if (s.label === 'Подписчики') {
+                      impact('light')
+                      navigate('/subscriptions?tab=followers')
+                    }
+                  }}
+                >
                   <span className="text-lg font-bold text-white shadow-black/80 drop-shadow-lg">{s.value}</span>
                   <span className="text-[9px] uppercase tracking-wider text-zinc-100 font-bold shadow-black/80 drop-shadow-md">{s.label}</span>
                 </div>
@@ -557,6 +591,74 @@ export default function Profile() {
               </p>
             </div>
           </div>
+          {/* Filters */}
+          <div className="mb-4 px-1 space-y-3">
+            {/* Model Filter */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <Filter size={14} className="flex-shrink-0 text-zinc-500" />
+              {[
+                { value: '', label: 'Все' },
+                { value: 'nanobanana', label: 'NanoBanana' },
+                { value: 'nanobanana-pro', label: 'NanoBanana Pro' },
+                { value: 'seedream4', label: 'Seedream 4' },
+                { value: 'seedream4-5', label: 'Seedream 4.5' },
+              ].map(m => {
+                const isActive = m.value === '' ? selectedModels.length === 0 : selectedModels.includes(m.value)
+                return (
+                  <button
+                    key={m.value}
+                    onClick={() => {
+                      impact('light')
+                      if (m.value === '') {
+                        setSelectedModels([])
+                      } else {
+                        if (selectedModels.includes(m.value)) {
+                          setSelectedModels(selectedModels.filter(x => x !== m.value))
+                        } else {
+                          setSelectedModels([...selectedModels, m.value])
+                        }
+                      }
+                      setItems([])
+                      setOffset(0)
+                    }}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all border ${isActive
+                      ? 'bg-violet-600 text-white border-violet-500'
+                      : 'bg-zinc-800/50 text-zinc-400 border-white/5 hover:bg-zinc-700/50'
+                      }`}
+                  >
+                    {m.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Visibility Filter */}
+            <div className="flex items-center gap-2">
+              <Globe size={14} className="flex-shrink-0 text-zinc-500" />
+              <div className="flex bg-zinc-800/50 rounded-full p-0.5 border border-white/5">
+                {[
+                  { value: 'all', label: 'Все' },
+                  { value: 'published', label: 'Публичные' },
+                  { value: 'private', label: 'Личные' },
+                ].map(v => (
+                  <button
+                    key={v.value}
+                    onClick={() => {
+                      impact('light')
+                      setVisibility(v.value as typeof visibility)
+                      setItems([])
+                      setOffset(0)
+                    }}
+                    className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${visibility === v.value
+                      ? 'bg-violet-600 text-white'
+                      : 'text-zinc-400 hover:text-white'
+                      }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           {loading && items.length === 0 ? (
             <ProfileSkeletonGrid />
           ) : items.length === 0 ? (
@@ -590,7 +692,7 @@ export default function Profile() {
                 </div>
                 {items.length > 0 && (
                   <div className="mt-4 flex justify-center">
-                    <button onClick={async () => { if (loading || !user?.id) return; setLoading(true); try { const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=${offset + 6}`); const j = await r.json().catch(() => null); if (r.ok && j) { setItems([...items, ...j.items]); setOffset(offset + 6); setTotal(j.total) } } finally { setLoading(false); impact('light') } }} className="text-xs text-violet-400 bg-violet-500/5 border border-violet-500/10 hover:bg-violet-500/10 px-4 py-2 rounded-lg">Загрузить ещё</button>
+                    <button onClick={async () => { if (loading || !user?.id) return; setLoading(true); const modelParam = selectedModels.length > 0 ? `&model=${selectedModels.join(',')}` : ''; const visibilityParam = visibility !== 'all' ? `&visibility=${visibility}` : ''; try { const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=${offset + 6}${modelParam}${visibilityParam}`); const j = await r.json().catch(() => null); if (r.ok && j) { setItems([...items, ...j.items]); setOffset(offset + 6); setTotal(j.total) } } finally { setLoading(false); impact('light') } }} className="text-xs text-violet-400 bg-violet-500/5 border border-violet-500/10 hover:bg-violet-500/10 px-4 py-2 rounded-lg">Загрузить ещё</button>
                   </div>
                 )}
               </div>
