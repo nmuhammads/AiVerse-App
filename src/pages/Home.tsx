@@ -241,21 +241,21 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => { setSort('new'); setFeedFilter('all'); impact('light') }}
-                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'new' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`text-[17px] font-semibold transition-colors ${sort === 'new' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   {t('home.tabs.new')}
                 </button>
                 <div className="w-[1px] h-4 bg-zinc-800"></div>
                 <button
                   onClick={() => { setSort('popular'); setFeedFilter('all'); impact('light') }}
-                  className={`text-lg font-bold tracking-tight transition-colors ${sort === 'popular' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`text-[17px] font-semibold transition-colors ${sort === 'popular' && feedFilter === 'all' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   {t('home.tabs.popular')}
                 </button>
                 <div className="w-[1px] h-4 bg-zinc-800"></div>
                 <button
                   onClick={() => { setFeedFilter('following'); impact('light') }}
-                  className={`text-lg font-bold tracking-tight transition-colors ${feedFilter === 'following' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`text-[17px] font-semibold transition-colors ${feedFilter === 'following' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   {t('home.tabs.following')}
                 </button>
