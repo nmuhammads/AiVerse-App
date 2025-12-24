@@ -147,16 +147,17 @@ export default function Settings() {
             items: [
                 { icon: Users, label: t('settings.items.subscriptions'), onClick: () => navigate('/subscriptions') },
             ]
-        },
-        {
-            title: t('settings.sections.about'),
-            items: [
-                { icon: MessageCircle, label: t('settings.items.support'), onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
-                { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
-                { icon: Info, label: t('settings.items.version'), value: 'v2.8.3', onClick: () => { } },
-            ]
         }
     ]
+
+    const aboutSection = {
+        title: t('settings.sections.about'),
+        items: [
+            { icon: MessageCircle, label: t('settings.items.support'), onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
+            { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
+            { icon: Info, label: t('settings.items.version'), value: 'v2.9.0', onClick: () => { } },
+        ]
+    }
 
     // Custom padding for different platforms
     const getPaddingTop = () => {
@@ -280,6 +281,30 @@ export default function Settings() {
                                 ))}
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* About Section - At the bottom */}
+                <div className="space-y-3">
+                    <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">{aboutSection.title}</h2>
+                    <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+                        {aboutSection.items.map((item, i) => (
+                            <div key={i} className={i !== aboutSection.items.length - 1 ? 'border-b border-white/5' : ''}>
+                                <button
+                                    onClick={() => { impact('light'); item.onClick() }}
+                                    className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                        <item.icon size={16} />
+                                    </div>
+                                    <div className="flex-1 text-left">
+                                        <div className="text-sm font-medium text-white">{item.label}</div>
+                                    </div>
+                                    {item.value && <div className="text-xs font-medium text-zinc-500">{item.value}</div>}
+                                    <ChevronRight size={16} className="text-zinc-600" />
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
