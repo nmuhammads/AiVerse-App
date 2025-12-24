@@ -283,7 +283,7 @@ export async function listGenerations(req: Request, res: Response) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
     // Enhanced query to get full details
-    let select = `select=id,image_url,prompt,created_at,is_published,model,likes_count,remix_count,input_images,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
+    let select = `select=id,image_url,prompt,created_at,is_published,model,likes_count,remix_count,input_images,user_id,edit_variants,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
     let query = `?user_id=eq.${encodeURIComponent(userId)}&status=neq.deleted&image_url=ilike.http%25&model=neq.seedream4.5&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
 
     // Legacy: published_only support
@@ -326,6 +326,7 @@ export async function listGenerations(req: Request, res: Response) {
         likes_count: it.likes_count || 0,
         remix_count: it.remix_count || 0,
         input_images: it.input_images || [],
+        edit_variants: it.edit_variants || null,
         is_liked: viewerId ? likes.some((l: any) => l.user_id === viewerId) : false,
         author: {
           id: it.user_id,

@@ -182,3 +182,51 @@ export async function createThumbnail(input: Buffer | string, originalUrl?: stri
     }
 }
 
+
+export async function uploadToEditedBucket(imageUrl: string): Promise<string> {
+    const EDITED_BUCKET = process.env.R2_BUCKET_EDITED
+    const EDITED_PUBLIC_URL = process.env.R2_PUBLIC_URL_EDITED
+    const client = getS3Client()
+
+    console.log('Starting R2 upload to edited bucket for:', imageUrl)
+
+    if (!client || !EDITED_BUCKET || !EDITED_PUBLIC_URL) {
+        console.warn('R2 edited bucket configuration missing:', {
+            hasClient: !!client,
+            hasBucket: !!EDITED_BUCKET,
+            hasPublicUrl: !!EDITED_PUBLIC_URL
+        })
+        return imageUrl
+    }
+
+    if (imageUrl.startsWith(EDITED_PUBLIC_URL)) {
+        console.log('Image is already on edited bucket, skipping:', imageUrl)
+        return imageUrl
+    }
+
+    try {
+        const response = await fetch(imageUrl)
+        if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`)
+        const arrayBuffer = await response.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const contentType = response.headers.get('content-type') || 'image/png'
+
+        const hash = crypto.randomBytes(16).toString('hex')
+        const ext = contentType.split('/')[1] || 'png'
+        const fileName = `${hash}.${ext}`
+
+        await client.send(new PutObjectCommand({
+            Bucket: EDITED_BUCKET,
+            Key: fileName,
+            Body: buffer,
+            ContentType: contentType,
+        }))
+
+        const publicUrl = `${EDITED_PUBLIC_URL}/${fileName}`
+        console.log('R2 edited bucket upload success:', publicUrl)
+        return publicUrl
+    } catch (error) {
+        console.error('R2 edited bucket upload failed:', error)
+        return imageUrl
+    }
+}

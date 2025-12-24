@@ -23,6 +23,7 @@ import eventsRoutes from './routes/events.js'
 import notificationsRoutes from './routes/notifications.js'
 import appNewsRoutes from './routes/app-news.js'
 import proxyRoutes from './routes/proxy.js'
+import editorRoutes from './routes/editor.js'
 
 
 // load env
@@ -52,6 +53,7 @@ app.use('/api/events', eventsRoutes)
 app.use('/api/notifications', notificationsRoutes)
 app.use('/api/app-news', appNewsRoutes)
 app.use('/api/proxy', proxyRoutes)
+app.use('/api/editor', editorRoutes)
 
 /**
  * Serve frontend build

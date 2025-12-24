@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Heart, Repeat, Trophy } from 'lucide-react'
+import { Heart, Repeat, Trophy, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -23,6 +23,7 @@ export interface FeedItem {
     input_images?: string[]
     is_liked: boolean
     model?: string | null
+    edit_variants?: string[] | null
     is_contest_entry?: boolean
     contest?: {
         id: number
@@ -178,6 +179,12 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                     {item.is_contest_entry && (
                         <div className="absolute top-2 right-2 bg-yellow-500/20 backdrop-blur-md text-yellow-500 p-1.5 rounded-full border border-yellow-500/30">
                             <Trophy size={12} />
+                        </div>
+                    )}
+                    {/* Edit variants indicator */}
+                    {!item.is_contest_entry && item.edit_variants && item.edit_variants.length > 0 && (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center border border-violet-400/30">
+                            <Pencil size={12} className="text-white" />
                         </div>
                     )}
                 </div>

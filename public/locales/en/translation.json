@@ -146,7 +146,7 @@
             "unpublish": "Remove from Feed",
             "delete": "Delete",
             "publicLabel": "Public",
-            "showPrompt": "Show Prompt",
+            "showPrompt": "Show & Copy",
             "hidePrompt": "Hide Prompt",
             "copyPrompt": "Copy Prompt",
             "copied": "Copied!"
@@ -363,7 +363,9 @@
     },
     "common": {
         "guest": "Guest",
-        "empty": "Empty"
+        "empty": "Empty",
+        "cancel": "Cancel",
+        "topUp": "Top Up"
     },
     "generationForm": {
         "title": "AI Image Generator",
@@ -441,5 +443,33 @@
         "description": "Meet: notification system 🔔, user subscriptions 👥 and generation filtering in profile 🔍. Now you won't miss anything important!",
         "button": "Learn more",
         "close": "Close"
+    },
+    "editor": {
+        "title": "Editor",
+        "edit": "Edit",
+        "image": "Source Image",
+        "upload": "Upload",
+        "myWorks": "My Works",
+        "fromGenerations": "From Generations",
+        "instruction": "Instruction",
+        "instructionPlaceholder": "Describe what to change...",
+        "hints": {
+            "title": "Tips",
+            "1": "Be specific about the changes",
+            "2": "Specify style or effect if needed",
+            "3": "Fewer words = more accurate result"
+        },
+        "generate": "Edit",
+        "generating": "Processing...",
+        "tokens": "tokens",
+        "result": "Result",
+        "save": "Save",
+        "continue": "Continue",
+        "close": "Close",
+        "insufficientBalance": "Insufficient balance",
+        "needTokens": "You need {{count}} tokens for editing",
+        "error": {
+            "required": "Upload an image and enter instruction"
+        }
     }
 }

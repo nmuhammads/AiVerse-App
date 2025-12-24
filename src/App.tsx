@@ -12,6 +12,7 @@ import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
 import EventsPage from "@/pages/EventsPage";
 import SpinPage from "@/pages/SpinPage";
+import ImageEditorPage from "@/pages/ImageEditorPage";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { useEffect, useRef } from "react";
@@ -168,6 +169,7 @@ export default function App() {
               <Route path="/accumulations" element={<Accumulations />} />
               <Route path="/events" element={<EventsPage />} />
               <Route path="/spin" element={<SpinPage />} />
+              <Route path="/editor" element={<ImageEditorPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

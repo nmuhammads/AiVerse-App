@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -24,6 +24,7 @@ const MODEL_PRICES: Record<ModelType, number> = {
   'nanobanana-pro': 15,
   seedream4: 4,
   'seedream4-5': 7,
+  'p-image-edit': 2,
 }
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
@@ -31,6 +32,7 @@ const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
   seedream4: ['16:9', '4:3', '1:1', '3:4', '9:16'],
   nanobanana: ['Auto', '16:9', '4:3', '1:1', '3:4', '9:16'],
   'seedream4-5': ['16:9', '4:3', '1:1', '3:4', '9:16'],
+  'p-image-edit': ['Auto', '1:1', '16:9', '9:16', '4:3', '3:4'],
 }
 
 const RATIO_EMOJIS: Record<AspectRatio, string> = {
@@ -90,6 +92,7 @@ export default function Studio() {
 
   const { shareImage, saveToGallery, user, platform, tg } = useTelegram()
   const { impact, notify } = useHaptics()
+  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [showBalancePopup, setShowBalancePopup] = useState(false)
@@ -436,6 +439,13 @@ export default function Studio() {
                     {t('studio.result.sendToChat')}
                   </Button>
                 </div>
+                <Button
+                  onClick={() => navigate(`/editor?image=${encodeURIComponent(generatedImage)}`)}
+                  className="w-full bg-cyan-600 text-white hover:bg-cyan-500 font-bold"
+                >
+                  <Pencil size={16} className="mr-2" />
+                  {t('editor.edit')}
+                </Button>
                 <Button onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setError(null) }} className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10">{t('studio.result.close')}</Button>
               </div>
             </CardContent>
@@ -487,17 +497,28 @@ export default function Studio() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">{t('studio.title')}</h1>
-          <button
-            onClick={() => { impact('light'); setIsPaymentModalOpen(true) }}
-            className="px-3 py-1.5 rounded-full bg-zinc-900 border border-white/10 flex items-center gap-1.5 active:scale-95 transition-transform"
-          >
-            <Zap size={14} className="text-yellow-500 fill-yellow-500" />
-            {balance === null ? (
-              <div className="h-4 w-8 bg-zinc-700 rounded animate-pulse" />
-            ) : (
-              <span className="text-xs font-bold text-white">{balance}</span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Editor Button */}
+            <button
+              onClick={() => { impact('light'); navigate('/editor') }}
+              className="px-3 py-1.5 rounded-full bg-cyan-600/20 border border-cyan-500/30 flex items-center gap-1.5 active:scale-95 transition-transform"
+            >
+              <Pencil size={14} className="text-cyan-400" />
+              <span className="text-xs font-bold text-cyan-300">{t('editor.title')}</span>
+            </button>
+            {/* Balance Button */}
+            <button
+              onClick={() => { impact('light'); setIsPaymentModalOpen(true) }}
+              className="px-3 py-1.5 rounded-full bg-zinc-900 border border-white/10 flex items-center gap-1.5 active:scale-95 transition-transform"
+            >
+              <Zap size={14} className="text-yellow-500 fill-yellow-500" />
+              {balance === null ? (
+                <div className="h-4 w-8 bg-zinc-700 rounded animate-pulse" />
+              ) : (
+                <span className="text-xs font-bold text-white">{balance}</span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 1. Compact Model Selector (Grid, no scroll) */}

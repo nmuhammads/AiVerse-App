@@ -52,7 +52,7 @@ export async function getFeed(req: Request, res: Response) {
         // Select generations where is_published is true
         // Embed users to get author info
         // Embed contest_entries to check if it's a contest entry and get contest details
-        const select = `select=id,image_url,prompt,created_at,likes_count,remix_count,input_images,model,user_id,users(username,first_name,last_name,avatar_url),generation_likes(user_id),contest_entries(contest_id, contests(title))`
+        const select = `select=id,image_url,prompt,created_at,likes_count,remix_count,input_images,model,user_id,edit_variants,users(username,first_name,last_name,avatar_url),generation_likes(user_id),contest_entries(contest_id, contests(title))`
 
         let order = 'created_at.desc'
         if (sort === 'popular') {
@@ -143,6 +143,7 @@ export async function getFeed(req: Request, res: Response) {
                 likes_count: it.likes_count || 0, // Use the column value
                 remix_count: it.remix_count || 0,
                 input_images: it.input_images || [],
+                edit_variants: it.edit_variants || null,
                 is_liked: currentUserId ? likes.some((l: any) => l.user_id === currentUserId) : false,
                 model: it.model || null,
                 is_contest_entry: isContestEntry,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -111,8 +111,9 @@ export default function Profile() {
   const [remixCount, setRemixCount] = useState<number>(0)
   const [followingCount, setFollowingCount] = useState<number>(0)
   const [followersCount, setFollowersCount] = useState<number>(0)
-  const [items, setItems] = useState<{ id: number; image_url: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null }[]>([])
-  const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null } | null>(null)
+  const [items, setItems] = useState<{ id: number; image_url: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null; edit_variants?: string[] | null }[]>([])
+  const [preview, setPreview] = useState<{ id: number; image_url: string; prompt: string; is_published: boolean; model?: string | null; edit_variants?: string[] | null } | null>(null)
+  const [previewIndex, setPreviewIndex] = useState(0) // 0 = original, 1+ = edit variants
   const [showPrompt, setShowPrompt] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [total, setTotal] = useState<number | undefined>(undefined)
@@ -121,6 +122,7 @@ export default function Profile() {
   // Filters
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [visibility, setVisibility] = useState<'all' | 'published' | 'private'>('all')
+  const [showEditedOnly, setShowEditedOnly] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [showCoverSelector, setShowCoverSelector] = useState(false)
@@ -243,13 +245,21 @@ export default function Profile() {
     const modelParam = selectedModels.length > 0 ? `&model=${selectedModels.join(',')}` : ''
     const visibilityParam = visibility !== 'all' ? `&visibility=${visibility}` : ''
     setLoading(true)
-    fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=0${modelParam}${visibilityParam}`)
+    fetch(`/api/user/generations?user_id=${user.id}&limit=50&offset=0${modelParam}${visibilityParam}`)
       .then(async r => {
         const j = await r.json().catch(() => null)
-        if (r.ok && j) { setItems(j.items || []); setTotal(j.total); setOffset(0) }
+        if (r.ok && j) {
+          let filteredItems = j.items || []
+          if (showEditedOnly) {
+            filteredItems = filteredItems.filter((item: any) => item.edit_variants && item.edit_variants.length > 0)
+          }
+          setItems(filteredItems)
+          setTotal(j.total)
+          setOffset(0)
+        }
       })
       .finally(() => setLoading(false))
-  }, [user?.id, selectedModels, visibility])
+  }, [user?.id, selectedModels, visibility, showEditedOnly])
 
   const {
     setPrompt,
@@ -431,7 +441,7 @@ export default function Profile() {
           {/* Cover Edit Button */}
           <button
             onClick={() => setShowCoverSelector(true)}
-            className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
+            className="absolute top-4 right-4 z-20 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
           >
             <Camera size={16} />
           </button>
@@ -659,6 +669,21 @@ export default function Profile() {
                   </button>
                 ))}
               </div>
+              {/* Edited filter toggle */}
+              <button
+                onClick={() => {
+                  impact('light')
+                  setShowEditedOnly(!showEditedOnly)
+                  setItems([])
+                  setOffset(0)
+                }}
+                className={`w-8 h-8 rounded-full text-[11px] font-medium transition-all flex items-center justify-center border ${showEditedOnly
+                  ? 'bg-violet-600 text-white border-violet-500'
+                  : 'bg-zinc-800/50 text-zinc-400 hover:text-white border-white/5'
+                  }`}
+              >
+                <Pencil size={14} />
+              </button>
             </div>
           </div>
           {loading && items.length === 0 ? (
@@ -671,7 +696,7 @@ export default function Profile() {
                 <div className="grid grid-cols-2 gap-3">
                   {items.filter(h => !!h.image_url).map((h) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                      <button onClick={() => setPreview({ id: h.id, image_url: h.image_url || '', prompt: h.prompt, is_published: h.is_published, model: h.model })} className="block w-full">
+                      <button onClick={() => { setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', prompt: h.prompt, is_published: h.is_published, model: h.model, edit_variants: h.edit_variants }) }} className="block w-full">
                         <GridImage
                           src={h.compressed_url || h.image_url || ''}
                           originalUrl={h.image_url || ''}
@@ -683,6 +708,12 @@ export default function Profile() {
                       {h.model && (
                         <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md border border-white/10 font-medium z-10 pointer-events-none">
                           {getModelDisplayName(h.model)}
+                        </div>
+                      )}
+                      {/* Edit variants indicator */}
+                      {h.edit_variants && h.edit_variants.length > 0 && (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center z-10 pointer-events-none border border-violet-400/30">
+                          <Pencil size={12} className="text-white" />
                         </div>
                       )}
                       <div className="absolute bottom-0 left-0 right-0 p-3">
@@ -702,6 +733,7 @@ export default function Profile() {
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setPreview(null) }}>
                   <div className={`relative w-full max-w-3xl bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden ${platform === 'ios' ? 'mt-16' : ''}`}>
                     <div className="relative w-full aspect-square bg-black">
+                      {/* Top buttons with better contrast */}
                       <div className="absolute top-0 left-0 right-0 px-2 pt-2 flex justify-between items-start z-20 pointer-events-none">
                         <button
                           onClick={() => {
@@ -712,7 +744,7 @@ export default function Profile() {
                               shareImage(preview.image_url, cleanPrompt(preview.prompt))
                             }
                           }}
-                          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto"
+                          className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10"
                         >
                           <Share2 size={20} />
                         </button>
@@ -721,23 +753,90 @@ export default function Profile() {
                             impact('light')
                             setIsFullScreen(true)
                           }}
-                          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto"
+                          className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10"
                         >
                           <Maximize2 size={20} />
                         </button>
                         <button
                           onClick={() => setPreview(null)}
-                          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto"
+                          className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10"
                         >
                           <X size={20} />
                         </button>
                       </div>
-                      <img src={preview.image_url} alt="Preview" className="w-full h-full object-contain" />
+                      {/* Edit button bottom right */}
+                      <div className="absolute bottom-2 right-2 z-20 pointer-events-none">
+                        <button
+                          onClick={() => {
+                            impact('light')
+                            const currentImage = preview.edit_variants && preview.edit_variants.length > 0
+                              ? [preview.image_url, ...preview.edit_variants][previewIndex]
+                              : preview.image_url
+                            setPreview(null)
+                            navigate(`/editor?image=${encodeURIComponent(currentImage)}&generation_id=${preview.id}`)
+                          }}
+                          className="px-3 py-2 rounded-lg bg-black/50 hover:bg-black/70 flex items-center justify-center gap-1.5 text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10 text-xs font-medium"
+                        >
+                          <Pencil size={14} />
+                          {t('editor.edit')}
+                        </button>
+                      </div>
+                      {/* Carousel navigation */}
+                      {preview.edit_variants && preview.edit_variants.length > 0 && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              impact('light')
+                              const allImages = [preview.image_url, ...preview.edit_variants!]
+                              setPreviewIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10"
+                          >
+                            <ChevronLeft size={24} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              impact('light')
+                              const allImages = [preview.image_url, ...preview.edit_variants!]
+                              setPreviewIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10"
+                          >
+                            <ChevronRight size={24} />
+                          </button>
+                          {/* Dots indicator */}
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+                            {[preview.image_url, ...preview.edit_variants].map((_, idx) => (
+                              <button
+                                key={idx}
+                                onClick={(e) => { e.stopPropagation(); impact('light'); setPreviewIndex(idx) }}
+                                className={`w-2 h-2 rounded-full transition-all ${idx === previewIndex ? 'bg-white w-4' : 'bg-white/50'}`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <img
+                        src={preview.edit_variants && preview.edit_variants.length > 0
+                          ? [preview.image_url, ...preview.edit_variants][previewIndex]
+                          : preview.image_url
+                        }
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                     <div className="p-4 flex flex-col gap-3">
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
-                          onClick={() => { impact('light'); saveToGallery(preview.image_url, `ai-${Date.now()}.jpg`) }}
+                          onClick={() => {
+                            impact('light')
+                            const currentImage = preview.edit_variants && preview.edit_variants.length > 0
+                              ? [preview.image_url, ...preview.edit_variants][previewIndex]
+                              : preview.image_url
+                            saveToGallery(currentImage, `ai-${Date.now()}.jpg`)
+                          }}
                           className="flex-1 min-h-[48px] h-auto py-3 rounded-xl bg-white text-black hover:bg-zinc-100 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
                         >
                           <DownloadIcon size={16} />
@@ -766,55 +865,58 @@ export default function Profile() {
                         </button>
                       </div>
 
-                      {/* Remix Share Button */}
-                      <button
-                        onClick={() => setShowRemixShareConfirm(true)}
-                        disabled={remixShareLoading}
-                        className="w-full min-h-[48px] h-auto py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
-                      >
-                        {remixShareLoading ? <Loader2 size={16} className="animate-spin" /> : <Repeat size={16} />}
-                        {t('profile.preview.shareRemix')}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (preview.is_published) {
-                            handlePublish()
-                          } else {
-                            setShowPublishConfirm(true)
-                          }
-                        }}
-                        className={`w-full min-h-[48px] h-auto py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-colors ${preview.is_published ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-                      >
-                        {preview.is_published ? <EyeOff size={16} /> : <Globe size={16} />}
-                        {preview.is_published ? t('profile.preview.unpublish') : t('profile.preview.publish')}
-                      </button>
+                      {/* Row 2: Remix + Publish */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowRemixShareConfirm(true)}
+                          disabled={remixShareLoading}
+                          className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
+                        >
+                          {remixShareLoading ? <Loader2 size={14} className="animate-spin" /> : <Repeat size={14} />}
+                          {t('profile.preview.shareRemix')}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (preview.is_published) {
+                              handlePublish()
+                            } else {
+                              setShowPublishConfirm(true)
+                            }
+                          }}
+                          className={`flex-1 min-h-[44px] py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-colors ${preview.is_published ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                        >
+                          {preview.is_published ? <EyeOff size={14} /> : <Globe size={14} />}
+                          {preview.is_published ? t('profile.preview.unpublish') : t('profile.preview.publish')}
+                        </button>
+                      </div>
 
                       {/* Prompt Actions */}
                       <div className="w-full flex gap-2">
                         <button
                           onClick={() => {
                             impact('light')
-                            setShowPrompt(!showPrompt)
-                          }}
-                          className="flex-1 py-2 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 flex items-center justify-center gap-2 text-zinc-300 hover:text-white transition-colors text-xs font-bold"
-                        >
-                          {showPrompt ? <EyeOff size={14} /> : <Sparkles size={14} />}
-                          {showPrompt ? t('profile.preview.hidePrompt') : t('profile.preview.showPrompt')}
-                        </button>
-                        <button
-                          onClick={() => {
-                            impact('light')
                             navigator.clipboard.writeText(cleanPrompt(preview.prompt))
                             notify('success')
                             setIsCopied(true)
+                            setShowPrompt(true)
                             setTimeout(() => setIsCopied(false), 2000)
                           }}
                           className={`flex-1 py-2 rounded-xl border border-white/5 flex items-center justify-center gap-2 transition-all text-xs font-bold ${isCopied ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white'}`}
                         >
                           {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                          {isCopied ? t('profile.preview.copied') : t('profile.preview.copyPrompt')}
+                          {isCopied ? t('profile.preview.copied') : t('profile.preview.showPrompt')}
                         </button>
+                        {showPrompt && (
+                          <button
+                            onClick={() => {
+                              impact('light')
+                              setShowPrompt(false)
+                            }}
+                            className="px-3 py-2 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                          >
+                            <EyeOff size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             impact('light')

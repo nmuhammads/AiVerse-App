@@ -1,4 +1,4 @@
-import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2, Trophy } from 'lucide-react'
+import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2, Trophy, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useState, useEffect } from 'react'
@@ -22,6 +22,7 @@ interface FeedItem {
     input_images?: string[]
     is_liked: boolean
     model?: string | null
+    edit_variants?: string[] | null
     contest?: {
         id: number
         title: string
@@ -55,7 +56,15 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
     const { user, platform } = useTelegram()
     const [isLikeAnimating, setIsLikeAnimating] = useState(false)
     const [isFullScreen, setIsFullScreen] = useState(false)
+    const [imageIndex, setImageIndex] = useState(0)
     const navigate = useNavigate()
+
+    // Get all images (original + variants)
+    const allImages = item.edit_variants && item.edit_variants.length > 0
+        ? [item.image_url, ...item.edit_variants]
+        : [item.image_url]
+    const hasVariants = allImages.length > 1
+    const currentImage = allImages[imageIndex] || item.image_url
 
     // Close on escape
     useEffect(() => {
@@ -133,10 +142,49 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                 {/* Main Image */}
                 <div className="relative flex items-center justify-center rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl border border-white/5 group">
                     <img
-                        src={item.image_url}
+                        src={currentImage}
                         alt={item.prompt}
                         className="max-w-full max-h-[65dvh] object-contain"
                     />
+                    {/* Carousel navigation */}
+                    {hasVariants && (
+                        <>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    impact('light')
+                                    setImageIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)
+                                }}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md border border-white/10"
+                            >
+                                <ChevronLeft size={24} />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    impact('light')
+                                    setImageIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)
+                                }}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md border border-white/10"
+                            >
+                                <ChevronRight size={24} />
+                            </button>
+                            {/* Dots indicator */}
+                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                {allImages.map((_, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={(e) => { e.stopPropagation(); impact('light'); setImageIndex(idx) }}
+                                        className={`w-2 h-2 rounded-full transition-all ${idx === imageIndex ? 'bg-white w-4' : 'bg-white/50'}`}
+                                    />
+                                ))}
+                            </div>
+                            {/* Edit indicator */}
+                            <div className="absolute top-3 left-3 w-8 h-8 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center border border-violet-400/30">
+                                <Pencil size={14} className="text-white" />
+                            </div>
+                        </>
+                    )}
                     <button
                         onClick={(e) => {
                             e.stopPropagation()
@@ -240,7 +288,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                         >
                             <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <img
-                                    src={item.image_url}
+                                    src={currentImage}
                                     alt="Fullscreen"
                                     className="max-w-full max-h-full object-contain"
                                 />
