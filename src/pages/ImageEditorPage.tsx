@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft } from 'lucide-react'
+import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
 import { GenerationSelector } from '@/components/GenerationSelector'
+import { InpaintCanvas } from '@/components/InpaintCanvas'
 import { compressImage } from '@/utils/imageCompression'
 
 const EDITOR_PRICE = 2
@@ -33,6 +34,9 @@ export default function ImageEditorPage() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showBalancePopup, setShowBalancePopup] = useState(false)
     const [showGenerationSelector, setShowGenerationSelector] = useState(false)
+    const [mode, setMode] = useState<'edit' | 'inpaint'>('edit')
+    const [maskImage, setMaskImage] = useState<string | null>(null)
+    const [showMaskEditor, setShowMaskEditor] = useState(false)
 
     // Загрузка изображения из URL параметра
     useEffect(() => {
@@ -124,14 +128,20 @@ export default function ImageEditorPage() {
         impact('heavy')
 
         try {
+            // Prepare images array: [source] or [source, mask] for inpaint
+            const imagesArray = mode === 'inpaint' && maskImage
+                ? [sourceImage, maskImage]
+                : [sourceImage]
+
             const res = await fetch('/api/editor/edit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt,
-                    images: [sourceImage],
+                    images: imagesArray,
                     user_id: user?.id || null,
-                    source_generation_id: sourceGenerationId
+                    source_generation_id: sourceGenerationId,
+                    mode: mode
                 })
             })
 
@@ -247,22 +257,76 @@ export default function ImageEditorPage() {
                         {t('editor.image')}
                     </label>
                     {sourceImage ? (
-                        <div className="relative rounded-xl overflow-hidden border border-white/10">
-                            <img
-                                src={sourceImage}
-                                alt="source"
-                                className="w-full max-h-[35vh] object-contain bg-zinc-900"
-                            />
-                            <button
-                                onClick={() => { setSourceImage(null); setSourceGenerationId(null) }}
-                                className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-black/80"
-                            >
-                                <X size={16} />
-                            </button>
-                            {sourceGenerationId && (
-                                <div className="absolute bottom-2 left-2 px-2 py-1 bg-violet-500/80 rounded text-[10px] text-white font-medium">
-                                    {t('editor.fromGenerations')}
+                        <div className="space-y-3">
+                            <div className="relative rounded-xl overflow-hidden border border-white/10">
+                                <img
+                                    src={sourceImage}
+                                    alt="source"
+                                    className="w-full max-h-[35vh] object-contain bg-zinc-900"
+                                />
+                                {/* Mask overlay preview */}
+                                {maskImage && mode === 'inpaint' && (
+                                    <div className="absolute inset-0 pointer-events-none">
+                                        <img
+                                            src={maskImage}
+                                            alt="mask"
+                                            className="w-full h-full object-contain mix-blend-multiply opacity-50"
+                                        />
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => { setSourceImage(null); setSourceGenerationId(null); setMaskImage(null) }}
+                                    className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-black/80"
+                                >
+                                    <X size={16} />
+                                </button>
+                                {sourceGenerationId && (
+                                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-violet-500/80 rounded text-[10px] text-white font-medium">
+                                        {t('editor.fromGenerations')}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Mode Toggle */}
+                            <div className="flex items-center gap-2">
+                                <div className="flex bg-zinc-800/50 rounded-full p-0.5 border border-white/5 flex-1">
+                                    <button
+                                        onClick={() => { setMode('edit'); setMaskImage(null); impact('light') }}
+                                        className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 ${mode === 'edit'
+                                            ? 'bg-violet-600 text-white'
+                                            : 'text-zinc-400 hover:text-white'
+                                            }`}
+                                    >
+                                        <Pencil size={14} />
+                                        {t('editor.mode.edit')}
+                                    </button>
+                                    <button
+                                        disabled
+                                        className="flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 text-zinc-600 cursor-not-allowed opacity-50"
+                                    >
+                                        <Paintbrush size={14} />
+                                        {t('editor.mode.inpaint')}
+                                        <span className="text-[10px] bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-400">
+                                            {t('common.soon', 'Скоро')}
+                                        </span>
+                                    </button>
                                 </div>
+                            </div>
+
+                            {/* Draw Mask Button (Inpaint mode) */}
+                            {mode === 'inpaint' && (
+                                <button
+                                    onClick={() => setShowMaskEditor(true)}
+                                    className={`w-full py-3 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 transition-colors ${maskImage
+                                        ? 'border-green-500/50 bg-green-500/10 text-green-400'
+                                        : 'border-violet-500/30 bg-violet-500/5 text-violet-400 hover:border-violet-500/50'
+                                        }`}
+                                >
+                                    <Paintbrush size={18} />
+                                    <span className="font-medium">
+                                        {maskImage ? '✓ ' : ''}{t('editor.drawMask')}
+                                    </span>
+                                </button>
                             )}
                         </div>
                     ) : (
@@ -385,6 +449,18 @@ export default function ImageEditorPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Inpaint Canvas Modal */}
+            {showMaskEditor && sourceImage && (
+                <InpaintCanvas
+                    imageUrl={sourceImage}
+                    onMaskGenerated={(mask) => {
+                        setMaskImage(mask)
+                        setShowMaskEditor(false)
+                    }}
+                    onClose={() => setShowMaskEditor(false)}
+                />
             )}
         </div>
     )

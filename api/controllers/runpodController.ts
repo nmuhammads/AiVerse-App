@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { uploadToEditedBucket } from '../services/r2Service.js'
+import { uploadToEditedBucket, uploadImageFromBase64 } from '../services/r2Service.js'
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || ''
@@ -11,7 +11,7 @@ const DEFAULT_TIMEOUT_MS = Number(process.env.RUNPOD_TIMEOUT_MS) || 300000
 async function createRunpodTask(modelId: string, input: Record<string, unknown>): Promise<string> {
     const url = `${RUNPOD_BASE_URL}/${modelId}/run`
 
-    console.log(`[Runpod] Creating task for ${modelId}:`, JSON.stringify(input).slice(0, 200))
+    console.log(`[Runpod] Creating task for ${modelId}:`, JSON.stringify(input).slice(0, 1000))
 
     const resp = await fetch(url, {
         method: 'POST',
@@ -85,12 +85,14 @@ async function pollRunpodTask(modelId: string, jobId: string, timeoutMs = DEFAUL
 
 // Главный обработчик редактирования
 export async function handleImageEdit(req: Request, res: Response) {
-    const { prompt, images, user_id, source_generation_id } = req.body
+    const { prompt, images, user_id, source_generation_id, mode } = req.body
 
     console.log('[Editor] Request received:', {
         userId: user_id,
         hasImages: images?.length > 0,
-        sourceGenerationId: source_generation_id
+        imagesCount: images?.length,
+        sourceGenerationId: source_generation_id,
+        mode: mode || 'edit'
     })
 
     // Валидация
@@ -128,9 +130,29 @@ export async function handleImageEdit(req: Request, res: Response) {
         }
 
         // Создание задачи в Runpod
+        // Модифицируем промпт для inpaint режима
+        let finalPrompt = prompt
+        let finalImages = [...images]
+
+        // Upload any base64 images to R2 (API requires URLs)
+        for (let i = 0; i < finalImages.length; i++) {
+            if (finalImages[i]?.startsWith('data:')) {
+                const folder = i === 0 ? 'editor-source' : 'masks'
+                console.log(`[Editor] Uploading image ${i} to R2 (${folder})...`)
+                const imageUrl = await uploadImageFromBase64(finalImages[i], folder)
+                finalImages[i] = imageUrl
+                console.log(`[Editor] Image ${i} uploaded:`, imageUrl)
+            }
+        }
+
+        if (mode === 'inpaint' && images.length >= 2) {
+            finalPrompt = `Edit only the masked area (white region in second image). ${prompt}`
+            console.log('[Editor] Inpaint mode, modified prompt:', finalPrompt.slice(0, 100))
+        }
+
         const input = {
-            prompt,
-            images,
+            prompt: finalPrompt,
+            images: finalImages,
             aspect_ratio: 'match_input_image',
             disable_safety_checker: false
         }

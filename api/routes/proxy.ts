@@ -11,6 +11,8 @@ const ALLOWED_DOMAINS = [
     'r2.cloudflarestorage.com',
     'pub-',  // R2 public buckets start with pub-
     'r2.dev',
+    'aiquickdraw.com',  // Temporary image URLs
+    'tempfile.aiquickdraw.com',
 ]
 
 /**
@@ -22,9 +24,11 @@ function isAllowedUrl(url: string): boolean {
         // Check R2_PUBLIC_URL from env
         const r2PublicUrl = process.env.R2_PUBLIC_URL
         const r2ThumbsUrl = process.env.R2_PUBLIC_URL_THUMBNAILS
+        const r2EditedUrl = process.env.R2_PUBLIC_URL_EDITED
 
         if (r2PublicUrl && url.startsWith(r2PublicUrl)) return true
         if (r2ThumbsUrl && url.startsWith(r2ThumbsUrl)) return true
+        if (r2EditedUrl && url.startsWith(r2EditedUrl)) return true
 
         // Check general allowed domains
         return ALLOWED_DOMAINS.some(domain => urlObj.hostname.includes(domain))

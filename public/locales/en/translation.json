@@ -365,7 +365,8 @@
         "guest": "Guest",
         "empty": "Empty",
         "cancel": "Cancel",
-        "topUp": "Top Up"
+        "topUp": "Top Up",
+        "loading": "Loading..."
     },
     "generationForm": {
         "title": "AI Image Generator",
@@ -470,6 +471,17 @@
         "needTokens": "You need {{count}} tokens for editing",
         "error": {
             "required": "Upload an image and enter instruction"
+        },
+        "mode": {
+            "edit": "Edit",
+            "inpaint": "Inpaint"
+        },
+        "drawMask": "Draw Mask",
+        "maskEditor": {
+            "title": "Draw Mask",
+            "clear": "Clear",
+            "done": "Done",
+            "brushSize": "Brush Size"
         }
     }
 }
