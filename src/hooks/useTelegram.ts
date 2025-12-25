@@ -114,10 +114,12 @@ export function useTelegram() {
     }
 
     try {
-      // Используем нативный метод скачивания
-      // Telegram сам обработает сохранение в галерею
+      // Use proxy URL to ensure correct Content-Disposition headers for Telegram downloadFile
+      const proxyUrl = `/api/telegram/proxy-download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(filename || '')}`
+      const fullUrl = `${window.location.origin}${proxyUrl}`
+
       wa.HapticFeedback?.impactOccurred?.('medium')
-      await wa.downloadFile({ url, file_name: filename || 'image.png' })
+      await wa.downloadFile({ url: fullUrl, file_name: filename || 'file' })
       wa.HapticFeedback?.notificationOccurred?.('success')
     } catch (e) {
       console.error('Download failed:', e)

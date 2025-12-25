@@ -387,16 +387,33 @@ export async function sendDocument(req: Request, res: Response) {
       if (!resp.ok) return res.status(400).json({ ok: false, error: 'file fetch failed', status: resp.status, ct: contentType })
       const ab = await resp.arrayBuffer()
       const blob = new Blob([ab], { type: contentType })
-      const ext = contentType.includes('png') ? 'png' : (contentType.includes('jpeg') || contentType.includes('jpg')) ? 'jpg' : (contentType.includes('webp') ? 'webp' : 'bin')
+
+      // Determine extension based on content-type (including video)
+      const isVideo = contentType.includes('video/') || contentType.includes('mp4')
+      const ext = (() => {
+        if (contentType.includes('mp4') || contentType.includes('video/mp4')) return 'mp4'
+        if (contentType.includes('webm')) return 'webm'
+        if (contentType.includes('png')) return 'png'
+        if (contentType.includes('jpeg') || contentType.includes('jpg')) return 'jpg'
+        if (contentType.includes('webp')) return 'webp'
+        if (contentType.includes('gif')) return 'gif'
+        return 'bin'
+      })()
       const filename = `ai-${Date.now()}.${ext}`
+
       const form = new FormData()
       form.append('chat_id', String(chat_id))
-      form.append('document', blob, filename)
-      console.info('sendDocument:upload_post', { filename, ct: contentType })
-      const r = await fetch(`${API}/sendDocument`, { method: 'POST', body: form })
+
+      // Use sendVideo for video files, sendDocument for others
+      const method = isVideo ? 'sendVideo' : 'sendDocument'
+      const fieldName = isVideo ? 'video' : 'document'
+      form.append(fieldName, blob, filename)
+
+      console.info(`${method}:upload_post`, { filename, ct: contentType, isVideo })
+      const r = await fetch(`${API}/${method}`, { method: 'POST', body: form })
       const j = await r.json().catch(() => null)
-      console.info('sendDocument:upload_resp', { ok: j?.ok === true, desc: j?.description, error_code: j?.error_code })
-      if (!j || j.ok !== true) return res.status(500).json({ ok: false, error: j?.description || 'telegram sendDocument failed', resp: j })
+      console.info(`${method}:upload_resp`, { ok: j?.ok === true, desc: j?.description, error_code: j?.error_code })
+      if (!j || j.ok !== true) return res.status(500).json({ ok: false, error: j?.description || `telegram ${method} failed`, resp: j })
       const msgId = j?.result?.message_id
       if (textWhole && textWhole.length > 0) {
         const MAX_MSG = 4096
@@ -438,7 +455,7 @@ export async function proxyDownload(req: Request, res: Response) {
     const nameParam = String(req.query?.name || '')
     if (!src) return res.status(400).json({ ok: false, error: 'missing url' })
     console.info('proxyDownload:start', { src: src.slice(0, 160), name: nameParam })
-    const r = await fetch(src, { headers: { 'Accept': 'image/*;q=0.9, */*;q=0.1' } })
+    const r = await fetch(src, { headers: { 'Accept': '*/*' } })
     if (!r.ok) {
       console.warn('proxyDownload:fetch_failed', { status: r.status })
       return res.status(400).json({ ok: false, error: 'fetch failed', status: r.status })
@@ -447,12 +464,15 @@ export async function proxyDownload(req: Request, res: Response) {
     const ab = await r.arrayBuffer()
     const buf = Buffer.from(ab)
     const ext = (() => {
+      if (ct.includes('mp4') || ct.includes('video/mp4')) return 'mp4'
+      if (ct.includes('webm')) return 'webm'
       if (ct.includes('png')) return 'png'
       if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg'
       if (ct.includes('webp')) return 'webp'
+      if (ct.includes('gif')) return 'gif'
       return 'bin'
     })()
-    const filename = nameParam || `image.${ext}`
+    const filename = nameParam || `ai-${Date.now()}.${ext}`
     res.setHeader('Content-Type', ct)
     res.setHeader('Content-Length', String(buf.length))
     res.setHeader('Accept-Ranges', 'bytes')

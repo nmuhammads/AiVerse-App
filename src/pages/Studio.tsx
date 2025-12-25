@@ -1228,7 +1228,7 @@ export default function Studio() {
           )}
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim() || (generationMode === 'image' && uploadedImages.length === 0)}
+            disabled={isGenerating || !prompt.trim() || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0)}
             className={`w-full py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900/80 text-violet-200 cursor-wait border border-violet-500/20' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
           >
             {isGenerating ? (

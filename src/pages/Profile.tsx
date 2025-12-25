@@ -975,10 +975,10 @@ export default function Profile() {
                         <button
                           onClick={() => setShowRemixShareConfirm(true)}
                           disabled={remixShareLoading}
-                          className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50 overflow-hidden"
+                          className="flex-1 min-h-[44px] py-2 px-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.98] disabled:opacity-50"
                         >
                           {remixShareLoading ? <Loader2 size={14} className="flex-shrink-0 animate-spin" /> : <Repeat size={14} className="flex-shrink-0" />}
-                          <span className="truncate">{t('profile.preview.shareRemix')}</span>
+                          <span className="text-center leading-tight">{t('profile.preview.shareRemix')}</span>
                         </button>
                         <button
                           onClick={() => {
@@ -988,10 +988,10 @@ export default function Profile() {
                               setShowPublishConfirm(true)
                             }
                           }}
-                          className={`flex-1 min-h-[44px] py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-colors ${preview.is_published ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                          className={`flex-1 min-h-[44px] py-2 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.98] transition-colors ${preview.is_published ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                         >
-                          {preview.is_published ? <EyeOff size={14} /> : <Globe size={14} />}
-                          {preview.is_published ? t('profile.preview.unpublish') : t('profile.preview.publish')}
+                          {preview.is_published ? <EyeOff size={14} className="flex-shrink-0" /> : <Globe size={14} className="flex-shrink-0" />}
+                          <span className="text-center leading-tight">{preview.is_published ? t('profile.preview.unpublish') : t('profile.preview.publish')}</span>
                         </button>
                       </div>
 
