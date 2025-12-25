@@ -346,6 +346,8 @@ export default function Profile() {
   const [remixShareLoading, setRemixShareLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [showVariantDeleteConfirm, setShowVariantDeleteConfirm] = useState(false)
+  const [variantDeleteLoading, setVariantDeleteLoading] = useState(false)
 
   const handleDelete = async () => {
     if (!preview || !user?.id) return
@@ -371,6 +373,42 @@ export default function Profile() {
       notify('error')
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  const handleDeleteVariant = async () => {
+    if (!preview || !user?.id || previewIndex === 0) return // Can't delete original
+    setVariantDeleteLoading(true)
+    try {
+      // previewIndex 1 = edit_variants[0], so variant index = previewIndex - 1
+      const variantIndex = previewIndex - 1
+      const res = await fetch(`/api/generation/${preview.id}/variant/${variantIndex}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id })
+      })
+      const data = await res.json()
+      if (res.ok && data.ok) {
+        impact('medium')
+        notify('success')
+        // Update local state
+        const newVariants = data.remaining_variants || []
+        setPreview(prev => prev ? { ...prev, edit_variants: newVariants.length > 0 ? newVariants : null } : null)
+        setItems(prev => prev.map(item =>
+          item.id === preview.id
+            ? { ...item, edit_variants: newVariants.length > 0 ? newVariants : null }
+            : item
+        ))
+        // Move to previous image or original
+        setPreviewIndex(prev => Math.max(0, prev - 1))
+        setShowVariantDeleteConfirm(false)
+      } else {
+        notify('error')
+      }
+    } catch {
+      notify('error')
+    } finally {
+      setVariantDeleteLoading(false)
     }
   }
 
@@ -766,7 +804,19 @@ export default function Profile() {
                         </button>
                       </div>
                       {/* Edit button bottom right */}
-                      <div className="absolute bottom-2 right-2 z-20 pointer-events-none">
+                      <div className="absolute bottom-2 right-2 z-20 pointer-events-none flex gap-2">
+                        {/* Delete variant button - only show for edit variants (not original) */}
+                        {preview.edit_variants && preview.edit_variants.length > 0 && previewIndex > 0 && (
+                          <button
+                            onClick={() => {
+                              impact('light')
+                              setShowVariantDeleteConfirm(true)
+                            }}
+                            className="px-3 py-2 rounded-lg bg-red-500/80 hover:bg-red-500 flex items-center justify-center gap-1.5 text-white backdrop-blur-md pointer-events-auto shadow-lg border border-red-400/30 text-xs font-medium"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             impact('light')
@@ -1052,6 +1102,36 @@ export default function Profile() {
                       >
                         {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         {deleteLoading ? t('profile.preview.delete') : t('profile.preview.delete')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Variant Delete Confirmation Modal */}
+              {showVariantDeleteConfirm && preview && previewIndex > 0 && (
+                <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowVariantDeleteConfirm(false) }}>
+                  <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-bold text-white">{t('profile.deleteVariantConfirm.title', 'Удалить вариант?')}</h3>
+                      <p className="text-sm text-zinc-400">
+                        {t('profile.deleteVariantConfirm.description', 'Этот вариант редактирования будет удалён. Оригинальное изображение останется.')}
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowVariantDeleteConfirm(false)}
+                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                      >
+                        {t('profile.deleteConfirm.cancel')}
+                      </button>
+                      <button
+                        onClick={handleDeleteVariant}
+                        disabled={variantDeleteLoading}
+                        className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {variantDeleteLoading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {t('profile.preview.delete')}
                       </button>
                     </div>
                   </div>

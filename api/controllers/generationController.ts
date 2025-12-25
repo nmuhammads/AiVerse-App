@@ -1114,7 +1114,65 @@ export async function deleteGeneration(req: Request, res: Response) {
     return res.json({ ok: true })
   } catch (e) {
     console.error('deleteGeneration error:', e)
-    return res.status(500).json({ error: 'Failed to delete generation' })
   }
 }
 
+// Delete a specific edit variant by index from edit_variants array
+export async function deleteEditVariant(req: Request, res: Response) {
+  try {
+    const { id, index } = req.params
+    const { user_id } = req.body
+    const variantIndex = parseInt(index, 10)
+
+    if (!id) {
+      return res.status(400).json({ error: 'Generation ID required' })
+    }
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'User ID required' })
+    }
+
+    if (isNaN(variantIndex) || variantIndex < 0) {
+      return res.status(400).json({ error: 'Valid variant index required' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    // Verify ownership and get current edit_variants
+    const query = `?id=eq.${id}&user_id=eq.${user_id}&select=id,edit_variants`
+    const result = await supaSelect('generations', query)
+
+    if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
+      return res.status(403).json({ error: 'Generation not found or not owned by user' })
+    }
+
+    const gen = result.data[0]
+    const editVariants = gen.edit_variants || []
+
+    // Validate index is within bounds
+    if (variantIndex >= editVariants.length) {
+      return res.status(400).json({ error: 'Variant index out of bounds' })
+    }
+
+    // Remove the variant at the specified index
+    const newVariants = [...editVariants]
+    newVariants.splice(variantIndex, 1)
+
+    // Update the generation with the new variants array
+    const updateRes = await supaPatch('generations', `?id=eq.${id}`, {
+      edit_variants: newVariants.length > 0 ? newVariants : null
+    })
+
+    if (!updateRes.ok) {
+      return res.status(500).json({ error: 'Failed to delete variant' })
+    }
+
+    console.log(`[Delete] Edit variant ${variantIndex} deleted from generation ${id} by user ${user_id}`)
+    return res.json({ ok: true, remaining_variants: newVariants })
+  } catch (e) {
+    console.error('deleteEditVariant error:', e)
+    return res.status(500).json({ error: 'Failed to delete variant' })
+  }
+}
