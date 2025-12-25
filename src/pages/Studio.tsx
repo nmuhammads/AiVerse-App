@@ -213,6 +213,17 @@ export default function Studio() {
               setGenerationMode('image')
             }
 
+            // Set media type
+            if (data.media_type === 'video') {
+              setMediaType('video')
+              // Ensure we use the video model
+              if (!data.model || data.model === 'seedance-1.5-pro') {
+                setSelectedModel('seedance-1.5-pro')
+              }
+            } else {
+              setMediaType('image')
+            }
+
             // Set parent generation for tracking remix chain
             setParentGeneration(data.id, data.users?.username || 'Unknown')
 

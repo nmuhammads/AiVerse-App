@@ -583,7 +583,8 @@ export async function sendRemixShare(req: Request, res: Response) {
         'seedream4': 'Seedream 4',
         'seedream4-5': 'Seedream 4.5',
         'nanobanana': 'NanoBanana',
-        'nanobanana-pro': 'NanoBanana Pro'
+        'nanobanana-pro': 'NanoBanana Pro',
+        'seedance-1.5-pro': 'Seedance Pro'
       }
       const displayName = modelNames[model] || model
       caption = `✨ AI Verse${authorText}\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
