@@ -115,7 +115,7 @@ export function useTelegram() {
 
     try {
       // Use proxy URL to ensure correct Content-Disposition headers for Telegram downloadFile
-      const proxyUrl = `/api/telegram/proxy-download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(filename || '')}`
+      const proxyUrl = `/api/telegram/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(filename || '')}`
       const fullUrl = `${window.location.origin}${proxyUrl}`
 
       wa.HapticFeedback?.impactOccurred?.('medium')

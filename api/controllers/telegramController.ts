@@ -493,7 +493,7 @@ export async function proxyDownload(req: Request, res: Response) {
     res.setHeader('Content-Type', ct)
     res.setHeader('Content-Length', String(buf.length))
     res.setHeader('Accept-Ranges', 'bytes')
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Disposition')
 
