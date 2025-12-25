@@ -237,7 +237,7 @@ export default function Studio() {
         })
         .catch(err => console.error('Failed to load remix data', err))
     }
-  }, [searchParams, setPrompt, setSelectedModel, setParentGeneration, setAspectRatio, setUploadedImages, setGenerationMode])
+  }, [searchParams, setPrompt, setSelectedModel, setParentGeneration, setAspectRatio, setUploadedImages, setGenerationMode, setMediaType])
 
   // Default ratio logic
   useEffect(() => {
