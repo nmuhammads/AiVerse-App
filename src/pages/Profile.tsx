@@ -79,6 +79,7 @@ function getModelDisplayName(model: string | null): string {
     case 'seedream4.5': return 'Seedream 4.5'
     case 'qwen-edit': return 'Qwen Edit'
     case 'flux': return 'Flux'
+    case 'p-image-edit': return 'Editor'
     default: return model
   }
 }
@@ -870,10 +871,10 @@ export default function Profile() {
                         <button
                           onClick={() => setShowRemixShareConfirm(true)}
                           disabled={remixShareLoading}
-                          className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
+                          className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white hover:from-fuchsia-700 hover:to-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50 overflow-hidden"
                         >
-                          {remixShareLoading ? <Loader2 size={14} className="animate-spin" /> : <Repeat size={14} />}
-                          {t('profile.preview.shareRemix')}
+                          {remixShareLoading ? <Loader2 size={14} className="flex-shrink-0 animate-spin" /> : <Repeat size={14} className="flex-shrink-0" />}
+                          <span className="truncate">{t('profile.preview.shareRemix')}</span>
                         </button>
                         <button
                           onClick={() => {

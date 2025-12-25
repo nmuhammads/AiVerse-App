@@ -41,6 +41,7 @@ function getModelDisplayName(model: string | null): string {
         case 'seedream4.5': return 'Seedream 4.5'
         case 'qwen-edit': return 'Qwen Edit'
         case 'flux': return 'Flux'
+        case 'p-image-edit': return 'Editor'
         default: return model
     }
 }
