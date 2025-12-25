@@ -53,7 +53,8 @@ export default function PublicProfile() {
         setCurrentScreen,
         setAspectRatio,
         setGenerationMode,
-        setUploadedImages
+        setUploadedImages,
+        setMediaType
     } = useGenerationStore()
 
     useEffect(() => {
@@ -131,11 +132,23 @@ export default function PublicProfile() {
             }
         }
 
+        // Load input images if present
         if (item.input_images && item.input_images.length > 0) {
             setUploadedImages(item.input_images)
             setGenerationMode('image')
         } else {
             setUploadedImages([])
+        }
+
+        // Set media type based on item
+        if (item.media_type === 'video') {
+            setMediaType('video')
+            // Ensure we use the video model
+            if (!item.model || item.model === 'seedance-1.5-pro') {
+                setSelectedModel('seedance-1.5-pro')
+            }
+        } else {
+            setMediaType('image')
         }
 
         setParentGeneration(item.id, item.author.username)
