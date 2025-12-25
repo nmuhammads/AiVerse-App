@@ -1141,7 +1141,8 @@ export default function Profile() {
                                 generation_id: preview.id,
                                 owner_username: user.username || null,
                                 owner_user_id: user.id,
-                                model: preview.model || null
+                                model: preview.model || null,
+                                video_url: preview.video_url || null
                               })
                             })
                             if (res.ok) {
