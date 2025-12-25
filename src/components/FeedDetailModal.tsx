@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next'
 
 interface FeedItem {
     id: number
-    image_url: string
+    image_url: string | null
+    video_url?: string | null
     prompt: string
     created_at: string
     author: {
@@ -23,6 +24,7 @@ interface FeedItem {
     is_liked: boolean
     model?: string | null
     edit_variants?: string[] | null
+    media_type?: 'image' | 'video' | null
     contest?: {
         id: number
         title: string
@@ -141,13 +143,23 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                     </button>
                 </div>
 
-                {/* Main Image */}
+                {/* Main Media - Video or Image */}
                 <div className="relative flex items-center justify-center rounded-2xl overflow-hidden bg-zinc-900 shadow-2xl border border-white/5 group">
-                    <img
-                        src={currentImage}
-                        alt={item.prompt}
-                        className="max-w-full max-h-[65dvh] object-contain"
-                    />
+                    {item.media_type === 'video' && item.video_url ? (
+                        <video
+                            src={item.video_url}
+                            controls
+                            loop
+                            playsInline
+                            className="max-w-full max-h-[65dvh] object-contain"
+                        />
+                    ) : (
+                        <img
+                            src={currentImage}
+                            alt={item.prompt}
+                            className="max-w-full max-h-[65dvh] object-contain"
+                        />
+                    )}
                     {/* Carousel navigation */}
                     {hasVariants && (
                         <>

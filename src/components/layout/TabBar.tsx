@@ -75,7 +75,7 @@ export function TabBar() {
                   ${isActive
                     ? (isStudio
                       ? 'bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-[0_0_10px_rgba(124,58,237,0.4)] border border-white/20 overflow-visible studio-btn-active'
-                      : 'bg-white/10 text-white shadow-inner backdrop-blur-md scale-100 border border-white/5'
+                      : 'bg-white/45 text-white shadow-sm backdrop-blur-md scale-105 border border-white/10'
                     )
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
                   }
@@ -99,7 +99,7 @@ export function TabBar() {
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] font-bold tracking-wide z-10" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>{tab.label}</span>
+                <span className="text-[10px] font-bold tracking-wide z-10">{tab.label}</span>
               </NavLink>
             )
           })}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Heart, Repeat, Trophy, Pencil } from 'lucide-react'
+import { Heart, Repeat, Trophy, Pencil, Video } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -8,7 +8,8 @@ import { useCloudflareProxy } from '@/contexts/CloudflareProxyContext'
 
 export interface FeedItem {
     id: number
-    image_url: string
+    image_url: string | null
+    video_url?: string | null
     compressed_url?: string | null
     prompt: string
     created_at: string
@@ -24,6 +25,7 @@ export interface FeedItem {
     is_liked: boolean
     model?: string | null
     edit_variants?: string[] | null
+    media_type?: 'image' | 'video' | null
     is_contest_entry?: boolean
     contest?: {
         id: number
@@ -57,7 +59,7 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
     const [isLiked, setIsLiked] = useState(item.is_liked)
     const [likesCount, setLikesCount] = useState(item.likes_count)
     const [isLikeAnimating, setIsLikeAnimating] = useState(false)
-    const [imgSrc, setImgSrc] = useState(getImageUrl(item.compressed_url || item.image_url))
+    const [imgSrc, setImgSrc] = useState(getImageUrl(item.compressed_url || item.image_url || ''))
     const [hasError, setHasError] = useState(false)
     const [triedProxy, setTriedProxy] = useState(false)
 
@@ -69,7 +71,7 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
     }, [item.is_liked, item.likes_count])
 
     useEffect(() => {
-        setImgSrc(getImageUrl(item.compressed_url || item.image_url))
+        setImgSrc(getImageUrl(item.compressed_url || item.image_url || ''))
         setHasError(false)
         setLoaded(false)
         setTriedProxy(false)
@@ -84,11 +86,11 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
 
     const handleImageError = () => {
         console.warn('Image load error for:', imgSrc)
-        if (!hasError && item.compressed_url && imgSrc !== getImageUrl(item.image_url)) {
+        if (!hasError && item.compressed_url && imgSrc !== getImageUrl(item.image_url || '')) {
             // First failure (thumbnail): try original
             console.log('Falling back to original:', item.image_url)
-            setImgSrc(getImageUrl(item.image_url))
-        } else if (!triedProxy && !needsProxy) {
+            setImgSrc(getImageUrl(item.image_url || ''))
+        } else if (!triedProxy && !needsProxy && item.image_url) {
             // If direct access failed and we haven't tried proxy yet, try proxy
             console.log('Trying proxy fallback for:', item.image_url)
             setTriedProxy(true)
@@ -187,6 +189,12 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                     {!item.is_contest_entry && item.edit_variants && item.edit_variants.length > 0 && (
                         <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center border border-violet-400/30">
                             <Pencil size={12} className="text-white" />
+                        </div>
+                    )}
+                    {/* Video indicator */}
+                    {!item.is_contest_entry && item.media_type === 'video' && (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center border border-violet-400/30">
+                            <Video size={12} className="text-white" />
                         </div>
                     )}
                 </div>

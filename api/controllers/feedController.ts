@@ -52,7 +52,7 @@ export async function getFeed(req: Request, res: Response) {
         // Select generations where is_published is true
         // Embed users to get author info
         // Embed contest_entries to check if it's a contest entry and get contest details
-        const select = `select=id,image_url,prompt,created_at,likes_count,remix_count,input_images,model,user_id,edit_variants,users(username,first_name,last_name,avatar_url),generation_likes(user_id),contest_entries(contest_id, contests(title))`
+        const select = `select=id,image_url,video_url,media_type,prompt,created_at,likes_count,remix_count,input_images,model,user_id,edit_variants,users(username,first_name,last_name,avatar_url),generation_likes(user_id),contest_entries(contest_id, contests(title))`
 
         let order = 'created_at.desc'
         if (sort === 'popular') {
@@ -129,6 +129,8 @@ export async function getFeed(req: Request, res: Response) {
             return {
                 id: it.id,
                 image_url: it.image_url,
+                video_url: it.video_url,
+                media_type: it.media_type,
                 compressed_url: process.env.R2_PUBLIC_URL_THUMBNAILS ? `${process.env.R2_PUBLIC_URL_THUMBNAILS}/gen_${it.id}_thumb.jpg` : null,
                 prompt: it.prompt,
                 created_at: it.created_at,
