@@ -1125,28 +1125,47 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
 
 // Get generation by ID for remix functionality
 export async function getGenerationById(req: Request, res: Response) {
+  console.log('[getGenerationById] === REQUEST RECEIVED ===')
   try {
     const { id } = req.params
+    console.log('[getGenerationById] Requested ID:', id)
+
     if (!id) {
+      console.log('[getGenerationById] ERROR: No ID provided')
       return res.status(400).json({ error: 'Generation ID required' })
     }
 
     if (!SUPABASE_URL || !SUPABASE_KEY) {
+      console.log('[getGenerationById] ERROR: Supabase not configured')
       return res.status(500).json({ error: 'Database not configured' })
     }
 
     // Fetch generation with user info
     const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,status,media_type,aspect_ratio,users(username,first_name)`
+    console.log('[getGenerationById] Query:', query)
+
     const result = await supaSelect('generations', query)
+    console.log('[getGenerationById] Supabase result.ok:', result.ok, 'data length:', Array.isArray(result.data) ? result.data.length : 'not array')
 
     if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
+      console.log('[getGenerationById] ERROR: Generation not found')
       return res.status(404).json({ error: 'Generation not found' })
     }
 
     const gen = result.data[0]
+    console.log('[getGenerationById] Found generation:', {
+      id: gen.id,
+      model: gen.model,
+      status: gen.status,
+      media_type: gen.media_type,
+      aspect_ratio: gen.aspect_ratio,
+      prompt_length: gen.prompt?.length,
+      has_input_images: !!gen.input_images?.length
+    })
 
     // Check if generation is deleted
     if (gen.status === 'deleted') {
+      console.log('[getGenerationById] ERROR: Generation is deleted')
       return res.status(404).json({ error: 'Generation not found' })
     }
 
@@ -1163,7 +1182,7 @@ export async function getGenerationById(req: Request, res: Response) {
       cleanPrompt = cleanPrompt.replace(/\s*\[type=[^\]]+\]\s*$/, '').trim()
     }
 
-    return res.json({
+    const response = {
       id: gen.id,
       prompt: cleanPrompt,
       model: gen.model,
@@ -1173,9 +1192,20 @@ export async function getGenerationById(req: Request, res: Response) {
       generation_type: type,
       media_type: gen.media_type || null,
       users: gen.users
+    }
+
+    console.log('[getGenerationById] Sending response:', {
+      id: response.id,
+      model: response.model,
+      media_type: response.media_type,
+      aspect_ratio: response.aspect_ratio,
+      prompt_preview: response.prompt?.slice(0, 50)
     })
+    console.log('[getGenerationById] === DONE ===')
+
+    return res.json(response)
   } catch (e) {
-    console.error('getGenerationById error:', e)
+    console.error('[getGenerationById] ERROR:', e)
     return res.status(500).json({ error: 'Failed to fetch generation' })
   }
 }
