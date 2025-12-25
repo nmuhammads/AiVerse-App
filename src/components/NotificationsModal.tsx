@@ -192,17 +192,23 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
                 <div className="flex shrink-0">
                     <button
                         onClick={() => { setTab('personal'); impact('light') }}
-                        className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${tab === 'personal' ? 'text-white border-b-2 border-violet-500' : 'text-zinc-500'}`}
+                        className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 relative ${tab === 'personal' ? 'text-white border-b-2 border-violet-500' : 'text-zinc-500'}`}
                     >
                         <Bell size={16} />
                         {t('notifications.personal')}
+                        {notifications.some(n => !n.read) && (
+                            <span className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full" />
+                        )}
                     </button>
                     <button
                         onClick={() => { setTab('news'); impact('light') }}
-                        className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${tab === 'news' ? 'text-white border-b-2 border-violet-500' : 'text-zinc-500'}`}
+                        className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 relative ${tab === 'news' ? 'text-white border-b-2 border-violet-500' : 'text-zinc-500'}`}
                     >
                         <Newspaper size={16} />
                         {t('notifications.news')}
+                        {news.some(n => !n.read) && (
+                            <span className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full" />
+                        )}
                     </button>
                 </div>
 
