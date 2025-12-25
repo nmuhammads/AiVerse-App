@@ -1136,7 +1136,7 @@ export async function getGenerationById(req: Request, res: Response) {
     }
 
     // Fetch generation with user info
-    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,status,users(username,first_name)`
+    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,user_id,status,media_type,aspect_ratio,users(username,first_name)`
     const result = await supaSelect('generations', query)
 
     if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
