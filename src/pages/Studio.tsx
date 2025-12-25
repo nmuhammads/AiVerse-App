@@ -1125,13 +1125,13 @@ export default function Studio() {
             <div className="grid grid-cols-2 gap-3">
               {/* Duration */}
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.duration')}</label>
-                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-lg border border-white/5">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.duration')}</label>
+                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   {(['4', '8', '12'] as VideoDuration[]).map((d) => (
                     <button
                       key={d}
                       onClick={() => { setVideoDuration(d); impact('light') }}
-                      className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${videoDuration === d ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${videoDuration === d ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                       {d}s
                     </button>
@@ -1141,17 +1141,17 @@ export default function Studio() {
 
               {/* Resolution */}
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.resolution')}</label>
-                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-lg border border-white/5">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.resolution')}</label>
+                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   <button
                     onClick={() => { setVideoResolution('480p'); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${videoResolution === '480p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${videoResolution === '480p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     480p
                   </button>
                   <button
                     onClick={() => { setVideoResolution('720p'); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${videoResolution === '720p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${videoResolution === '720p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     720p
                   </button>
@@ -1163,20 +1163,20 @@ export default function Studio() {
             <div className="grid grid-cols-2 gap-3">
               {/* Camera */}
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.camera')}</label>
-                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-lg border border-white/5">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.camera')}</label>
+                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   <button
                     onClick={() => { setFixedLens(true); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${fixedLens ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${fixedLens ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    <Lock size={10} />
+                    <Lock size={12} />
                     {t('studio.video.cameraStatic')}
                   </button>
                   <button
                     onClick={() => { setFixedLens(false); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${!fixedLens ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${!fixedLens ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    <Unlock size={10} />
+                    <Unlock size={12} />
                     {t('studio.video.cameraDynamic')}
                   </button>
                 </div>
@@ -1184,20 +1184,20 @@ export default function Studio() {
 
               {/* Audio */}
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.audio')}</label>
-                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-lg border border-white/5">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.video.audio')}</label>
+                <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   <button
                     onClick={() => { setGenerateAudio(false); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${!generateAudio ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${!generateAudio ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    <VolumeX size={10} />
+                    <VolumeX size={12} />
                     {t('studio.video.audioOff')}
                   </button>
                   <button
                     onClick={() => { setGenerateAudio(true); impact('light') }}
-                    className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${generateAudio ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${generateAudio ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    <Volume2 size={10} />
+                    <Volume2 size={12} />
                     {t('studio.video.audioOn')}
                   </button>
                 </div>

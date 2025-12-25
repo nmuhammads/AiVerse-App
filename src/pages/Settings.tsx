@@ -155,7 +155,7 @@ export default function Settings() {
         items: [
             { icon: MessageCircle, label: t('settings.items.support'), onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
-            { icon: Info, label: t('settings.items.version'), value: 'v3.0.0', onClick: () => { } },
+            { icon: Info, label: t('settings.items.version'), value: 'v3.0.1', onClick: () => { } },
         ]
     }
 
