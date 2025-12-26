@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import sharp from 'sharp'
+import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -48,10 +49,15 @@ export async function webhook(req: Request, res: Response) {
       const payment = msg.successful_payment
       const userId = msg.from?.id
       const payload = JSON.parse(payment.invoice_payload || '{}')
-      const tokensToAdd = Number(payload.tokens || 0)
+      const baseTokens = Number(payload.tokens || 0)
       const spinsToAdd = Number(payload.spins || 0)
 
-      console.log(`[Payment] Successful payment from ${userId}, tokens: ${tokensToAdd}, spins: ${spinsToAdd}, payload:`, payload)
+      // Apply New Year promo bonus (+20%)
+      const promoActive = isPromoActive()
+      const tokensToAdd = promoActive ? calculateBonusTokens(baseTokens) : baseTokens
+      const bonusTokens = promoActive ? getBonusAmount(baseTokens) : 0
+
+      console.log(`[Payment] Successful payment from ${userId}, base: ${baseTokens}, bonus: ${bonusTokens}, total: ${tokensToAdd}, promoActive: ${promoActive}, spins: ${spinsToAdd}, payload:`, payload)
 
       if (userId && tokensToAdd > 0) {
         // Fetch current balance and spins
@@ -70,7 +76,8 @@ export async function webhook(req: Request, res: Response) {
 
           if (updateRes.ok) {
             const spinText = spinsToAdd > 0 ? `\n🎰 Бонус: +${spinsToAdd} ${spinsToAdd === 1 ? 'спин' : 'спина'} для Колеса Фортуны!` : ''
-            await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.${spinText}` })
+            const promoText = promoActive ? `\n(Включая новогодний бонус +${bonusTokens} 🎁)` : ''
+            await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.${promoText}${spinText}` })
           } else {
             console.error('[Payment] Failed to update balance', updateRes)
             await tg('sendMessage', { chat_id: userId, text: `⚠️ Оплата прошла, но возникла ошибка при начислении. Обратитесь в поддержку.` })

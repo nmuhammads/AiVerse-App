@@ -1,8 +1,9 @@
-import { X, CreditCard, Star, Zap } from 'lucide-react'
+import { X, CreditCard, Star, Zap, Gift } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
+import { isPromoActive, calculateBonusTokens, getBonusAmount } from '@/utils/promo'
 
 interface PaymentModalProps {
     isOpen: boolean
@@ -184,6 +185,18 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                     </div>
                 </div>
 
+                {/* New Year Promo Banner */}
+                {isPromoActive() && (
+                    <div className="mx-5 mb-3 p-3 rounded-xl bg-gradient-to-r from-emerald-500/20 via-red-500/20 to-emerald-500/20 border border-emerald-500/30 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <Gift size={18} className="text-emerald-400 shrink-0" />
+                            <div className="text-xs">
+                                <span className="font-bold text-white">{t('promo.banner')}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Packages Grid */}
                 <div className="px-5 pb-5 overflow-y-auto">
                     <div className="grid grid-cols-2 gap-2">
@@ -206,8 +219,18 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
                                     <div className={`flex-1 text-left ${isLast ? 'flex justify-between items-center w-full pl-2' : ''}`}>
                                         <div>
-                                            <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{t('payment.packages.tokens', { count: pkg.tokens })}</div>
-                                            {pkg.bonus && <div className="text-[10px] text-emerald-400 font-bold">{t('payment.packages.bonus')} {pkg.bonus}</div>}
+                                            {isPromoActive() ? (
+                                                <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
+                                                    <span className="line-through text-zinc-500 mr-1">{pkg.tokens}</span>
+                                                    <span className="text-emerald-400">{calculateBonusTokens(pkg.tokens)} ✨</span>
+                                                </div>
+                                            ) : (
+                                                <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{t('payment.packages.tokens', { count: pkg.tokens })}</div>
+                                            )}
+                                            {isPromoActive() && (
+                                                <div className="text-[10px] text-emerald-400 font-bold">+{getBonusAmount(pkg.tokens)} 🎁</div>
+                                            )}
+                                            {pkg.bonus && !isPromoActive() && <div className="text-[10px] text-emerald-400 font-bold">{t('payment.packages.bonus')} {pkg.bonus}</div>}
                                             {pkg.spins > 0 && <div className="text-[10px] text-violet-400 font-bold">{t('payment.packages.spins', { count: pkg.spins })}</div>}
                                         </div>
                                         <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>

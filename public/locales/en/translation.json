@@ -513,5 +513,8 @@
             "done": "Done",
             "brushSize": "Brush Size"
         }
+    },
+    "promo": {
+        "banner": "🎄 New Year Promo! +20% tokens on any purchase until Jan 5! 🎁"
     }
 }
