@@ -380,7 +380,8 @@ export default function Profile() {
         'seedream4': 'seedream4',
         'seedream4-5': 'seedream4-5',
         'seedream4.5': 'seedream4-5',
-        'qwen-edit': 'seedream4-5'
+        'seedance-1.5-pro': 'seedance-1.5-pro',
+        'gptimage1.5': 'gpt-image-1.5'
       }
       if (modelMap[item.model]) {
         setSelectedModel(modelMap[item.model])
@@ -934,6 +935,7 @@ export default function Profile() {
                 { value: 'nanobanana-pro', label: 'NanoBanana Pro' },
                 { value: 'seedream4', label: 'Seedream 4' },
                 { value: 'seedream4-5', label: 'Seedream 4.5' },
+                { value: 'gptimage1.5', label: 'GPT Image 1.5' },
               ].map(m => {
                 const isActive = m.value === '' ? selectedModels.length === 0 : selectedModels.includes(m.value)
                 return (
