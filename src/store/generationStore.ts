@@ -1,14 +1,16 @@
 import { create } from 'zustand'
 
-export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro'
+export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro' | 'gpt-image-1.5'
 
-export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto' | 'square_hd' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9'
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto' | 'square_hd' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | '2:3' | '3:2'
 
 export type MediaType = 'image' | 'video'
 
 export type VideoDuration = '4' | '8' | '12'
 
 export type VideoResolution = '480p' | '720p'
+
+export type GptImageQuality = 'medium' | 'high'
 
 export interface GenerationState {
   // Текущая выбранная модель
@@ -49,6 +51,10 @@ export interface GenerationState {
   fixedLens: boolean
   // Генерация аудио (удваивает стоимость!)
   generateAudio: boolean
+
+  // === Параметры для GPT Image 1.5 ===
+  // Качество генерации (medium=8 токенов, high=15 токенов)
+  gptImageQuality: GptImageQuality
 }
 
 export interface GenerationActions {
@@ -93,6 +99,10 @@ export interface GenerationActions {
   // Установить генерацию аудио
   setGenerateAudio: (generate: boolean) => void
 
+  // === Actions для GPT Image 1.5 ===
+  // Установить качество генерации
+  setGptImageQuality: (quality: GptImageQuality) => void
+
   // Сбросить состояние
   reset: () => void
 }
@@ -116,7 +126,9 @@ const initialState: GenerationState = {
   videoDuration: '4',
   videoResolution: '480p',
   fixedLens: true,
-  generateAudio: false
+  generateAudio: false,
+  // GPT Image 1.5 параметры
+  gptImageQuality: 'medium'
 }
 
 export const useGenerationStore = create<GenerationState & GenerationActions>()(
@@ -145,6 +157,9 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
     setFixedLens: (fixed) => set({ fixedLens: fixed }),
     setGenerateAudio: (generate) => set({ generateAudio: generate }),
 
+    // GPT Image 1.5 actions
+    setGptImageQuality: (quality) => set({ gptImageQuality: quality }),
+
     reset: () => set({
       prompt: '',
       negativePrompt: '',
@@ -160,7 +175,8 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
       videoDuration: '8',
       videoResolution: '720p',
       fixedLens: false,
-      generateAudio: false
+      generateAudio: false,
+      gptImageQuality: 'medium'
     })
   })
 )

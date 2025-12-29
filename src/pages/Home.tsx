@@ -163,7 +163,8 @@ export default function Home() {
         'seedream4-5': 'seedream4-5',
         'seedream4.5': 'seedream4-5', // Fallback for potential legacy/dot notation
         'qwen-edit': 'seedream4-5', // Legacy handling (just in case)
-        'seedance-1.5-pro': 'seedance-1.5-pro'
+        'seedance-1.5-pro': 'seedance-1.5-pro',
+        'gptimage1.5': 'gpt-image-1.5'
       }
       if (modelMap[item.model]) {
         setSelectedModel(modelMap[item.model])
@@ -329,6 +330,7 @@ export default function Home() {
                 <option value="seedream4">SeeDream 4</option>
                 <option value="seedream4-5">SeeDream 4.5</option>
                 <option value="seedance-1.5-pro">Seedance Pro</option>
+                <option value="gptimage1.5">GPT image 1.5</option>
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             </div>

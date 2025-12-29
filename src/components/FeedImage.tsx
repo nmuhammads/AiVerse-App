@@ -45,6 +45,7 @@ function getModelDisplayName(model: string | null): string {
         case 'flux': return 'Flux'
         case 'p-image-edit': return 'Editor'
         case 'seedance-1.5-pro': return 'Seedance Pro'
+        case 'gptimage1.5': return 'GPT image 1.5'
         default: return model
     }
 }
