@@ -19,6 +19,7 @@ export default function PublicProfile() {
     const [profileUser, setProfileUser] = useState<any>(null)
     const [items, setItems] = useState<FeedItem[]>([])
     const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null)
+    const [currentGenerationIndex, setCurrentGenerationIndex] = useState<number | null>(null)
     const [total, setTotal] = useState<number | undefined>(undefined)
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(false)
@@ -204,6 +205,61 @@ export default function PublicProfile() {
         }
     }
 
+    // Navigation between generations
+    const goToPrevGeneration = () => {
+        if (currentGenerationIndex === null || currentGenerationIndex <= 0) return
+        impact('light')
+        const newIndex = currentGenerationIndex - 1
+        const newItem = items[newIndex]
+        if (!newItem) return
+        setCurrentGenerationIndex(newIndex)
+        setSelectedItem(newItem)
+    }
+
+    const goToNextGeneration = async () => {
+        if (currentGenerationIndex === null) return
+
+        // If at the last item and there are more to load, fetch next batch
+        if (currentGenerationIndex >= items.length - 1) {
+            if (total !== undefined && items.length < total && userId) {
+                impact('light')
+                const viewerParam = currentUser?.id ? `&viewer_id=${currentUser.id}` : ''
+                try {
+                    const r = await fetch(`/api/user/generations?user_id=${userId}&limit=6&offset=${offset + 6}&published_only=true${viewerParam}`)
+                    const j = await r.json().catch(() => null)
+                    if (r.ok && j && j.items && j.items.length > 0) {
+                        const newItems = [...items, ...j.items]
+                        setItems(newItems)
+                        setOffset(offset + 6)
+                        setTotal(j.total)
+
+                        const newIndex = currentGenerationIndex + 1
+                        if (newIndex < newItems.length) {
+                            setCurrentGenerationIndex(newIndex)
+                            setSelectedItem(newItems[newIndex])
+                        }
+                    }
+                } catch {
+                    // Ignore errors
+                }
+            }
+            return
+        }
+
+        impact('light')
+        const newIndex = currentGenerationIndex + 1
+        const newItem = items[newIndex]
+        if (!newItem) return
+        setCurrentGenerationIndex(newIndex)
+        setSelectedItem(newItem)
+    }
+
+    const handleSelectItem = (item: FeedItem) => {
+        const index = items.findIndex(i => i.id === item.id)
+        setCurrentGenerationIndex(index)
+        setSelectedItem(item)
+    }
+
     const displayName = (profileUser?.first_name && profileUser?.last_name)
         ? `${profileUser.first_name} ${profileUser.last_name}`
         : (profileUser?.first_name || profileUser?.username || 'User')
@@ -313,12 +369,12 @@ export default function PublicProfile() {
                             <div className="flex gap-4 items-start">
                                 <div className="flex-1 min-w-0 space-y-4">
                                     {items.filter((_, i) => i % 2 === 0).map(item => (
-                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={setSelectedItem} />
+                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={handleSelectItem} />
                                     ))}
                                 </div>
                                 <div className="flex-1 min-w-0 space-y-4">
                                     {items.filter((_, i) => i % 2 !== 0).map(item => (
-                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={setSelectedItem} />
+                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={handleSelectItem} />
                                     ))}
                                 </div>
                             </div>
@@ -336,9 +392,13 @@ export default function PublicProfile() {
             {selectedItem && (
                 <FeedDetailModal
                     item={selectedItem}
-                    onClose={() => setSelectedItem(null)}
-                    onRemix={(item) => { setSelectedItem(null); handleRemix(item) }}
+                    onClose={() => { setSelectedItem(null); setCurrentGenerationIndex(null) }}
+                    onRemix={(item) => { setSelectedItem(null); setCurrentGenerationIndex(null); handleRemix(item) }}
                     onLike={handleLike}
+                    onPrevGeneration={goToPrevGeneration}
+                    onNextGeneration={goToNextGeneration}
+                    canGoPrev={currentGenerationIndex !== null && currentGenerationIndex > 0}
+                    canGoNext={currentGenerationIndex !== null && (currentGenerationIndex < items.length - 1 || (total !== undefined && items.length < total))}
                 />
             )}
         </div>

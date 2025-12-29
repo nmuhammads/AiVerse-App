@@ -116,6 +116,7 @@ export default function Profile() {
   const [items, setItems] = useState<{ id: number; image_url: string | null; video_url?: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null }[]>([])
   const [preview, setPreview] = useState<{ id: number; image_url: string; video_url?: string | null; prompt: string; is_published: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null } | null>(null)
   const [previewIndex, setPreviewIndex] = useState(0) // 0 = original, 1+ = edit variants
+  const [currentGenerationIndex, setCurrentGenerationIndex] = useState<number | null>(null) // index in items array
   const [isVideoMuted, setIsVideoMuted] = useState(true)
   const [showPrompt, setShowPrompt] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
@@ -424,6 +425,92 @@ export default function Profile() {
     navigate('/studio')
   }
 
+  // Navigation between generations
+  const goToPrevGeneration = () => {
+    if (currentGenerationIndex === null || currentGenerationIndex <= 0) return
+    impact('light')
+    const newIndex = currentGenerationIndex - 1
+    const newItem = items[newIndex]
+    if (!newItem) return
+    setCurrentGenerationIndex(newIndex)
+    setPreviewIndex(0)
+    setPreview({
+      id: newItem.id,
+      image_url: newItem.image_url || '',
+      video_url: newItem.video_url,
+      prompt: newItem.prompt,
+      is_published: newItem.is_published,
+      model: newItem.model,
+      edit_variants: newItem.edit_variants,
+      media_type: newItem.media_type
+    })
+  }
+
+  const goToNextGeneration = async () => {
+    if (currentGenerationIndex === null) return
+
+    const filteredItems = items.filter(h => !!(h.image_url || h.video_url))
+
+    // If at the last item and there are more to load, fetch next batch
+    if (currentGenerationIndex >= filteredItems.length - 1) {
+      // Check if there are more items to load
+      if (total !== undefined && items.length < total && user?.id) {
+        impact('light')
+        const modelParam = selectedModels.length > 0 ? `&model=${selectedModels.join(',')}` : ''
+        const visibilityParam = visibility !== 'all' ? `&visibility=${visibility}` : ''
+        try {
+          const r = await fetch(`/api/user/generations?user_id=${user.id}&limit=6&offset=${offset + 6}${modelParam}${visibilityParam}`)
+          const j = await r.json().catch(() => null)
+          if (r.ok && j && j.items && j.items.length > 0) {
+            const newItems = [...items, ...j.items]
+            setItems(newItems)
+            setOffset(offset + 6)
+            setTotal(j.total)
+
+            // Now navigate to the next item
+            const newFilteredItems = newItems.filter(h => !!(h.image_url || h.video_url))
+            const newIndex = currentGenerationIndex + 1
+            if (newIndex < newFilteredItems.length) {
+              const newItem = newFilteredItems[newIndex]
+              setCurrentGenerationIndex(newIndex)
+              setPreviewIndex(0)
+              setPreview({
+                id: newItem.id,
+                image_url: newItem.image_url || '',
+                video_url: newItem.video_url,
+                prompt: newItem.prompt,
+                is_published: newItem.is_published,
+                model: newItem.model,
+                edit_variants: newItem.edit_variants,
+                media_type: newItem.media_type
+              })
+            }
+          }
+        } catch {
+          // Ignore errors
+        }
+      }
+      return
+    }
+
+    impact('light')
+    const newIndex = currentGenerationIndex + 1
+    const newItem = filteredItems[newIndex]
+    if (!newItem) return
+    setCurrentGenerationIndex(newIndex)
+    setPreviewIndex(0)
+    setPreview({
+      id: newItem.id,
+      image_url: newItem.image_url || '',
+      video_url: newItem.video_url,
+      prompt: newItem.prompt,
+      is_published: newItem.is_published,
+      model: newItem.model,
+      edit_variants: newItem.edit_variants,
+      media_type: newItem.media_type
+    })
+  }
+
   const stats = [
     { label: t('profile.stats.generations'), value: typeof total === 'number' ? total : items.length },
     { label: t('profile.stats.followers'), value: followersCount },
@@ -456,6 +543,7 @@ export default function Profile() {
         setItems(prev => prev.filter(item => item.id !== preview.id))
         setTotal(prev => (prev !== undefined ? prev - 1 : prev))
         setPreview(null)
+        setCurrentGenerationIndex(null)
         setShowDeleteConfirm(false)
       } else {
         notify('error')
@@ -950,9 +1038,9 @@ export default function Profile() {
             <>
               <div>
                 <div className="grid grid-cols-2 gap-3">
-                  {items.filter(h => !!(h.image_url || h.video_url)).map((h) => (
+                  {items.filter(h => !!(h.image_url || h.video_url)).map((h, idx) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                      <button onClick={() => { setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type }) }} className="block w-full">
+                      <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type }) }} className="block w-full">
                         <GridImage
                           src={h.compressed_url || h.image_url || ''}
                           originalUrl={h.image_url || ''}
@@ -992,7 +1080,7 @@ export default function Profile() {
                 )}
               </div>
               {preview && (
-                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setPreview(null) }}>
+                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) { setPreview(null); setCurrentGenerationIndex(null) } }}>
                   <div className={`relative w-full max-w-3xl bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden ${platform === 'ios' ? 'mt-16' : ''}`}>
                     <div className="relative w-full aspect-square bg-black">
                       {/* Top buttons with better contrast */}
@@ -1021,47 +1109,29 @@ export default function Profile() {
                           <Maximize2 size={20} />
                         </button>
                         <button
-                          onClick={() => setPreview(null)}
+                          onClick={() => { setPreview(null); setCurrentGenerationIndex(null) }}
                           className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10"
                         >
                           <X size={20} />
                         </button>
                       </div>
-                      {/* Edit button bottom right */}
-                      <div className="absolute bottom-2 right-2 z-20 pointer-events-none flex gap-2">
-                        {/* Delete variant button - only show for edit variants (not original) */}
-                        {preview.edit_variants && preview.edit_variants.length > 0 && previewIndex > 0 && (
+                      {/* Bottom left - Delete variant button */}
+                      {preview.edit_variants && preview.edit_variants.length > 0 && previewIndex > 0 && (
+                        <div className="absolute bottom-2 left-2 z-20">
                           <button
                             onClick={() => {
                               impact('light')
                               setShowVariantDeleteConfirm(true)
                             }}
-                            className="px-3 py-2 rounded-lg bg-red-500/80 hover:bg-red-500 flex items-center justify-center gap-1.5 text-white backdrop-blur-md pointer-events-auto shadow-lg border border-red-400/30 text-xs font-medium"
+                            className="w-8 h-8 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-red-400/30"
                           >
                             <Trash2 size={14} />
                           </button>
-                        )}
-                        {/* Edit button - hide for videos */}
-                        {preview.media_type !== 'video' && (
-                          <button
-                            onClick={() => {
-                              impact('light')
-                              const currentImage = preview.edit_variants && preview.edit_variants.length > 0
-                                ? [preview.image_url, ...preview.edit_variants][previewIndex]
-                                : preview.image_url
-                              setPreview(null)
-                              navigate(`/editor?image=${encodeURIComponent(currentImage)}&generation_id=${preview.id}`)
-                            }}
-                            className="px-3 py-2 rounded-lg bg-black/50 hover:bg-black/70 flex items-center justify-center gap-1.5 text-white backdrop-blur-md pointer-events-auto shadow-lg border border-white/10 text-xs font-medium"
-                          >
-                            <Pencil size={14} />
-                            {t('editor.edit')}
-                          </button>
-                        )}
-                      </div>
-                      {/* Carousel navigation */}
+                        </div>
+                      )}
+                      {/* Bottom center - Variant switcher */}
                       {preview.edit_variants && preview.edit_variants.length > 0 && (
-                        <>
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 py-1.5 px-2 bg-black/50 backdrop-blur-md rounded-lg border border-white/10">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1069,10 +1139,13 @@ export default function Profile() {
                               const allImages = [preview.image_url, ...preview.edit_variants!]
                               setPreviewIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)
                             }}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10"
+                            className="w-5 h-5 rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center text-white active:scale-95 transition-all"
                           >
-                            <ChevronLeft size={24} />
+                            <ChevronLeft size={14} />
                           </button>
+                          <span className="text-xs text-white/80 min-w-[28px] text-center font-medium">
+                            {previewIndex + 1}/{[preview.image_url, ...preview.edit_variants].length}
+                          </span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1080,22 +1153,53 @@ export default function Profile() {
                               const allImages = [preview.image_url, ...preview.edit_variants!]
                               setPreviewIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)
                             }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10"
+                            className="w-5 h-5 rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center text-white active:scale-95 transition-all"
                           >
-                            <ChevronRight size={24} />
+                            <ChevronRight size={14} />
                           </button>
-                          {/* Dots indicator */}
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
-                            {[preview.image_url, ...preview.edit_variants].map((_, idx) => (
-                              <button
-                                key={idx}
-                                onClick={(e) => { e.stopPropagation(); impact('light'); setPreviewIndex(idx) }}
-                                className={`w-2 h-2 rounded-full transition-all ${idx === previewIndex ? 'bg-white w-4' : 'bg-white/50'}`}
-                              />
-                            ))}
-                          </div>
-                        </>
+                        </div>
                       )}
+                      {/* Bottom right - Edit button */}
+                      {preview.media_type !== 'video' && (
+                        <div className="absolute bottom-2 right-2 z-20">
+                          <button
+                            onClick={() => {
+                              impact('light')
+                              const currentImage = preview.edit_variants && preview.edit_variants.length > 0
+                                ? [preview.image_url, ...preview.edit_variants][previewIndex]
+                                : preview.image_url
+                              setPreview(null)
+                              setCurrentGenerationIndex(null)
+                              navigate(`/editor?image=${encodeURIComponent(currentImage)}&generation_id=${preview.id}`)
+                            }}
+                            className="px-3 py-2 rounded-lg bg-black/50 hover:bg-black/70 flex items-center justify-center gap-1.5 text-white backdrop-blur-md shadow-lg border border-white/10 text-xs font-medium"
+                          >
+                            <Pencil size={14} />
+                            {t('editor.edit')}
+                          </button>
+                        </div>
+                      )}
+                      {/* Navigation between generations */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goToPrevGeneration()
+                        }}
+                        disabled={currentGenerationIndex === null || currentGenerationIndex <= 0}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goToNextGeneration()
+                        }}
+                        disabled={currentGenerationIndex === null || (currentGenerationIndex >= items.filter(h => !!(h.image_url || h.video_url)).length - 1 && (total === undefined || items.length >= total))}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight size={24} />
+                      </button>
                       {/* Media content - video or image */}
                       {preview.media_type === 'video' && preview.video_url ? (
                         <>

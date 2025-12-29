@@ -36,6 +36,11 @@ interface Props {
     onClose: () => void
     onRemix: (item: FeedItem) => void
     onLike: (item: FeedItem) => void
+    // Optional navigation between generations
+    onPrevGeneration?: () => void
+    onNextGeneration?: () => void
+    canGoPrev?: boolean
+    canGoNext?: boolean
 }
 
 function getModelDisplayName(model: string | null): string {
@@ -54,7 +59,7 @@ function getModelDisplayName(model: string | null): string {
     }
 }
 
-export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
+export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGeneration, onNextGeneration, canGoPrev, canGoNext }: Props) {
     const { t, i18n } = useTranslation()
     const { impact } = useHaptics()
     const { user, platform } = useTelegram()
@@ -181,8 +186,64 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                             className="max-w-full max-h-[65dvh] object-contain"
                         />
                     )}
-                    {/* Carousel navigation */}
+
+                    {/* Navigation between generations (if provided) */}
+                    {onPrevGeneration && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onPrevGeneration()
+                            }}
+                            disabled={canGoPrev === false}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ChevronLeft size={24} />
+                        </button>
+                    )}
+                    {onNextGeneration && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onNextGeneration()
+                            }}
+                            disabled={canGoNext === false}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ChevronRight size={24} />
+                        </button>
+                    )}
+
+                    {/* Variant switcher (bottom center) - only if has variants */}
                     {hasVariants && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 py-1.5 px-2 bg-black/50 backdrop-blur-md rounded-lg border border-white/10">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    impact('light')
+                                    setImageIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)
+                                }}
+                                className="w-5 h-5 rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center text-white active:scale-95 transition-all"
+                            >
+                                <ChevronLeft size={14} />
+                            </button>
+                            <span className="text-xs text-white/80 min-w-[28px] text-center font-medium">
+                                {imageIndex + 1}/{allImages.length}
+                            </span>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    impact('light')
+                                    setImageIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)
+                                }}
+                                className="w-5 h-5 rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center text-white active:scale-95 transition-all"
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Fallback: Old carousel navigation for when generation nav is not provided */}
+                    {hasVariants && !onPrevGeneration && !onNextGeneration && (
                         <>
                             <button
                                 onClick={(e) => {
@@ -204,20 +265,6 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                             >
                                 <ChevronRight size={24} />
                             </button>
-                            {/* Dots indicator */}
-                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                                {allImages.map((_, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={(e) => { e.stopPropagation(); impact('light'); setImageIndex(idx) }}
-                                        className={`w-2 h-2 rounded-full transition-all ${idx === imageIndex ? 'bg-white w-4' : 'bg-white/50'}`}
-                                    />
-                                ))}
-                            </div>
-                            {/* Edit indicator */}
-                            <div className="absolute top-3 left-3 w-8 h-8 rounded-full bg-violet-500/80 backdrop-blur-md flex items-center justify-center border border-violet-400/30">
-                                <Pencil size={14} className="text-white" />
-                            </div>
                         </>
                     )}
                     {item.media_type !== 'video' && (
@@ -302,7 +349,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                         </button>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {isFullScreen && (
                 <div className="fixed inset-0 z-[200] bg-black flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -333,7 +380,8 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike }: Props) {
                         </TransformWrapper>
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     )
 }
