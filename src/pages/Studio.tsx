@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution } from '@/store/generationStore'
+import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
@@ -18,6 +18,7 @@ const IMAGE_MODELS: { id: ModelType; name: string; desc: string; color: string; 
   { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
   { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/optimized/seedream.png' },
   { id: 'seedream4-5', name: 'Seedream 4.5', desc: '7 токенов', color: 'from-blue-400 to-indigo-500', icon: '/models/optimized/seedream-4-5.png' },
+  { id: 'gpt-image-1.5', name: 'GPT image 1.5', desc: 'от 8 токенов', color: 'from-cyan-400 to-blue-500', icon: '/models/optimized/gpt-image.png' },
 ]
 
 // Модели для генерации видео
@@ -35,6 +36,13 @@ const MODEL_PRICES: Record<ModelType, number> = {
   'seedream4-5': 7,
   'p-image-edit': 2,
   'seedance-1.5-pro': 42, // Default: 720p, 8s, без аудио
+  'gpt-image-1.5': 8, // Default: medium quality
+}
+
+// Цены для GPT Image 1.5 по качеству
+const GPT_IMAGE_PRICES: Record<GptImageQuality, number> = {
+  medium: 8,
+  high: 15,
 }
 
 const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
@@ -44,6 +52,7 @@ const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
   'seedream4-5': ['16:9', '4:3', '1:1', '3:4', '9:16'],
   'p-image-edit': ['Auto', '1:1', '16:9', '9:16', '4:3', '3:4'],
   'seedance-1.5-pro': ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'],
+  'gpt-image-1.5': ['1:1', '2:3', '3:2'],
 }
 
 // Цены для видео Seedance 1.5 Pro
@@ -75,6 +84,8 @@ const RATIO_EMOJIS: Record<AspectRatio, string> = {
   '3:4': '📕',
   '21:9': '🎬',
   '16:21': '📜',
+  '2:3': '📷',
+  '3:2': '🖼️',
   'square_hd': '🟧',
   'portrait_4_3': '📕',
   'portrait_16_9': '📱',
@@ -132,6 +143,9 @@ export default function Studio() {
     setVideoResolution,
     setFixedLens,
     setGenerateAudio,
+    // GPT Image 1.5 параметры
+    gptImageQuality,
+    setGptImageQuality,
   } = useGenerationStore()
 
   const { shareImage, saveToGallery, user, platform, tg } = useTelegram()
@@ -256,6 +270,8 @@ export default function Studio() {
       setAspectRatio('3:4')
     } else if (selectedModel === 'seedream4-5') {
       setAspectRatio('3:4')
+    } else if (selectedModel === 'gpt-image-1.5') {
+      setAspectRatio('2:3')
     } else if (selectedModel === 'nanobanana-pro' && aspectRatio === '16:21') {
       setAspectRatio('Auto')
     }
@@ -399,6 +415,11 @@ export default function Studio() {
         requestBody.video_resolution = videoResolution
         requestBody.fixed_lens = fixedLens
         requestBody.generate_audio = generateAudio
+      }
+
+      // Добавить параметр качества для GPT Image 1.5
+      if (selectedModel === 'gpt-image-1.5') {
+        requestBody.gpt_image_quality = gptImageQuality
       }
 
       const res = await fetch('/api/generation/generate', {
@@ -1147,13 +1168,34 @@ export default function Studio() {
                 onClick={() => { setResolution('2K'); impact('light') }}
                 className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${resolution === '2K' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
-                {t('studio.quality.2k')}
+                2K · 10 ⚡
               </button>
               <button
                 onClick={() => { setResolution('4K'); impact('light') }}
                 className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${resolution === '4K' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
-                {t('studio.quality.4k')}
+                4K · 15 ⚡
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 5.1.5 Quality Selector (GPT Image 1.5 only) */}
+        {selectedModel === 'gpt-image-1.5' && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-4">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.quality.label')}</label>
+            <div className="flex gap-2 p-1 bg-zinc-900/50 rounded-xl border border-white/5">
+              <button
+                onClick={() => { setGptImageQuality('medium'); impact('light') }}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${gptImageQuality === 'medium' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                Medium · {GPT_IMAGE_PRICES.medium} ⚡
+              </button>
+              <button
+                onClick={() => { setGptImageQuality('high'); impact('light') }}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${gptImageQuality === 'high' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                High · {GPT_IMAGE_PRICES.high} ⚡
               </button>
             </div>
           </div>
@@ -1283,7 +1325,10 @@ export default function Studio() {
               {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
                 {mediaType === 'video'
                   ? `${calculateVideoCost(videoResolution, videoDuration, generateAudio)} ${t('studio.tokens')}`
-                  : `${selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10 : MODEL_PRICES[selectedModel]} ${t('studio.tokens')}`
+                  : `${selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10
+                    : selectedModel === 'gpt-image-1.5' ? GPT_IMAGE_PRICES[gptImageQuality]
+                      : MODEL_PRICES[selectedModel]
+                  } ${t('studio.tokens')}`
                 }
               </span>}
             </div>

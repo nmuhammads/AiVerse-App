@@ -111,7 +111,8 @@ export default function PublicProfile() {
                 'seedream4': 'seedream4',
                 'seedream4-5': 'seedream4-5',
                 'seedream4.5': 'seedream4-5',
-                'qwen-edit': 'seedream4-5'
+                'qwen-edit': 'seedream4-5',
+                'gptimage1.5': 'gpt-image-1.5'
             }
             if (modelMap[item.model]) {
                 setSelectedModel(modelMap[item.model])

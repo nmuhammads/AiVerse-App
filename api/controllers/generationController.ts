@@ -24,6 +24,8 @@ interface KieAIRequest {
   video_resolution?: '480p' | '720p'
   fixed_lens?: boolean
   generate_audio?: boolean
+  // Параметры для GPT Image 1.5
+  gpt_image_quality?: 'medium' | 'high'
 }
 
 interface KieAIResponse {
@@ -42,6 +44,7 @@ const MODEL_CONFIGS = {
   'nanobanana-pro': { kind: 'jobs' as const, model: 'nano-banana-pro' },
   'qwen-edit': { kind: 'jobs' as const, model: 'qwen/text-or-image' },
   'seedance-1.5-pro': { kind: 'jobs' as const, model: 'bytedance/seedance-1.5-pro', mediaType: 'video' as const },
+  'gpt-image-1.5': { kind: 'jobs' as const, model: 'gpt-image/1.5-text-to-image', dbModel: 'gptimage1.5' },
 }
 
 function mapSeedreamImageSize(ratio?: string): string | undefined {
@@ -333,6 +336,18 @@ const MODEL_PRICES: Record<string, number> = {
   seedream4: 4,
   'seedream4-5': 7,
   flux: 4,
+  'gpt-image-1.5': 8, // Default: medium quality
+}
+
+// Цены для GPT Image 1.5 по качеству
+const GPT_IMAGE_PRICES: Record<string, number> = {
+  medium: 8,
+  high: 15,
+}
+
+// Рассчитать стоимость GPT Image 1.5 в токенах
+function calculateGptImageCost(quality: string): number {
+  return GPT_IMAGE_PRICES[quality] ?? 8
 }
 
 // Цены для видео-генерации Seedance 1.5 Pro
@@ -687,6 +702,43 @@ async function generateImageWithKieAI(
       return { images: [url], inputImages: imageUrls }
     }
 
+    // GPT Image 1.5 — Text-to-Image и Image-to-Image
+    if (model === 'gpt-image-1.5') {
+      const { gpt_image_quality } = requestData as any
+      const quality = gpt_image_quality || 'medium'
+
+      // Маппинг соотношений сторон (только 1:1, 2:3, 3:2 поддерживаются)
+      let apiAspectRatio = aspect_ratio || '1:1'
+      if (!['1:1', '2:3', '3:2'].includes(apiAspectRatio)) {
+        apiAspectRatio = '1:1' // Fallback
+      }
+
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: apiAspectRatio,
+        quality,
+      }
+
+      // Выбор модели: T2I или I2I
+      let modelId = 'gpt-image/1.5-text-to-image'
+      if (imageUrls.length > 0) {
+        modelId = 'gpt-image/1.5-image-to-image'
+        input.input_urls = imageUrls
+      }
+
+      console.log(`[GPT Image 1.5] Creating task (${modelId}):`, JSON.stringify(input))
+      const taskId = await createJobsTask(apiKey, modelId, input, onTaskCreated, metaPayload)
+      const url = await pollJobsTask(apiKey, taskId)
+
+      if (url === 'TIMEOUT') {
+        console.log('[GPT Image 1.5] Generation timed out, status stays pending')
+        return { timeout: true, inputImages: imageUrls }
+      }
+
+      console.log('[GPT Image 1.5] Image generated:', url)
+      return { images: [url], inputImages: imageUrls }
+    }
+
 
     throw new Error('Unsupported model')
   } catch (error) {
@@ -808,6 +860,11 @@ export async function handleGenerateImage(req: Request, res: Response) {
           generate_audio ?? false
         )
       }
+      // Dynamic pricing for GPT Image 1.5
+      if (model === 'gpt-image-1.5') {
+        const gpt_image_quality = req.body.gpt_image_quality || 'medium'
+        cost = calculateGptImageCost(gpt_image_quality)
+      }
       const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
       const balance = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : 0
 
@@ -847,10 +904,12 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const promptWithMeta = prompt + metaString
 
       // Insert pending record
+      // Для GPT Image 1.5 используем gptimage1.5 в БД
+      const dbModel = model === 'gpt-image-1.5' ? 'gptimage1.5' : model
       const genBody: any = {
         user_id: Number(user_id),
         prompt: promptWithMeta,
-        model,
+        model: dbModel,
         status: 'pending',
         input_images: r2Images.length > 0 ? r2Images : undefined,
         parent_id: parent_id,
@@ -903,7 +962,9 @@ export async function handleGenerateImage(req: Request, res: Response) {
       video_duration,
       video_resolution,
       fixed_lens,
-      generate_audio
+      generate_audio,
+      // Параметры для GPT Image 1.5
+      gpt_image_quality: req.body.gpt_image_quality,
     }, async (taskId) => {
       if (generationId) {
         console.log(`[API] Task ID received: ${taskId} for generation ${generationId}`)
