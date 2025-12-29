@@ -8,12 +8,12 @@ import { useNavigate } from 'react-router-dom'
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
     enabled: true, // Set to true to enable the announcement
-    id: 'announcement_v2_8_3', // Updated ID to force show again
-    title: 'Обновление AiVerse 🚀',
-    description: 'Встречайте: система уведомлений 🔔, подписки на пользователей 👥 и фильтрация генераций в профиле 🔍. Теперь вы не пропустите ничего важного!',
-    image: '/announcements/v2_8_3.png', // Placeholder for the new image
-    buttonText: 'Узнать больше',
-    link: '/news', // Redirect to news page
+    id: 'announcement_gpt_image_1_5', // Updated ID to force show again
+    title: 'Встречайте GPT Image 1.5 🚀',
+    description: 'Новая модель от OpenAI уже здесь! Невероятное качество, понимание сложных промптов и поддержка текста на фото.',
+    image: '/announcements/gpt-image-launch.png', // New launch image
+    buttonText: 'Попробовать',
+    link: '/studio', // Redirect to studio
     secondaryButtonText: 'Закрыть',
     secondaryLink: '' // Close modal
 }
@@ -120,11 +120,11 @@ export function AnnouncementModal() {
                     </div>
 
                     <h2 className="text-xl font-bold text-white mb-2">
-                        {t('announcement.title')}
+                        {ANNOUNCEMENT.title}
                     </h2>
 
                     <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                        {t('announcement.description')}
+                        {ANNOUNCEMENT.description}
                     </p>
 
                     <div className="w-full space-y-3">
@@ -132,7 +132,7 @@ export function AnnouncementModal() {
                             onClick={handleAction}
                             className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5 active:scale-[0.98] transition-transform"
                         >
-                            {t('announcement.button')}
+                            {ANNOUNCEMENT.buttonText}
                         </button>
 
                         {ANNOUNCEMENT.secondaryButtonText && (
@@ -140,7 +140,7 @@ export function AnnouncementModal() {
                                 onClick={handleSecondaryAction}
                                 className="w-full py-3.5 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors border border-white/5 active:scale-[0.98] transition-transform"
                             >
-                                {t('announcement.close')}
+                                {ANNOUNCEMENT.secondaryButtonText}
                             </button>
                         )}
                     </div>

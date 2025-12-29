@@ -470,9 +470,9 @@
         }
     },
     "announcement": {
-        "title": "AiVerse Update 🚀",
-        "description": "Meet: notification system 🔔, user subscriptions 👥 and generation filtering in profile 🔍. Now you won't miss anything important!",
-        "button": "Learn more",
+        "title": "Meet GPT Image 1.5 🚀",
+        "description": "New model from OpenAI is here! Incredible quality, complex prompt understanding, and text-on-image support. Try it now!",
+        "button": "Try it",
         "close": "Close"
     },
     "editor": {
