@@ -301,14 +301,14 @@ export default function ImageEditorPage() {
                                         {t('editor.mode.edit')}
                                     </button>
                                     <button
-                                        disabled
-                                        className="flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 text-zinc-600 cursor-not-allowed opacity-50"
+                                        onClick={() => { setMode('inpaint'); impact('light') }}
+                                        className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 ${mode === 'inpaint'
+                                            ? 'bg-violet-600 text-white'
+                                            : 'text-zinc-400 hover:text-white'
+                                            }`}
                                     >
                                         <Paintbrush size={14} />
                                         {t('editor.mode.inpaint')}
-                                        <span className="text-[10px] bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-400">
-                                            {t('common.soon', 'Скоро')}
-                                        </span>
                                     </button>
                                 </div>
                             </div>

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { uploadToEditedBucket, uploadImageFromBase64 } from '../services/r2Service.js'
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
+import { createInpaintPrediction } from '../services/replicateService.js'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || ''
 const RUNPOD_BASE_URL = 'https://api.runpod.ai/v2'
@@ -145,36 +146,57 @@ export async function handleImageEdit(req: Request, res: Response) {
             }
         }
 
-        if (mode === 'inpaint' && images.length >= 2) {
-            finalPrompt = `Edit only the masked area (white region in second image). ${prompt}`
-            console.log('[Editor] Inpaint mode, modified prompt:', finalPrompt.slice(0, 100))
-        }
+        let resultImageUrl: string
 
-        const input = {
-            prompt: finalPrompt,
-            images: finalImages,
-            aspect_ratio: 'match_input_image',
-            disable_safety_checker: false
-        }
-
-        const jobId = await createRunpodTask('p-image-edit', input)
-
-        // Polling результата
-        const runpodImageUrl = await pollRunpodTask('p-image-edit', jobId)
-
-        if (runpodImageUrl === 'TIMEOUT') {
-            // Возврат токенов при таймауте
-            if (user_id) {
-                const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
-                const balance = userRes?.data?.[0]?.balance || 0
-                await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + EDITOR_PRICE })
-                console.log(`[Editor] Refunded ${EDITOR_PRICE} tokens to user ${user_id}`)
+        if (mode === 'inpaint' && finalImages.length >= 2) {
+            // INPAINT: Use Replicate z-image-turbo-inpaint
+            console.log('[Editor] Using Replicate for inpaint mode')
+            try {
+                resultImageUrl = await createInpaintPrediction(
+                    finalImages[0],  // source image
+                    finalImages[1],  // mask image
+                    prompt
+                )
+            } catch (err) {
+                console.error('[Editor] Replicate inpaint failed:', err)
+                // Refund tokens
+                if (user_id) {
+                    const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                    const balance = userRes?.data?.[0]?.balance || 0
+                    await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + EDITOR_PRICE })
+                    console.log(`[Editor] Refunded ${EDITOR_PRICE} tokens due to error`)
+                }
+                throw err
             }
-            return res.json({ status: 'pending', message: 'Processing, please check later' })
+        } else {
+            // EDIT: Use Runpod p-image-edit
+            console.log('[Editor] Using Runpod for edit mode')
+            const input = {
+                prompt,
+                images: finalImages,
+                aspect_ratio: 'match_input_image',
+                disable_safety_checker: false
+            }
+
+            const jobId = await createRunpodTask('p-image-edit', input)
+            const runpodResult = await pollRunpodTask('p-image-edit', jobId)
+
+            if (runpodResult === 'TIMEOUT') {
+                // Возврат токенов при таймауте
+                if (user_id) {
+                    const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                    const balance = userRes?.data?.[0]?.balance || 0
+                    await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + EDITOR_PRICE })
+                    console.log(`[Editor] Refunded ${EDITOR_PRICE} tokens to user ${user_id}`)
+                }
+                return res.json({ status: 'pending', message: 'Processing, please check later' })
+            }
+
+            resultImageUrl = runpodResult
         }
 
         // Загрузка в R2 бакет edited
-        const r2Url = await uploadToEditedBucket(runpodImageUrl)
+        const r2Url = await uploadToEditedBucket(resultImageUrl)
         console.log(`[Editor] Uploaded to R2:`, r2Url)
 
         // Сохранение результата в БД
