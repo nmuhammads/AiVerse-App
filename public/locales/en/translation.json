@@ -245,6 +245,8 @@
     "payment": {
         "title": "Top up balance",
         "subtitle": "Select a token package",
+        "devModeWarning": "⚠️ Test Payment Mode",
+        "devModeDescription": "You will be redirected to the production bot for payment. This is a test environment.",
         "methods": {
             "stars": "Stars",
             "card": "Card",
@@ -476,7 +478,7 @@
         "close": "Close"
     },
     "editor": {
-        "title": "Editor",
+        "title": "Image Editor",
         "edit": "Edit",
         "image": "Source Image",
         "upload": "Upload",
@@ -504,7 +506,14 @@
         },
         "mode": {
             "edit": "Edit",
-            "inpaint": "Inpaint"
+            "inpaint": "Inpaint",
+            "angles": "Angles"
+        },
+        "angles": {
+            "rotation": "Rotation",
+            "tilt": "Tilt",
+            "zoom": "Zoom",
+            "reset": "Reset"
         },
         "drawMask": "Draw Mask",
         "maskEditor": {
@@ -527,5 +536,10 @@
         "notSubscribed": "Subscribe to channel first",
         "success": "+10 tokens claimed!",
         "modalDescription": "Subscribe to our channel and get bonus tokens!"
+    },
+    "devMode": {
+        "title": "⚠️ Test Environment",
+        "description": "This is a test version of the app. Errors and instability may occur.",
+        "warning": "Tokens are not refunded for errors."
     }
 }

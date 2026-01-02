@@ -13,6 +13,10 @@ COPY . .
 # Устанавливаем зависимости
 RUN pnpm install --no-frozen-lockfile
 
+# Build arguments для Vite переменных (Railway передаёт env vars как build args)
+ARG VITE_DEV_MODE
+ENV VITE_DEV_MODE=$VITE_DEV_MODE
+
 # Собираем frontend
 RUN pnpm run build
 

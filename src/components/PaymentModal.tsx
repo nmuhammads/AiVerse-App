@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '@/utils/promo'
+import { isDevMode } from '@/components/DevModeBanner'
 
 interface PaymentModalProps {
     isOpen: boolean
@@ -80,6 +81,19 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const handlePayment = async () => {
         impact('medium')
         if (activeMethod === 'stars') {
+            // In dev mode, redirect to hub bot for Stars payment
+            if (isDevMode()) {
+                const wa = (window as any).Telegram?.WebApp
+                const link = `https://t.me/aiverse_hub_bot?start=pay-stars-${selectedPackage.tokens}`
+                if (wa) {
+                    wa.openTelegramLink(link)
+                    onClose()
+                } else {
+                    window.open(link, '_blank')
+                }
+                return
+            }
+
             setLoading(true)
             try {
                 const response = await fetch('/api/payment/create-stars-invoice', {
@@ -184,6 +198,19 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                         </button>
                     </div>
                 </div>
+
+                {/* Dev Mode Warning Banner */}
+                {isDevMode() && (
+                    <div className="mx-5 mb-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 shrink-0">
+                        <div className="flex items-start gap-2">
+                            <div className="text-amber-400 mt-0.5">⚠️</div>
+                            <div className="text-xs">
+                                <div className="font-bold text-amber-300">{t('payment.devModeWarning')}</div>
+                                <div className="text-zinc-300 mt-0.5">{t('payment.devModeDescription')}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* New Year Promo Banner */}
                 {isPromoActive() && (

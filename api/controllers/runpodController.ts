@@ -1,10 +1,13 @@
 import { Request, Response } from 'express'
 import { uploadToEditedBucket, uploadImageFromBase64 } from '../services/r2Service.js'
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
+import { createInpaintPrediction } from '../services/replicateService.js'
+import { createAnglesPrediction } from '../services/wavespeedService.js'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || ''
 const RUNPOD_BASE_URL = 'https://api.runpod.ai/v2'
 const EDITOR_PRICE = 2
+const ANGLES_PRICE = 4
 const DEFAULT_TIMEOUT_MS = Number(process.env.RUNPOD_TIMEOUT_MS) || 300000
 
 // Создание задачи Runpod
@@ -85,21 +88,26 @@ async function pollRunpodTask(modelId: string, jobId: string, timeoutMs = DEFAUL
 
 // Главный обработчик редактирования
 export async function handleImageEdit(req: Request, res: Response) {
-    const { prompt, images, user_id, source_generation_id, mode } = req.body
+    const { prompt, images, user_id, source_generation_id, mode, rotation, tilt, zoom } = req.body
+
+    // Determine price based on mode
+    const price = mode === 'angles' ? ANGLES_PRICE : EDITOR_PRICE
 
     console.log('[Editor] Request received:', {
         userId: user_id,
         hasImages: images?.length > 0,
         imagesCount: images?.length,
         sourceGenerationId: source_generation_id,
-        mode: mode || 'edit'
+        mode: mode || 'edit',
+        rotation, tilt, zoom
     })
 
     // Валидация
     if (!images?.length) {
         return res.status(400).json({ error: 'Image required' })
     }
-    if (!prompt?.trim()) {
+    // Для режима angles промпт не требуется
+    if (mode !== 'angles' && !prompt?.trim()) {
         return res.status(400).json({ error: 'Prompt required' })
     }
 
@@ -117,16 +125,16 @@ export async function handleImageEdit(req: Request, res: Response) {
             const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
             console.log('[Editor] User balance response:', userRes)
             const balance = userRes?.data?.[0]?.balance || 0
-            console.log(`[Editor] User ${user_id} balance: ${balance}, required: ${EDITOR_PRICE}`)
+            console.log(`[Editor] User ${user_id} balance: ${balance}, required: ${price}`)
 
-            if (balance < EDITOR_PRICE) {
+            if (balance < price) {
                 console.log('[Editor] Insufficient balance, returning 403')
-                return res.status(403).json({ error: 'Insufficient balance', required: EDITOR_PRICE, current: balance })
+                return res.status(403).json({ error: 'Insufficient balance', required: price, current: balance })
             }
 
             // Списание токенов
-            await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance - EDITOR_PRICE })
-            console.log(`[Editor] Deducted ${EDITOR_PRICE} tokens from user ${user_id}`)
+            await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance - price })
+            console.log(`[Editor] Deducted ${price} tokens from user ${user_id}`)
         }
 
         // Создание задачи в Runpod
@@ -145,36 +153,89 @@ export async function handleImageEdit(req: Request, res: Response) {
             }
         }
 
-        if (mode === 'inpaint' && images.length >= 2) {
-            finalPrompt = `Edit only the masked area (white region in second image). ${prompt}`
-            console.log('[Editor] Inpaint mode, modified prompt:', finalPrompt.slice(0, 100))
-        }
+        let resultImageUrl: string
 
-        const input = {
-            prompt: finalPrompt,
-            images: finalImages,
-            aspect_ratio: 'match_input_image',
-            disable_safety_checker: false
-        }
+        if (mode === 'angles') {
+            // ANGLES: Use WaveSpeed API with LoRA
+            console.log('[Editor] Using WaveSpeed for angles mode')
+            try {
+                resultImageUrl = await createAnglesPrediction(
+                    finalImages[0],  // source image
+                    rotation || 0,
+                    tilt || 0,
+                    zoom || 0
+                )
 
-        const jobId = await createRunpodTask('p-image-edit', input)
-
-        // Polling результата
-        const runpodImageUrl = await pollRunpodTask('p-image-edit', jobId)
-
-        if (runpodImageUrl === 'TIMEOUT') {
-            // Возврат токенов при таймауте
-            if (user_id) {
-                const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
-                const balance = userRes?.data?.[0]?.balance || 0
-                await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + EDITOR_PRICE })
-                console.log(`[Editor] Refunded ${EDITOR_PRICE} tokens to user ${user_id}`)
+                if (resultImageUrl === 'TIMEOUT') {
+                    // Возврат токенов при таймауте
+                    if (user_id) {
+                        const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                        const balance = userRes?.data?.[0]?.balance || 0
+                        await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                        console.log(`[Editor] Refunded ${price} tokens to user ${user_id}`)
+                    }
+                    return res.json({ status: 'pending', message: 'Processing, please check later' })
+                }
+            } catch (err) {
+                console.error('[Editor] WaveSpeed angles failed:', err)
+                // Refund tokens
+                if (user_id) {
+                    const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                    const balance = userRes?.data?.[0]?.balance || 0
+                    await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    console.log(`[Editor] Refunded ${price} tokens due to error`)
+                }
+                throw err
             }
-            return res.json({ status: 'pending', message: 'Processing, please check later' })
+        } else if (mode === 'inpaint' && finalImages.length >= 2) {
+            // INPAINT: Use Replicate z-image-turbo-inpaint
+            console.log('[Editor] Using Replicate for inpaint mode')
+            try {
+                resultImageUrl = await createInpaintPrediction(
+                    finalImages[0],  // source image
+                    finalImages[1],  // mask image
+                    prompt
+                )
+            } catch (err) {
+                console.error('[Editor] Replicate inpaint failed:', err)
+                // Refund tokens
+                if (user_id) {
+                    const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                    const balance = userRes?.data?.[0]?.balance || 0
+                    await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    console.log(`[Editor] Refunded ${price} tokens due to error`)
+                }
+                throw err
+            }
+        } else {
+            // EDIT: Use Runpod p-image-edit
+            console.log('[Editor] Using Runpod for edit mode')
+            const input = {
+                prompt,
+                images: finalImages,
+                aspect_ratio: 'match_input_image',
+                disable_safety_checker: false
+            }
+
+            const jobId = await createRunpodTask('p-image-edit', input)
+            const runpodResult = await pollRunpodTask('p-image-edit', jobId)
+
+            if (runpodResult === 'TIMEOUT') {
+                // Возврат токенов при таймауте
+                if (user_id) {
+                    const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
+                    const balance = userRes?.data?.[0]?.balance || 0
+                    await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    console.log(`[Editor] Refunded ${price} tokens to user ${user_id}`)
+                }
+                return res.json({ status: 'pending', message: 'Processing, please check later' })
+            }
+
+            resultImageUrl = runpodResult
         }
 
         // Загрузка в R2 бакет edited
-        const r2Url = await uploadToEditedBucket(runpodImageUrl)
+        const r2Url = await uploadToEditedBucket(resultImageUrl)
         console.log(`[Editor] Uploaded to R2:`, r2Url)
 
         // Сохранение результата в БД
