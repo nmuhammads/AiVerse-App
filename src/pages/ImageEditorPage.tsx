@@ -269,6 +269,42 @@ export default function ImageEditorPage() {
             {/* Content */}
             <div className="px-4 max-w-xl mx-auto w-full flex flex-col gap-5">
 
+                {/* Mode Toggle */}
+                <div className="flex items-center gap-2">
+                    <div className="flex bg-zinc-800/50 rounded-full p-0.5 border border-white/5 flex-1">
+                        <button
+                            onClick={() => { setMode('edit'); setMaskImage(null); impact('light') }}
+                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'edit'
+                                ? 'bg-violet-600 text-white'
+                                : 'text-zinc-400 hover:text-white'
+                                }`}
+                        >
+                            <Pencil size={14} />
+                            {t('editor.mode.edit')}
+                        </button>
+                        <button
+                            disabled={true}
+                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed text-zinc-400`}
+                        >
+                            <Paintbrush size={14} />
+                            {t('editor.mode.inpaint')}
+                            <span className="text-[10px] bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-400 ml-1">
+                                {t('common.soon', 'Скоро')}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => { setMode('angles'); setMaskImage(null); impact('light') }}
+                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'angles'
+                                ? 'bg-violet-600 text-white'
+                                : 'text-zinc-400 hover:text-white'
+                                }`}
+                        >
+                            <Box size={14} />
+                            {t('editor.mode.angles')}
+                        </button>
+                    </div>
+                </div>
+
                 {/* Source Image */}
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
@@ -305,41 +341,7 @@ export default function ImageEditorPage() {
                                 )}
                             </div>
 
-                            {/* Mode Toggle */}
-                            <div className="flex items-center gap-2">
-                                <div className="flex bg-zinc-800/50 rounded-full p-0.5 border border-white/5 flex-1">
-                                    <button
-                                        onClick={() => { setMode('edit'); setMaskImage(null); impact('light') }}
-                                        className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'edit'
-                                            ? 'bg-violet-600 text-white'
-                                            : 'text-zinc-400 hover:text-white'
-                                            }`}
-                                    >
-                                        <Pencil size={14} />
-                                        {t('editor.mode.edit')}
-                                    </button>
-                                    <button
-                                        onClick={() => { setMode('inpaint'); impact('light') }}
-                                        className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'inpaint'
-                                            ? 'bg-violet-600 text-white'
-                                            : 'text-zinc-400 hover:text-white'
-                                            }`}
-                                    >
-                                        <Paintbrush size={14} />
-                                        {t('editor.mode.inpaint')}
-                                    </button>
-                                    <button
-                                        onClick={() => { setMode('angles'); setMaskImage(null); impact('light') }}
-                                        className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'angles'
-                                            ? 'bg-violet-600 text-white'
-                                            : 'text-zinc-400 hover:text-white'
-                                            }`}
-                                    >
-                                        <Box size={14} />
-                                        {t('editor.mode.angles')}
-                                    </button>
-                                </div>
-                            </div>
+
 
                             {/* Draw Mask Button (Inpaint mode) */}
                             {mode === 'inpaint' && (
