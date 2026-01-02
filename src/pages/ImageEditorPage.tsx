@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box } from 'lucide-react'
+import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -40,6 +40,7 @@ export default function ImageEditorPage() {
     const [mode, setMode] = useState<'edit' | 'inpaint' | 'angles'>('edit')
     const [maskImage, setMaskImage] = useState<string | null>(null)
     const [showMaskEditor, setShowMaskEditor] = useState(false)
+    const [isSending, setIsSending] = useState(false)
 
     // Angles mode state
     const [rotation, setRotation] = useState(45)      // -90 to 90
@@ -176,6 +177,21 @@ export default function ImageEditorPage() {
 
             setResult(data.image)
             notify('success')
+
+            // Автоматически отправляем результат в чат
+            if (user?.id && data.image) {
+                fetch('/api/telegram/sendPhoto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: user.id,
+                        photo_url: data.image,
+                        caption: mode === 'angles'
+                            ? `🎨 ${t('editor.mode.angles')}`
+                            : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                    })
+                }).catch(err => console.error('Auto send to chat failed:', err))
+            }
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Error')
             notify('error')
@@ -190,6 +206,41 @@ export default function ImageEditorPage() {
             setSourceGenerationId(null) // Новый результат, сбросить ID
             setResult(null)
             setPrompt('')
+        }
+    }
+
+    const handleSendToChat = async () => {
+        if (!result || !user?.id) return
+
+        setIsSending(true)
+        impact('medium')
+
+        try {
+            const response = await fetch('/api/telegram/sendPhoto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: user.id,
+                    photo_url: result,
+                    caption: mode === 'angles'
+                        ? `🎨 ${t('editor.mode.angles')}`
+                        : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                })
+            })
+
+            const data = await response.json()
+
+            if (data.ok) {
+                notify('success')
+            } else {
+                notify('error')
+                console.error('Send to chat failed:', data.error)
+            }
+        } catch (error) {
+            notify('error')
+            console.error('Send to chat error:', error)
+        } finally {
+            setIsSending(false)
         }
     }
 
@@ -224,13 +275,25 @@ export default function ImageEditorPage() {
                                 {t('editor.save')}
                             </Button>
                             <Button
-                                onClick={handleUseResult}
-                                className="flex-1 bg-cyan-600 text-white hover:bg-cyan-700"
+                                onClick={handleSendToChat}
+                                disabled={isSending}
+                                className="flex-1 bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50"
                             >
-                                <Pencil size={16} className="mr-2" />
-                                {t('editor.continue')}
+                                {isSending ? (
+                                    <Loader2 size={16} className="mr-2 animate-spin" />
+                                ) : (
+                                    <Send size={16} className="mr-2" />
+                                )}
+                                {t('studio.result.sendToChat')}
                             </Button>
                         </div>
+                        <Button
+                            onClick={handleUseResult}
+                            className="w-full bg-cyan-600 text-white hover:bg-cyan-700"
+                        >
+                            <Pencil size={16} className="mr-2" />
+                            {t('editor.continue')}
+                        </Button>
                         <Button
                             onClick={() => { setResult(null); navigate(-1) }}
                             variant="outline"

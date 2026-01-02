@@ -742,6 +742,18 @@ export default function Studio() {
                 </button>
               )
             })}
+            {/* Image Editor Button */}
+            <button
+              onClick={() => { impact('light'); navigate('/editor') }}
+              className="flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all duration-200 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 hover:from-cyan-500/30 hover:to-blue-500/30"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md">
+                <Pencil size={20} className="text-white" />
+              </div>
+              <span className="text-[10px] font-semibold text-center leading-tight text-cyan-300">
+                {t('editor.title')}
+              </span>
+            </button>
           </div>
         )}
 
