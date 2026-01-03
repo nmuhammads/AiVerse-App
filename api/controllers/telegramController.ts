@@ -735,6 +735,7 @@ const MODEL_HASHTAGS: Record<string, string> = {
   'seedream4': '#Seedream4',
   'seedream4-5': '#SeedreamPRO',
   'gpt-image-1.5': '#GPTImage',
+  'gptimage1.5': '#GPTImage', // DB value
   'seedance-1.5-pro': '#Seedance',
 }
 
@@ -745,6 +746,7 @@ const MODEL_BOTS: Record<string, string> = {
   'seedream4': 'seedreameditbot',
   'seedream4-5': 'seedreameditbot',
   'gpt-image-1.5': 'GPTimagePro_bot',
+  'gptimage1.5': 'GPTimagePro_bot', // DB value
   'seedance-1.5-pro': 'seedancepro_bot',
 }
 
