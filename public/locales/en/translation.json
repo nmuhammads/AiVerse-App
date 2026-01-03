@@ -6,7 +6,8 @@
             "remix": "Remixes",
             "social": "Social",
             "about": "About",
-            "notifications": "Notifications"
+            "notifications": "Notifications",
+            "tools": "Tools"
         },
         "items": {
             "language": "Language",
@@ -34,6 +35,16 @@
                 "generation": "Generations",
                 "likes": "Likes"
             }
+        },
+        "fingerprint": {
+            "title": "Check Prompt Author",
+            "description": "Paste a prompt received via 'With prompt' to find out its author",
+            "placeholder": "Paste prompt here...",
+            "check": "Check",
+            "author": "Author",
+            "found": "Author found!",
+            "notFound": "Author fingerprint not found",
+            "noFingerprint": "No author fingerprint in this prompt"
         }
     },
     "home": {
@@ -170,7 +181,7 @@
         },
         "preview": {
             "saveToGallery": "Save to Gallery",
-            "sendToChat": "Send to Chat with Prompt",
+            "sendToChat": "Send as File",
             "shareRemix": "Share Remix",
             "publish": "Publish to Feed",
             "unpublish": "Remove from Feed",
@@ -179,7 +190,14 @@
             "showPrompt": "Show & Copy",
             "hidePrompt": "Hide Prompt",
             "copyPrompt": "Copy Prompt",
-            "copied": "Copied!"
+            "copied": "Copied!",
+            "promptPrivate": "Prompt hidden",
+            "promptPublic": "Hide prompt",
+            "hiddenByAuthor": "🔒 Hidden by author",
+            "sendWithPrompt": "Send with Refs",
+            "sendWithPromptHint": "Send to chat with prompt and referral link",
+            "buttonPrivate": "Private Prompt",
+            "buttonPublic": "Open Prompt"
         },
         "deleteConfirm": {
             "title": "Delete generation?",
@@ -188,10 +206,12 @@
             "confirm": "Delete"
         },
         "publishConfirm": {
-            "title": "Publish to public feed?",
-            "description": "Other users will see your work",
+            "title": "Publish to Feed?",
+            "description": "Your work will be seen by other users",
             "cancel": "Cancel",
-            "confirm": "Publish"
+            "confirm": "Publish",
+            "publishOpen": "Publish with Open Prompt",
+            "publishPrivate": "Publish with Private Prompt"
         }
     },
     "spin": {

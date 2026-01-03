@@ -39,6 +39,8 @@ export interface GenerationState {
   parentGenerationId: number | null
   // Имя автора родительской генерации
   parentAuthorUsername: string | null
+  // Флаг приватности промпта родительской генерации (для слепого ремикса)
+  isPromptPrivate: boolean
   // Текущий экран
   currentScreen: 'form' | 'result'
 
@@ -87,7 +89,7 @@ export interface GenerationActions {
   // Переключить экран
   setCurrentScreen: (screen: 'form' | 'result') => void
   // Установить родительскую генерацию
-  setParentGeneration: (id: number | null, username: string | null) => void
+  setParentGeneration: (id: number | null, username: string | null, isPrivate?: boolean) => void
 
   // === Actions для видео ===
   // Установить длительность видео
@@ -122,6 +124,7 @@ const initialState: GenerationState = {
   currentScreen: 'form',
   parentGenerationId: null,
   parentAuthorUsername: null,
+  isPromptPrivate: false,
   // Видео параметры по умолчанию (первые пункты)
   videoDuration: '4',
   videoResolution: '480p',
@@ -149,7 +152,7 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
     setIsGenerating: (isGenerating) => set({ isGenerating }),
     setError: (error) => set({ error }),
     setCurrentScreen: (screen) => set({ currentScreen: screen }),
-    setParentGeneration: (id, username) => set({ parentGenerationId: id, parentAuthorUsername: username }),
+    setParentGeneration: (id, username, isPrivate = false) => set({ parentGenerationId: id, parentAuthorUsername: username, isPromptPrivate: isPrivate }),
 
     // Видео actions
     setVideoDuration: (duration) => set({ videoDuration: duration }),
@@ -172,6 +175,7 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
       currentScreen: 'form',
       parentGenerationId: null,
       parentAuthorUsername: null,
+      isPromptPrivate: false,
       videoDuration: '8',
       videoResolution: '720p',
       fixedLens: false,

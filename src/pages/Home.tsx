@@ -135,21 +135,27 @@ export default function Home() {
   const handleRemix = (item: FeedItem) => {
     impact('medium')
 
-    // Parse metadata from prompt
+    // Check if prompt is private - pass flag to store for UI hiding
+    const isPrivate = item.is_prompt_private === true
+
+    // Parse metadata from prompt - always process prompt for generation to work
     // Format: ... real prompt ... [type=text_photo; ratio=3:4; photos=1]
-    let cleanPrompt = item.prompt
+    let cleanPrompt = item.prompt || ''
     let metadata: Record<string, string> = {}
 
-    // Match [ ... ] at the end of the string, allowing for whitespace
-    const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
-    if (match) {
-      const metaString = match[1]
-      cleanPrompt = item.prompt.replace(match[0], '').trim()
+    // Always parse metadata if prompt exists
+    if (item.prompt) {
+      // Match [ ... ] at the end of the string, allowing for whitespace
+      const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
+      if (match) {
+        const metaString = match[1]
+        cleanPrompt = item.prompt.replace(match[0], '').trim()
 
-      metaString.split(';').forEach(part => {
-        const [key, val] = part.split('=').map(s => s.trim())
-        if (key && val) metadata[key] = val
-      })
+        metaString.split(';').forEach(part => {
+          const [key, val] = part.split('=').map(s => s.trim())
+          if (key && val) metadata[key] = val
+        })
+      }
     }
 
     setPrompt(cleanPrompt)
@@ -207,7 +213,7 @@ export default function Home() {
       setMediaType('image')
     }
 
-    setParentGeneration(item.id, item.author.username)
+    setParentGeneration(item.id, item.author.username, isPrivate)
     setCurrentScreen('form')
     navigate('/studio')
   }

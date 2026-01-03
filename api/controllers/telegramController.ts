@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import sharp from 'sharp'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
+import { addFingerprint } from '../utils/fingerprint.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -723,6 +724,167 @@ export async function sendRemixShare(req: Request, res: Response) {
     }
   } catch (e) {
     console.error('sendRemixShare error', e)
+    return res.status(500).json({ ok: false })
+  }
+}
+
+// Model → Hashtag mapping
+const MODEL_HASHTAGS: Record<string, string> = {
+  'nanobanana': '#NanoBanana',
+  'nanobanana-pro': '#NanoBananaPro',
+  'seedream4': '#Seedream4',
+  'seedream4-5': '#SeedreamPRO',
+  'gpt-image-1.5': '#GPTImage',
+  'seedance-1.5-pro': '#Seedance',
+}
+
+// Model → Bot mapping
+const MODEL_BOTS: Record<string, string> = {
+  'nanobanana': 'BananNanoBot',
+  'nanobanana-pro': 'BananNanoBot',
+  'seedream4': 'seedreameditbot',
+  'seedream4-5': 'seedreameditbot',
+  'gpt-image-1.5': 'GPTimagePro_bot',
+  'seedance-1.5-pro': 'seedancepro_bot',
+}
+
+// Escape HTML special characters
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * Send generation to chat with prompt (Feature 5: Invisible Fingerprint)
+ * Uses HTML parse_mode for better stability with expandable blockquotes
+ */
+export async function sendWithPrompt(req: Request, res: Response) {
+  try {
+    const chat_id = Number(req.body?.chat_id || 0)
+    const photo = String(req.body?.photo_url || '')
+    const video = String(req.body?.video_url || '')
+    const prompt = String(req.body?.prompt || '')
+    const model = String(req.body?.model || '')
+    const username = req.body?.username ? String(req.body.username).replace(/^@/, '') : null
+    const userId = Number(req.body?.user_id || 0)
+
+    if (!API || !chat_id || (!photo && !video)) {
+      return res.status(400).json({ ok: false, error: 'invalid payload' })
+    }
+
+    // Get hashtag for model
+    const hashtag = MODEL_HASHTAGS[model] || '#AIVerse'
+
+    // Get bot for model
+    const botName = MODEL_BOTS[model] || 'AiVerseAppBot'
+
+    // Build ref link
+    const refParam = username || String(userId)
+    const botLink = `https://t.me/${botName}?start=ref_${refParam}`
+    const appLink = `https://t.me/AiVerseAppBot?start=ref_${refParam}`
+
+    // Add fingerprint to prompt
+    const promptWithFingerprint = prompt ? addFingerprint(prompt, username, userId) : ''
+
+    // Format parts
+    const headerHtml = `${hashtag}\n\n🎨 Создай похожее:\nВ боте - <a href="${botLink}">@${botName}</a>\nВ приложении - <a href="${appLink}">📱 AiVerse App</a>`
+
+    // Build full caption to check length
+    // HTML format: <blockquote expandable>text</blockquote>
+    const promptHtml = promptWithFingerprint
+      ? `\n\n💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      : ''
+
+    const fullCaption = headerHtml + promptHtml
+    const isCaptionTooLong = fullCaption.length > 1024
+
+    // Use short caption if too long (only header)
+    const caption = isCaptionTooLong ? headerHtml : fullCaption
+
+    console.info('sendWithPrompt:start', {
+      chat_id,
+      model,
+      promptLen: prompt.length,
+      fullCaptionLen: fullCaption.length,
+      isCaptionTooLong,
+      isVideo: !!video
+    })
+
+    // Determine method and media
+    const method = video ? 'sendVideo' : 'sendPhoto'
+    const mediaUrl = video || photo
+    const mediaKey = video ? 'video' : 'photo'
+
+    // Try sending with URL first
+    const payload: Record<string, unknown> = {
+      chat_id,
+      [mediaKey]: mediaUrl,
+      caption,
+      parse_mode: 'HTML'
+    }
+
+    let resp = await tg(method, payload)
+    let msgId = resp?.result?.message_id
+
+    // Fallback: Download and upload if URL failed
+    if (!resp?.ok) {
+      console.warn('sendWithPrompt:url_failed', resp)
+      try {
+        const mediaResp = await fetch(mediaUrl)
+        if (!mediaResp.ok) throw new Error('media fetch failed')
+
+        const ab = await mediaResp.arrayBuffer()
+        const ct = mediaResp.headers.get('content-type') || (video ? 'video/mp4' : 'image/jpeg')
+        const isVideoContent = ct.includes('video/')
+        const ext = isVideoContent ? 'mp4' : 'jpg' // simplified
+        const filename = `ai-${Date.now()}.${ext}`
+        const blob = new Blob([ab], { type: ct })
+
+        const form = new FormData()
+        form.append('chat_id', String(chat_id))
+        form.append('caption', caption)
+        form.append('parse_mode', 'HTML')
+        form.append(isVideoContent ? 'video' : 'photo', blob, filename)
+
+        const uploadMethod = isVideoContent ? 'sendVideo' : 'sendPhoto'
+        const r = await fetch(`${API}/${uploadMethod}`, { method: 'POST', body: form })
+        resp = await r.json().catch(() => null)
+        msgId = resp?.result?.message_id
+
+        if (!resp?.ok) {
+          console.error('sendWithPrompt:fallback_failed', resp)
+          return res.status(500).json({ ok: false, error: resp?.description || 'upload failed' })
+        }
+      } catch (e) {
+        console.error('sendWithPrompt:fallback_error', e)
+        return res.status(500).json({ ok: false, error: (e as Error).message })
+      }
+    }
+
+    // If prompt was too long, send it as a reply message
+    if (isCaptionTooLong && promptWithFingerprint && msgId) {
+      console.info('sendWithPrompt:sending_separate_prompt')
+      const text = `💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+
+      // Split if even text message is too long (4096 limit)
+      // But blockquote structure makes splitting hard. Just send what fits or rely on Telegram limits.
+      // 4096 is usually enough for prompts (unless huge).
+
+      await tg('sendMessage', {
+        chat_id,
+        text,
+        parse_mode: 'HTML',
+        reply_to_message_id: msgId
+      })
+    }
+
+    return res.json({ ok: true })
+
+  } catch (e) {
+    console.error('sendWithPrompt error', e)
     return res.status(500).json({ ok: false })
   }
 }

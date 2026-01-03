@@ -1224,7 +1224,7 @@ export async function getGenerationById(req: Request, res: Response) {
 
     // Fetch generation - include video_url for video generations
     // Note: aspect_ratio not in DB, extracted from prompt metadata
-    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,video_url,user_id,status,media_type,users(username,first_name)`
+    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,video_url,user_id,status,media_type,is_prompt_private,users(username,first_name)`
     console.log('[getGenerationById] Query:', query)
 
     const result = await supaSelect('generations', query)
@@ -1272,7 +1272,8 @@ export async function getGenerationById(req: Request, res: Response) {
 
     const response = {
       id: gen.id,
-      prompt: cleanPrompt,
+      prompt: cleanPrompt, // Always return prompt for generation to work
+      is_prompt_private: !!gen.is_prompt_private,
       model: gen.model,
       input_images: gen.input_images || [],
       image_url: gen.image_url,
@@ -1425,3 +1426,38 @@ export async function getPendingCount(req: Request, res: Response) {
   }
 }
 
+// Toggle prompt privacy for a generation
+export async function togglePromptPrivacy(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { is_prompt_private } = req.body
+
+    if (!id) {
+      return res.status(400).json({ error: 'Generation ID required' })
+    }
+
+    if (typeof is_prompt_private !== 'boolean') {
+      return res.status(400).json({ error: 'is_prompt_private must be a boolean' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    // Update the privacy flag
+    const updateRes = await supaPatch('generations', `?id=eq.${id}`, {
+      is_prompt_private: is_prompt_private
+    })
+
+    if (!updateRes.ok) {
+      console.error('[togglePromptPrivacy] Failed to update:', updateRes)
+      return res.status(500).json({ error: 'Failed to update privacy setting' })
+    }
+
+    console.log(`[Privacy] Generation ${id} is_prompt_private set to ${is_prompt_private}`)
+    return res.json({ ok: true, is_prompt_private })
+  } catch (e) {
+    console.error('togglePromptPrivacy error:', e)
+    return res.status(500).json({ error: 'Failed to toggle privacy' })
+  }
+}
