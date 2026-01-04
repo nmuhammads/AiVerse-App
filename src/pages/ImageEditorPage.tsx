@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box, Send } from 'lucide-react'
+import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box, Send, Scissors } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -37,7 +37,7 @@ export default function ImageEditorPage() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showBalancePopup, setShowBalancePopup] = useState(false)
     const [showGenerationSelector, setShowGenerationSelector] = useState(false)
-    const [mode, setMode] = useState<'edit' | 'inpaint' | 'angles'>('edit')
+    const [mode, setMode] = useState<'edit' | 'inpaint' | 'angles' | 'remove-bg'>('edit')
     const [maskImage, setMaskImage] = useState<string | null>(null)
     const [showMaskEditor, setShowMaskEditor] = useState(false)
     const [isSending, setIsSending] = useState(false)
@@ -132,8 +132,8 @@ export default function ImageEditorPage() {
     }
 
     const handleGenerate = async () => {
-        // Для angles режима промпт не нужен
-        if (!sourceImage || (mode !== 'angles' && !prompt.trim())) {
+        // Для angles и remove-bg режима промпт не нужен
+        if (!sourceImage || ((mode !== 'angles' && mode !== 'remove-bg') && !prompt.trim())) {
             setError(t('editor.error.required'))
             notify('error')
             return
@@ -149,19 +149,31 @@ export default function ImageEditorPage() {
                 ? [sourceImage, maskImage]
                 : [sourceImage]
 
-            const res = await fetch('/api/editor/edit', {
+            let endpoint = '/api/editor/edit'
+            let body: any = {
+                prompt: mode === 'angles' ? '' : prompt,
+                images: imagesArray,
+                user_id: user?.id || null,
+                source_generation_id: sourceGenerationId,
+                mode: mode,
+                rotation: mode === 'angles' ? rotation : undefined,
+                tilt: mode === 'angles' ? tilt : undefined,
+                zoom: mode === 'angles' ? zoom : undefined
+            }
+
+            if (mode === 'remove-bg') {
+                endpoint = '/api/editor/remove-background'
+                body = {
+                    user_id: user?.id || null,
+                    images: [sourceImage],
+                    source_generation_id: sourceGenerationId
+                }
+            }
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: mode === 'angles' ? '' : prompt,
-                    images: imagesArray,
-                    user_id: user?.id || null,
-                    source_generation_id: sourceGenerationId,
-                    mode: mode,
-                    rotation: mode === 'angles' ? rotation : undefined,
-                    tilt: mode === 'angles' ? tilt : undefined,
-                    zoom: mode === 'angles' ? zoom : undefined
-                })
+                body: JSON.stringify(body)
             })
 
             if (res.status === 403) {
@@ -180,7 +192,8 @@ export default function ImageEditorPage() {
 
             // Автоматически отправляем результат в чат
             if (user?.id && data.image) {
-                fetch('/api/telegram/sendPhoto', {
+                const tgEndpoint = mode === 'remove-bg' ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
+                fetch(tgEndpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -188,7 +201,9 @@ export default function ImageEditorPage() {
                         photo_url: data.image,
                         caption: mode === 'angles'
                             ? `🎨 ${t('editor.mode.angles')}`
-                            : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                            : mode === 'remove-bg'
+                                ? `✂️ ${t('editor.mode.removeBg', 'Remove BG')}`
+                                : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
                     })
                 }).catch(err => console.error('Auto send to chat failed:', err))
             }
@@ -216,7 +231,8 @@ export default function ImageEditorPage() {
         impact('medium')
 
         try {
-            const response = await fetch('/api/telegram/sendPhoto', {
+            const tgEndpoint = mode === 'remove-bg' ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
+            const response = await fetch(tgEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -224,7 +240,9 @@ export default function ImageEditorPage() {
                     photo_url: result,
                     caption: mode === 'angles'
                         ? `🎨 ${t('editor.mode.angles')}`
-                        : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                        : mode === 'remove-bg'
+                            ? `✂️ ${t('editor.mode.removeBg', 'Remove BG')}`
+                            : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
                 })
             })
 
@@ -333,39 +351,51 @@ export default function ImageEditorPage() {
             <div className="px-4 max-w-xl mx-auto w-full flex flex-col gap-5">
 
                 {/* Mode Toggle */}
-                <div className="flex items-center gap-2">
-                    <div className="flex bg-zinc-800/50 rounded-full p-0.5 border border-white/5 flex-1">
-                        <button
-                            onClick={() => { setMode('edit'); setMaskImage(null); impact('light') }}
-                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'edit'
-                                ? 'bg-violet-600 text-white'
-                                : 'text-zinc-400 hover:text-white'
-                                }`}
-                        >
-                            <Pencil size={14} />
-                            {t('editor.mode.edit')}
-                        </button>
-                        <button
-                            disabled={true}
-                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed text-zinc-400`}
-                        >
-                            <Paintbrush size={14} />
-                            {t('editor.mode.inpaint')}
-                            <span className="text-[10px] bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-400 ml-1">
-                                {t('common.soon', 'Скоро')}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => { setMode('angles'); setMaskImage(null); impact('light') }}
-                            className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${mode === 'angles'
-                                ? 'bg-violet-600 text-white'
-                                : 'text-zinc-400 hover:text-white'
-                                }`}
-                        >
-                            <Box size={14} />
-                            {t('editor.mode.angles')}
-                        </button>
-                    </div>
+                {/* Mode Toggle */}
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => { setMode('edit'); setMaskImage(null); impact('light') }}
+                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border ${mode === 'edit'
+                            ? 'bg-violet-600 text-white border-violet-500 shadow-lg shadow-violet-500/20'
+                            : 'bg-zinc-800/50 text-zinc-400 border-white/5 hover:bg-zinc-800 hover:text-white'
+                            }`}
+                    >
+                        <Pencil size={16} />
+                        {t('editor.mode.edit')}
+                    </button>
+
+                    <button
+                        onClick={() => { setMode('angles'); setMaskImage(null); impact('light') }}
+                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border ${mode === 'angles'
+                            ? 'bg-violet-600 text-white border-violet-500 shadow-lg shadow-violet-500/20'
+                            : 'bg-zinc-800/50 text-zinc-400 border-white/5 hover:bg-zinc-800 hover:text-white'
+                            }`}
+                    >
+                        <Box size={16} />
+                        {t('editor.mode.angles')}
+                    </button>
+
+                    <button
+                        onClick={() => { setMode('remove-bg'); setMaskImage(null); impact('light') }}
+                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border ${mode === 'remove-bg'
+                            ? 'bg-violet-600 text-white border-violet-500 shadow-lg shadow-violet-500/20'
+                            : 'bg-zinc-800/50 text-zinc-400 border-white/5 hover:bg-zinc-800 hover:text-white'
+                            }`}
+                    >
+                        <Scissors size={16} />
+                        {t('editor.mode.removeBg', 'Remove BG')}
+                    </button>
+
+                    <button
+                        disabled={true}
+                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border opacity-50 cursor-not-allowed bg-zinc-800/30 text-zinc-500 border-white/5`}
+                    >
+                        <Paintbrush size={16} />
+                        {t('editor.mode.inpaint')}
+                        <span className="text-[10px] bg-zinc-700/50 px-1.5 py-0.5 rounded ml-1">
+                            {t('common.soon', 'Soon')}
+                        </span>
+                    </button>
                 </div>
 
                 {/* Source Image */}
@@ -492,7 +522,7 @@ export default function ImageEditorPage() {
                 )}
 
                 {/* Prompt - only for edit/inpaint modes */}
-                {mode !== 'angles' && (
+                {mode !== 'angles' && mode !== 'remove-bg' && (
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
                             {t('editor.instruction')}
@@ -507,7 +537,7 @@ export default function ImageEditorPage() {
                 )}
 
                 {/* Hints - only for edit/inpaint modes */}
-                {mode !== 'angles' && (
+                {mode !== 'angles' && mode !== 'remove-bg' && (
                     <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-200 text-xs">
                         <p className="font-medium mb-1.5">💡 {t('editor.hints.title')}</p>
                         <ul className="list-disc list-inside space-y-0.5 text-cyan-300/80">
@@ -528,7 +558,7 @@ export default function ImageEditorPage() {
                 {/* Generate Button */}
                 <Button
                     onClick={handleGenerate}
-                    disabled={isGenerating || !sourceImage || (mode !== 'angles' && !prompt.trim())}
+                    disabled={isGenerating || !sourceImage || ((mode !== 'angles' && mode !== 'remove-bg') && !prompt.trim())}
                     className="w-full py-6 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isGenerating ? (
@@ -538,10 +568,10 @@ export default function ImageEditorPage() {
                         </>
                     ) : (
                         <>
-                            {mode === 'angles' ? <Box size={20} className="mr-2" /> : <Pencil size={20} className="mr-2" />}
-                            {t('editor.generate')}
+                            {mode === 'angles' ? <Box size={20} className="mr-2" /> : mode === 'remove-bg' ? <Scissors size={20} className="mr-2" /> : <Pencil size={20} className="mr-2" />}
+                            {mode === 'remove-bg' ? t('editor.removeBg', 'Remove Background') : t('editor.generate')}
                             <span className="ml-2 bg-black/20 px-2 py-0.5 rounded text-xs">
-                                {mode === 'angles' ? ANGLES_PRICE : EDITOR_PRICE} {t('editor.tokens')}
+                                {mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : EDITOR_PRICE} {t('editor.tokens')}
                             </span>
                         </>
                     )}
@@ -569,7 +599,7 @@ export default function ImageEditorPage() {
                             {t('editor.insufficientBalance')}
                         </h3>
                         <p className="text-zinc-400 text-sm mb-4">
-                            {t('editor.needTokens', { count: EDITOR_PRICE })}
+                            {t('editor.needTokens', { count: mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : EDITOR_PRICE })}
                         </p>
                         <div className="flex gap-2">
                             <Button

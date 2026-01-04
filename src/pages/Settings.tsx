@@ -1,11 +1,12 @@
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { DevModeBanner } from '@/components/DevModeBanner'
+import { extractFingerprint } from '@/utils/fingerprint'
 
 interface NotificationSettings {
     telegram_news: boolean
@@ -32,6 +33,11 @@ export default function Settings() {
     const [notifSettings, setNotifSettings] = useState<NotificationSettings>(defaultSettings)
     const [showArrow, setShowArrow] = useState(false)
     const [searchParams] = useSearchParams()
+
+    // Fingerprint decoder state
+    const [fingerprintExpanded, setFingerprintExpanded] = useState(false)
+    const [fingerprintInput, setFingerprintInput] = useState('')
+    const [decodedAuthor, setDecodedAuthor] = useState<string | null>(null)
 
     const isMobile = platform === 'ios' || platform === 'android'
 
@@ -156,7 +162,7 @@ export default function Settings() {
         items: [
             { icon: MessageCircle, label: t('settings.items.support'), onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots', '_blank') : tg.openTelegramLink('https://t.me/aiversebots') },
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
-            { icon: Info, label: t('settings.items.version'), value: 'v3.0.7', onClick: () => { } },
+            { icon: Info, label: t('settings.items.version'), value: 'v3.0.8', onClick: () => { } },
         ]
     }
 
@@ -283,6 +289,82 @@ export default function Settings() {
                                         </button>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Tools Section */}
+                <div className="space-y-3">
+                    <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">{t('settings.sections.tools')}</h2>
+                    <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+                        {/* Watermark Editor */}
+                        <button
+                            onClick={() => { impact('light'); navigate('/watermark') }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <Droplets size={16} />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-sm font-medium text-white">{t('watermark.title')}</div>
+                            </div>
+                            <ChevronRight size={16} className="text-zinc-600" />
+                        </button>
+
+                        {/* Fingerprint Decoder */}
+                        <button
+                            onClick={() => { impact('light'); setFingerprintExpanded(!fingerprintExpanded) }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <Search size={16} />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-sm font-medium text-white">{t('settings.fingerprint.title')}</div>
+                            </div>
+                            <ChevronDown size={16} className={`text-zinc-600 transition-transform ${fingerprintExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {fingerprintExpanded && (
+                            <div className="border-t border-white/5 p-4 space-y-3">
+                                <p className="text-xs text-zinc-500">{t('settings.fingerprint.description')}</p>
+                                <textarea
+                                    value={fingerprintInput}
+                                    onChange={(e) => setFingerprintInput(e.target.value)}
+                                    placeholder={t('settings.fingerprint.placeholder')}
+                                    className="w-full h-24 px-3 py-2 bg-zinc-800 border border-white/10 rounded-xl text-sm text-white placeholder:text-zinc-600 resize-none focus:outline-none focus:border-violet-500"
+                                />
+                                <button
+                                    onClick={() => {
+                                        impact('medium')
+                                        const result = extractFingerprint(fingerprintInput)
+                                        setDecodedAuthor(result.identifier)
+                                        if (result.identifier) {
+                                            toast.success(t('settings.fingerprint.found'))
+                                        } else {
+                                            toast.error(t('settings.fingerprint.notFound'))
+                                        }
+                                    }}
+                                    disabled={!fingerprintInput.trim()}
+                                    className="w-full py-2.5 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    <Search size={16} />
+                                    {t('settings.fingerprint.check')}
+                                </button>
+
+                                {decodedAuthor !== null && (
+                                    <div className={`p-3 rounded-xl ${decodedAuthor ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
+                                        {decodedAuthor ? (
+                                            <div className="flex items-center gap-2">
+                                                <User size={16} className="text-emerald-400" />
+                                                <span className="text-sm text-emerald-400 font-medium">{t('settings.fingerprint.author')}: {decodedAuthor}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-red-400">{t('settings.fingerprint.noFingerprint')}</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

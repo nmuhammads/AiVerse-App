@@ -119,6 +119,7 @@ export default function Studio() {
     currentScreen,
     parentAuthorUsername,
     parentGenerationId,
+    isPromptPrivate,
     // Видео параметры
     videoDuration,
     videoResolution,
@@ -244,8 +245,8 @@ export default function Studio() {
               setMediaType('image')
             }
 
-            // Set parent generation for tracking remix chain
-            setParentGeneration(data.id, data.users?.username || 'Unknown')
+            // Set parent generation for tracking remix chain (with privacy flag)
+            setParentGeneration(data.id, data.users?.username || 'Unknown', !!data.is_prompt_private)
 
             console.log('[Remix] Loaded data:', {
               id: data.id,
@@ -742,18 +743,7 @@ export default function Studio() {
                 </button>
               )
             })}
-            {/* Image Editor Button */}
-            <button
-              onClick={() => { impact('light'); navigate('/editor') }}
-              className="flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all duration-200 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 hover:from-cyan-500/30 hover:to-blue-500/30"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-md">
-                <Pencil size={20} className="text-white" />
-              </div>
-              <span className="text-[10px] font-semibold text-center leading-tight text-cyan-300">
-                {t('editor.title')}
-              </span>
-            </button>
+
           </div>
         )}
 
@@ -816,6 +806,7 @@ export default function Studio() {
             <div className="flex items-center gap-1.5 text-xs font-medium text-violet-400 animate-in fade-in slide-in-from-bottom-2 mb-1 px-1">
               <Sparkles size={12} />
               <span>{t('studio.prompt.from', { username: parentAuthorUsername })}</span>
+
               <button
                 onClick={() => {
                   setParentGeneration(null, null)
@@ -828,20 +819,32 @@ export default function Studio() {
               </button>
             </div>
           )}
-          <div className="prompt-container group">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={t('studio.prompt.placeholder')}
-              className={`prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar ${parentAuthorUsername ? 'border-violet-500/30 focus:border-violet-500/50' : ''}`}
-            />
-            {prompt && (
-              <button
-                onClick={() => setPrompt('')}
-                className="absolute top-3 right-3 p-1.5 bg-zinc-800/50 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 transition-colors z-10"
-              >
-                <X size={14} />
-              </button>
+          <div className="prompt-container group relative">
+            {/* For private prompts: show only placeholder, completely hide real prompt */}
+            {isPromptPrivate && parentAuthorUsername ? (
+              <>
+                {/* Visual placeholder - no access to real prompt */}
+                <div className="prompt-input min-h-[120px] bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-amber-500/30 !flex items-center justify-center">
+                  <span className="text-zinc-400 italic">{t('profile.preview.hiddenByAuthor')}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={t('studio.prompt.placeholder')}
+                  className={`prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar ${parentAuthorUsername ? 'border-violet-500/30 focus:border-violet-500/50' : ''}`}
+                />
+                {prompt && (
+                  <button
+                    onClick={() => setPrompt('')}
+                    className="absolute top-3 right-3 p-1.5 bg-zinc-800/50 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 transition-colors z-10"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

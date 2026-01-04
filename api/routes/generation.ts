@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { handleGenerateImage, handleCheckPendingGenerations, getGenerationById, deleteGeneration, deleteEditVariant, getPendingCount } from '../controllers/generationController'
+import { handleGenerateImage, handleCheckPendingGenerations, getGenerationById, deleteGeneration, deleteEditVariant, getPendingCount, togglePromptPrivacy } from '../controllers/generationController'
 
 const router = Router()
 
@@ -8,6 +8,7 @@ router.post('/generate', handleGenerateImage)
 router.post('/check-status', handleCheckPendingGenerations)
 router.get('/pending-count', getPendingCount)
 router.get('/:id', getGenerationById)
+router.patch('/:id/privacy', togglePromptPrivacy)
 router.delete('/:id', deleteGeneration)
 router.delete('/:id/variant/:index', deleteEditVariant)
 

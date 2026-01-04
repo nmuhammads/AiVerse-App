@@ -10,7 +10,8 @@ interface FeedItem {
     id: number
     image_url: string | null
     video_url?: string | null
-    prompt: string
+    prompt: string | null
+    is_prompt_private?: boolean
     created_at: string
     author: {
         id: number

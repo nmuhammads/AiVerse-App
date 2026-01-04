@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift, Lock, Unlock, MessageSquare, Droplets } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -61,6 +61,7 @@ const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: st
 }
 
 import { PaymentModal } from '@/components/PaymentModal'
+import { toast } from 'sonner'
 import { GenerationSelector } from '@/components/GenerationSelector'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -114,8 +115,8 @@ export default function Profile() {
   const [remixCount, setRemixCount] = useState<number>(0)
   const [followingCount, setFollowingCount] = useState<number>(0)
   const [followersCount, setFollowersCount] = useState<number>(0)
-  const [items, setItems] = useState<{ id: number; image_url: string | null; video_url?: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null }[]>([])
-  const [preview, setPreview] = useState<{ id: number; image_url: string; video_url?: string | null; prompt: string; is_published: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null } | null>(null)
+  const [items, setItems] = useState<{ id: number; image_url: string | null; video_url?: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null }[]>([])
+  const [preview, setPreview] = useState<{ id: number; image_url: string; video_url?: string | null; prompt: string; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null } | null>(null)
   const [previewIndex, setPreviewIndex] = useState(0) // 0 = original, 1+ = edit variants
   const [currentGenerationIndex, setCurrentGenerationIndex] = useState<number | null>(null) // index in items array
   const [isVideoMuted, setIsVideoMuted] = useState(true)
@@ -442,6 +443,7 @@ export default function Profile() {
       video_url: newItem.video_url,
       prompt: newItem.prompt,
       is_published: newItem.is_published,
+      is_prompt_private: newItem.is_prompt_private,
       model: newItem.model,
       edit_variants: newItem.edit_variants,
       media_type: newItem.media_type
@@ -482,6 +484,7 @@ export default function Profile() {
                 video_url: newItem.video_url,
                 prompt: newItem.prompt,
                 is_published: newItem.is_published,
+                is_prompt_private: newItem.is_prompt_private,
                 model: newItem.model,
                 edit_variants: newItem.edit_variants,
                 media_type: newItem.media_type
@@ -507,6 +510,7 @@ export default function Profile() {
       video_url: newItem.video_url,
       prompt: newItem.prompt,
       is_published: newItem.is_published,
+      is_prompt_private: newItem.is_prompt_private,
       model: newItem.model,
       edit_variants: newItem.edit_variants,
       media_type: newItem.media_type
@@ -524,6 +528,8 @@ export default function Profile() {
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
   const [remixShareLoading, setRemixShareLoading] = useState(false)
+  const [sendWithPromptLoading, setSendWithPromptLoading] = useState(false)
+  const [sendWithWatermarkLoading, setSendWithWatermarkLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [showVariantDeleteConfirm, setShowVariantDeleteConfirm] = useState(false)
@@ -593,38 +599,71 @@ export default function Profile() {
     }
   }
 
-  const handlePublish = async () => {
+  const handlePublish = async (privacy?: boolean) => {
     if (!preview) return
     impact('medium')
     const newStatus = !preview.is_published
+    const newPrivacy = privacy !== undefined ? privacy : preview.is_prompt_private
+    const oldStatus = preview.is_published
+    const oldPrivacy = preview.is_prompt_private
 
     // Optimistic update
-    setPreview(prev => prev ? { ...prev, is_published: newStatus } : null)
-    setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: newStatus } : i))
+    setPreview(prev => prev ? { ...prev, is_published: newStatus, is_prompt_private: newPrivacy } : null)
+    setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: newStatus, is_prompt_private: newPrivacy } : i))
     setShowPublishConfirm(false)
 
     try {
       const r = await fetch('/api/user/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generationId: preview.id, isPublished: newStatus })
+        body: JSON.stringify({ generationId: preview.id, isPublished: newStatus, isPrivate: newPrivacy })
       })
       if (r.ok) {
         notify('success')
       } else {
         notify('error')
         // Revert
-        setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
-        setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
+        setPreview(prev => prev ? { ...prev, is_published: oldStatus, is_prompt_private: oldPrivacy } : null)
+        setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: oldStatus, is_prompt_private: oldPrivacy } : i))
       }
     } catch {
       notify('error')
       // Revert
-      setPreview(prev => prev ? { ...prev, is_published: !newStatus } : null)
-      setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: !newStatus } : i))
+      setPreview(prev => prev ? { ...prev, is_published: oldStatus, is_prompt_private: oldPrivacy } : null)
+      setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_published: oldStatus, is_prompt_private: oldPrivacy } : i))
     }
   }
 
+  const handlePrivacyToggle = async () => {
+    if (!preview) return
+    impact('light')
+    const newPrivate = !preview.is_prompt_private
+
+    // Optimistic update
+    setPreview(prev => prev ? { ...prev, is_prompt_private: newPrivate } : null)
+    setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_prompt_private: newPrivate } : i))
+
+    try {
+      const r = await fetch(`/api/generation/${preview.id}/privacy`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_prompt_private: newPrivate })
+      })
+      if (r.ok) {
+        notify('success')
+      } else {
+        notify('error')
+        // Revert
+        setPreview(prev => prev ? { ...prev, is_prompt_private: !newPrivate } : null)
+        setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_prompt_private: !newPrivate } : i))
+      }
+    } catch {
+      notify('error')
+      // Revert
+      setPreview(prev => prev ? { ...prev, is_prompt_private: !newPrivate } : null)
+      setItems(prev => prev.map(i => i.id === preview.id ? { ...i, is_prompt_private: !newPrivate } : i))
+    }
+  }
 
   const handleCoverSelect = async (generationId: number) => {
     if (!user?.id) return
@@ -1043,7 +1082,7 @@ export default function Profile() {
                 <div className="grid grid-cols-2 gap-3">
                   {items.filter(h => !!(h.image_url || h.video_url)).map((h, idx) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                      <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type }) }} className="block w-full">
+                      <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, is_prompt_private: h.is_prompt_private, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type }) }} className="block w-full">
                         <GridImage
                           src={h.compressed_url || h.image_url || ''}
                           originalUrl={h.image_url || ''}
@@ -1241,7 +1280,110 @@ export default function Profile() {
                       )}
                     </div>
                     <div className="p-4 flex flex-col gap-3">
-                      <div className="flex flex-col sm:flex-row gap-3">
+                      {/* Send to Chat Section */}
+                      <div className="border border-white/10 rounded-xl p-3 space-y-2">
+                        <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{t('profile.preview.sendToSection')}</h4>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!user?.id) return
+                              impact('light')
+                              try {
+                                const fileUrl = (preview.media_type === 'video' && preview.video_url) ? preview.video_url : preview.image_url
+                                const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: fileUrl, caption: cleanPrompt(preview.prompt) }) })
+                                const j = await r.json().catch(() => null)
+                                if (r.ok && j?.ok) { notify('success') }
+                                else {
+                                  notify('error')
+                                  shareImage(fileUrl, cleanPrompt(preview.prompt))
+                                }
+                              } catch {
+                                notify('error')
+                              }
+                            }}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98]"
+                          >
+                            <span className="flex items-center gap-2"><Send size={16} />{t('profile.preview.sendToChat')}</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id || !preview) return
+                              setSendWithPromptLoading(true)
+                              impact('medium')
+                              try {
+                                const r = await fetch('/api/telegram/sendWithPrompt', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    chat_id: user.id,
+                                    photo_url: preview.image_url,
+                                    video_url: preview.video_url || null,
+                                    prompt: cleanPrompt(preview.prompt),
+                                    model: preview.model || '',
+                                    username: user.username || null,
+                                    user_id: user.id
+                                  })
+                                })
+                                if (r.ok) {
+                                  notify('success')
+                                } else {
+                                  notify('error')
+                                }
+                              } catch {
+                                notify('error')
+                              } finally {
+                                setSendWithPromptLoading(false)
+                              }
+                            }}
+                            disabled={sendWithPromptLoading || !preview.prompt}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                            title={t('profile.preview.sendWithPromptHint')}
+                          >
+                            <span className="flex items-center gap-2">{sendWithPromptLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}{t('profile.preview.sendWithPrompt')}</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id || !preview) return
+                              setSendWithWatermarkLoading(true)
+                              impact('medium')
+                              try {
+                                const r = await fetch('/api/telegram/sendWithWatermark', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    chat_id: user.id,
+                                    photo_url: preview.image_url,
+                                    prompt: cleanPrompt(preview.prompt),
+                                    model: preview.model || '',
+                                    username: user.username || null,
+                                    user_id: user.id
+                                  })
+                                })
+                                const data = await r.json()
+                                if (r.ok) {
+                                  notify('success')
+                                } else if (data.error === 'no_watermark_settings') {
+                                  toast.error(t('profile.preview.noWatermarkSettings'))
+                                } else {
+                                  notify('error')
+                                }
+                              } catch {
+                                notify('error')
+                              } finally {
+                                setSendWithWatermarkLoading(false)
+                              }
+                            }}
+                            disabled={sendWithWatermarkLoading || preview.media_type === 'video'}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                            title={t('profile.preview.sendWithWatermarkHint')}
+                          >
+                            <span className="flex items-center gap-2">{sendWithWatermarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Droplets size={16} />}{t('profile.preview.sendWithWatermark')}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Save + Remix */}
+                      <div className="flex gap-3">
                         <button
                           onClick={() => {
                             impact('light')
@@ -1254,37 +1396,11 @@ export default function Profile() {
                               saveToGallery(currentImage, `ai-${Date.now()}.jpg`)
                             }
                           }}
-                          className="flex-1 min-h-[48px] h-auto py-3 rounded-xl bg-white text-black hover:bg-zinc-100 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
+                          className="flex-1 min-h-[44px] py-2 px-2 rounded-xl bg-white text-black hover:bg-zinc-100 font-bold text-xs flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
                         >
                           <DownloadIcon size={16} />
                           {t('profile.preview.saveToGallery')}
                         </button>
-                        <button
-                          onClick={async () => {
-                            if (!user?.id) return
-                            impact('light')
-                            try {
-                              const fileUrl = (preview.media_type === 'video' && preview.video_url) ? preview.video_url : preview.image_url
-                              const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: fileUrl, caption: cleanPrompt(preview.prompt) }) })
-                              const j = await r.json().catch(() => null)
-                              if (r.ok && j?.ok) { notify('success') }
-                              else {
-                                notify('error')
-                                shareImage(fileUrl, cleanPrompt(preview.prompt))
-                              }
-                            } catch {
-                              notify('error')
-                            }
-                          }}
-                          className="flex-1 min-h-[48px] h-auto py-3 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
-                        >
-                          <Send size={16} />
-                          {t('profile.preview.sendToChat')}
-                        </button>
-                      </div>
-
-                      {/* Row 2: Remix + Publish */}
-                      <div className="flex gap-3">
                         <button
                           onClick={() => setShowRemixShareConfirm(true)}
                           disabled={remixShareLoading}
@@ -1293,6 +1409,10 @@ export default function Profile() {
                           {remixShareLoading ? <Loader2 size={14} className="flex-shrink-0 animate-spin" /> : <Repeat size={14} className="flex-shrink-0" />}
                           <span className="text-center leading-tight">{t('profile.preview.shareRemix')}</span>
                         </button>
+                      </div>
+
+                      {/* Row 3: Publish + Privacy */}
+                      <div className="flex gap-3">
                         <button
                           onClick={() => {
                             if (preview.is_published) {
@@ -1305,6 +1425,14 @@ export default function Profile() {
                         >
                           {preview.is_published ? <EyeOff size={14} className="flex-shrink-0" /> : <Globe size={14} className="flex-shrink-0" />}
                           <span className="text-center leading-tight">{preview.is_published ? t('profile.preview.unpublish') : t('profile.preview.publish')}</span>
+                        </button>
+                        <button
+                          onClick={handlePrivacyToggle}
+                          className={`flex-1 min-h-[44px] py-2 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.98] transition-colors border ${preview.is_prompt_private ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30' : 'bg-zinc-800 text-zinc-400 border-white/5 hover:bg-zinc-700'}`}
+                          title={preview.is_prompt_private ? t('profile.preview.promptPrivate') : t('profile.preview.promptPublic')}
+                        >
+                          {preview.is_prompt_private ? <Lock size={14} /> : <Unlock size={14} />}
+                          <span className="text-center leading-tight">{preview.is_prompt_private ? t('profile.preview.buttonPrivate') : t('profile.preview.buttonPublic')}</span>
                         </button>
                       </div>
 
@@ -1356,6 +1484,8 @@ export default function Profile() {
                 </div>
               )}
 
+
+
               {/* Publish Confirmation Modal */}
               {showPublishConfirm && (
                 <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPublishConfirm(false) }}>
@@ -1366,19 +1496,27 @@ export default function Profile() {
                         {t('profile.publishConfirm.description')}
                       </p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3">
                       <button
                         onClick={() => setShowPublishConfirm(false)}
-                        className="flex-1 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
+                        className="w-full py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-colors"
                       >
                         {t('profile.publishConfirm.cancel')}
                       </button>
-                      <button
-                        onClick={handlePublish}
-                        className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors"
-                      >
-                        {t('profile.publishConfirm.confirm')}
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handlePublish(false)}
+                          className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-[10px] leading-tight hover:bg-emerald-700 transition-colors"
+                        >
+                          {t('profile.publishConfirm.publishOpen')}
+                        </button>
+                        <button
+                          onClick={() => handlePublish(true)}
+                          className="flex-1 py-3 rounded-xl bg-amber-600/80 text-white font-bold text-[10px] leading-tight hover:bg-amber-600 transition-colors"
+                        >
+                          {t('profile.publishConfirm.publishPrivate')}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,10 @@
 # Используем Node.js 18 как базовый образ
 FROM node:18-alpine
 
+# Устанавливаем fontconfig и шрифты для поддержки кириллицы в водяных знаках
+RUN apk add --no-cache fontconfig font-noto font-noto-cjk ttf-dejavu \
+    && fc-cache -fv
+
 # Устанавливаем рабочую директорию
 WORKDIR /app
 

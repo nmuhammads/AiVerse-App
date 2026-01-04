@@ -6,7 +6,8 @@
             "remix": "Remixes",
             "social": "Social",
             "about": "About",
-            "notifications": "Notifications"
+            "notifications": "Notifications",
+            "tools": "Tools"
         },
         "items": {
             "language": "Language",
@@ -34,6 +35,55 @@
                 "generation": "Generations",
                 "likes": "Likes"
             }
+        },
+        "fingerprint": {
+            "title": "Check Prompt Author",
+            "description": "Paste a prompt received via 'With prompt' to find out its author",
+            "placeholder": "Paste prompt here...",
+            "check": "Check",
+            "author": "Author",
+            "found": "Author found!",
+            "notFound": "Author fingerprint not found",
+            "noFingerprint": "No author fingerprint in this prompt"
+        }
+    },
+    "watermark": {
+        "title": "Watermark",
+        "textLabel": "Watermark text",
+        "textPlaceholder": "Your text...",
+        "opacity": "Opacity",
+        "position": "Position",
+        "save": "Save",
+        "saved": "Watermark saved",
+        "deleted": "Watermark deleted",
+        "generate": "Generate AI",
+        "previewPlaceholder": "Preview",
+        "generated": "✨ Watermark created!",
+        "insufficientBalance": "Insufficient balance",
+        "switchToText": "Switch to text",
+        "switchToAi": "Switch to AI watermark",
+        "switchedToAi": "Switched to AI watermark",
+        "tabs": {
+            "generator": "Generator",
+            "custom": "Custom"
+        },
+        "uploadSection": "Upload image",
+        "uploadImage": "Upload image",
+        "uploaded": "✨ Image uploaded!",
+        "customLoaded": "Image uploaded",
+        "invalidFileType": "Please select an image",
+        "removeBg": "Remove background",
+        "bgRemoved": "✨ Background removed!",
+        "removingBg": "Removing background...",
+        "bgRemovedLabel": "Background removed",
+        "saveAsIs": "Save as is",
+        "uploadPreview": {
+            "title": "Image preview"
+        },
+        "replaceWarning": {
+            "title": "⚠️ Replace watermark?",
+            "text": "Current watermark will be permanently deleted and replaced with a new one.",
+            "confirm": "Replace"
         }
     },
     "home": {
@@ -170,7 +220,7 @@
         },
         "preview": {
             "saveToGallery": "Save to Gallery",
-            "sendToChat": "Send to Chat with Prompt",
+            "sendToChat": "File",
             "shareRemix": "Share Remix",
             "publish": "Publish to Feed",
             "unpublish": "Remove from Feed",
@@ -179,7 +229,18 @@
             "showPrompt": "Show & Copy",
             "hidePrompt": "Hide Prompt",
             "copyPrompt": "Copy Prompt",
-            "copied": "Copied!"
+            "copied": "Copied!",
+            "promptPrivate": "Prompt hidden",
+            "promptPublic": "Hide prompt",
+            "hiddenByAuthor": "🔒 Hidden by author",
+            "sendToSection": "Send to Chat",
+            "sendWithPrompt": "With Refs",
+            "sendWithPromptHint": "Send to chat with prompt and referral link",
+            "sendWithWatermark": "Ref & Watermark",
+            "sendWithWatermarkHint": "Send with watermark and referral link",
+            "noWatermarkSettings": "First set up watermark in Settings",
+            "buttonPrivate": "Private Prompt",
+            "buttonPublic": "Open Prompt"
         },
         "deleteConfirm": {
             "title": "Delete generation?",
@@ -188,10 +249,12 @@
             "confirm": "Delete"
         },
         "publishConfirm": {
-            "title": "Publish to public feed?",
-            "description": "Other users will see your work",
+            "title": "Publish to Feed?",
+            "description": "Your work will be seen by other users",
             "cancel": "Cancel",
-            "confirm": "Publish"
+            "confirm": "Publish",
+            "publishOpen": "Publish with Open Prompt",
+            "publishPrivate": "Publish with Private Prompt"
         }
     },
     "spin": {
@@ -397,6 +460,8 @@
         "guest": "Guest",
         "empty": "Empty",
         "cancel": "Cancel",
+        "done": "Done",
+        "error": "Error",
         "topUp": "Top Up",
         "loading": "Loading..."
     },
@@ -478,7 +543,7 @@
         "close": "Close"
     },
     "editor": {
-        "title": "Image Editor",
+        "title": "Editor",
         "edit": "Edit",
         "image": "Source Image",
         "upload": "Upload",
@@ -493,6 +558,7 @@
             "3": "Fewer words = more accurate result"
         },
         "generate": "Edit",
+        "removeBg": "Remove Background",
         "generating": "Processing...",
         "tokens": "tokens",
         "result": "Result",
@@ -507,7 +573,8 @@
         "mode": {
             "edit": "Edit",
             "inpaint": "Inpaint",
-            "angles": "Angles"
+            "angles": "Angles",
+            "removeBg": "Remove BG"
         },
         "angles": {
             "rotation": "Rotation",
