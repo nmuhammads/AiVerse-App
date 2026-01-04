@@ -231,7 +231,7 @@ export default function WatermarkEditor() {
     return (
         <div className="min-h-screen bg-black text-white pb-44" style={{ paddingTop: getPaddingTop() }}>
             {/* Header */}
-            <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10">
+            <div className="bg-black/80 backdrop-blur-xl border-b border-white/10">
                 <div className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
                         {!isMobile && (
