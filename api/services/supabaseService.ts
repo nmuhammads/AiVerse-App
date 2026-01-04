@@ -49,4 +49,10 @@ export async function supaStorageUpload(pathname: string, buf: Buffer, contentTy
     return { ok: r.ok, data }
 }
 
+export async function supaDelete(table: string, filter: string) {
+    const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
+    const r = await fetch(url, { method: 'DELETE', headers: { ...supaHeaders(), 'Content-Type': 'application/json' } })
+    return { ok: r.ok }
+}
+
 export { SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET }

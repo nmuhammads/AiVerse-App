@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useEffect, useState } from 'react'
@@ -294,10 +294,25 @@ export default function Settings() {
                     </div>
                 </div>
 
-                {/* Fingerprint Decoder Section */}
+                {/* Tools Section */}
                 <div className="space-y-3">
                     <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider px-1">{t('settings.sections.tools')}</h2>
                     <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+                        {/* Watermark Editor */}
+                        <button
+                            onClick={() => { impact('light'); navigate('/watermark') }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <Droplets size={16} />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-sm font-medium text-white">{t('watermark.title')}</div>
+                            </div>
+                            <ChevronRight size={16} className="text-zinc-600" />
+                        </button>
+
+                        {/* Fingerprint Decoder */}
                         <button
                             onClick={() => { impact('light'); setFingerprintExpanded(!fingerprintExpanded) }}
                             className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors"

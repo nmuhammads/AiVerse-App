@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import sharp from 'sharp'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
 import { addFingerprint } from '../utils/fingerprint.js'
+import { applyTextWatermark, applyImageWatermark } from '../utils/watermark.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -890,3 +891,131 @@ export async function sendWithPrompt(req: Request, res: Response) {
     return res.status(500).json({ ok: false })
   }
 }
+
+/**
+ * Send generation to chat with watermark and refs (Feature 2: Watermark Overlay)
+ * Downloads image, applies watermark from user settings, sends with refs
+ */
+export async function sendWithWatermark(req: Request, res: Response) {
+  try {
+    const chat_id = Number(req.body?.chat_id || 0)
+    const photo = String(req.body?.photo_url || '')
+    const prompt = String(req.body?.prompt || '')
+    const model = String(req.body?.model || '')
+    const username = req.body?.username ? String(req.body.username).replace(/^@/, '') : null
+    const userId = Number(req.body?.user_id || 0)
+
+    if (!API || !chat_id || !photo) {
+      return res.status(400).json({ ok: false, error: 'invalid payload' })
+    }
+
+    // Get user's watermark settings
+    const { data: watermarks } = await supaSelect('user_watermarks', `?user_id=eq.${userId}&is_active=eq.true&limit=1`)
+    const watermark = watermarks?.[0]
+
+    if (!watermark || (!watermark.text_content && watermark.type !== 'ai_generated') || (watermark.type === 'ai_generated' && !watermark.image_url)) {
+      // No watermark settings, fallback to sendWithPrompt behavior
+      return res.status(400).json({ ok: false, error: 'no_watermark_settings' })
+    }
+
+    console.info('sendWithWatermark:start', { chat_id, userId, hasWatermark: !!watermark, type: watermark.type })
+
+    // Download image
+    const imageResponse = await fetch(photo)
+    if (!imageResponse.ok) {
+      return res.status(400).json({ ok: false, error: 'failed_to_fetch_image' })
+    }
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer())
+
+    // Apply watermark
+    let watermarkedBuffer: Buffer
+    if (watermark.type === 'ai_generated' && watermark.image_url) {
+      // Map font_size (10-100) to scale percentage (10-50%?)
+      // Standard scale: font_size directly as percentage if sliders are 10-100?
+      // Default font_size is 48 -> 48% is HUGE.
+      // Maybe slider 10-100 maps to 10%-50%?
+      // Or 10-100 maps to 5%-30%?
+      // Let's assume font_size IS the percentage (10 to 100).
+      // 48% is big but user can slide it down.
+      const scale = watermark.font_size || 20
+
+      watermarkedBuffer = await applyImageWatermark(
+        imageBuffer,
+        watermark.image_url,
+        watermark.position || 'bottom-right',
+        watermark.opacity ?? 0.5,
+        scale
+      )
+    } else {
+      watermarkedBuffer = await applyTextWatermark(
+        imageBuffer,
+        watermark.text_content || '',
+        watermark.position || 'bottom-right',
+        watermark.opacity ?? 0.5,
+        watermark.font_size || 48,
+        watermark.font_color || '#FFFFFF'
+      )
+    }
+
+    // Get hashtag and bot for model
+    const hashtag = MODEL_HASHTAGS[model] || '#AIVerse'
+    const botName = MODEL_BOTS[model] || 'AiVerseAppBot'
+
+    // Build ref link
+    const refParam = username || String(userId)
+    const botLink = `https://t.me/${botName}?start=ref_${refParam}`
+    const appLink = `https://t.me/AiVerseAppBot?start=ref_${refParam}`
+
+    // Add fingerprint to prompt
+    const promptWithFingerprint = prompt ? addFingerprint(prompt, username, userId) : ''
+
+    // Format caption
+    const headerHtml = `${hashtag}\n\n🎨 Создай похожее:\nВ боте - <a href="${botLink}">@${botName}</a>\nВ приложении - <a href="${appLink}">📱 AiVerse App</a>`
+
+    const promptHtml = promptWithFingerprint
+      ? `\n\n💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      : ''
+
+    const fullCaption = headerHtml + promptHtml
+    const isCaptionTooLong = fullCaption.length > 1024
+    const caption = isCaptionTooLong ? headerHtml : fullCaption
+
+    // Send photo with watermark as file upload
+    const formData = new FormData()
+    formData.append('chat_id', String(chat_id))
+    formData.append('photo', new Blob([new Uint8Array(watermarkedBuffer)], { type: 'image/jpeg' }), 'watermarked.jpg')
+    formData.append('caption', caption)
+    formData.append('parse_mode', 'HTML')
+
+    const sendResult = await fetch(`${API}/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    })
+    const sendData = await sendResult.json()
+
+    if (!sendData.ok) {
+      console.error('sendWithWatermark:telegram_error', sendData)
+      return res.status(500).json({ ok: false, error: 'telegram_error' })
+    }
+
+    const msgId = sendData.result?.message_id
+
+    // Send separate prompt if caption was too long
+    if (isCaptionTooLong && promptWithFingerprint && msgId) {
+      const text = `💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      await tg('sendMessage', {
+        chat_id,
+        text,
+        parse_mode: 'HTML',
+        reply_to_message_id: msgId
+      })
+    }
+
+    return res.json({ ok: true })
+
+  } catch (e) {
+    console.error('sendWithWatermark error', e)
+    return res.status(500).json({ ok: false })
+  }
+}
+

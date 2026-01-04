@@ -78,15 +78,25 @@ export async function uploadImageFromUrl(imageUrl: string, folder: string = ''):
 }
 
 
-export async function uploadImageFromBase64(base64Data: string, folder: string = ''): Promise<string> {
-    const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME
-    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL
+
+export async function uploadImageFromBase64(
+    base64Data: string,
+    folder: string = '',
+    options: { bucket?: string; publicUrl?: string } = {}
+): Promise<string> {
+    const { bucket, publicUrl: customUrl } = options
+    const R2_BUCKET_NAME = bucket || process.env.R2_BUCKET_NAME
+    const R2_PUBLIC_URL = customUrl || process.env.R2_PUBLIC_URL
     const client = getS3Client()
 
     console.log('Starting R2 upload for Base64 data')
 
     if (!client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
-        console.warn('R2 credentials missing for Base64 upload')
+        console.warn('R2 credentials missing for Base64 upload', {
+            hasClient: !!client,
+            hasBucket: !!R2_BUCKET_NAME,
+            hasPublicUrl: !!R2_PUBLIC_URL
+        })
         return base64Data // Return original data if upload not possible
     }
 
@@ -116,14 +126,15 @@ export async function uploadImageFromBase64(base64Data: string, folder: string =
             ContentType: contentType,
         }))
 
-        const publicUrl = `${R2_PUBLIC_URL}/${fileName}`
-        console.log('R2 Base64 upload success:', publicUrl)
-        return publicUrl
+        const finalUrl = `${R2_PUBLIC_URL}/${fileName}`
+        console.log('R2 Base64 upload success:', finalUrl)
+        return finalUrl
     } catch (error) {
         console.error('R2 Base64 upload failed:', error)
         return base64Data // Fallback to original on failure
     }
 }
+
 
 
 export async function createThumbnail(input: Buffer | string, originalUrl?: string, customFileName?: string): Promise<string> {

@@ -47,6 +47,18 @@
             "noFingerprint": "No author fingerprint in this prompt"
         }
     },
+    "watermark": {
+        "title": "Watermark",
+        "textLabel": "Watermark text",
+        "textPlaceholder": "Your text...",
+        "opacity": "Opacity",
+        "position": "Position",
+        "save": "Save",
+        "saved": "Watermark saved",
+        "deleted": "Watermark deleted",
+        "generate": "Generate AI",
+        "previewPlaceholder": "Preview"
+    },
     "home": {
         "tabs": {
             "new": "New",
@@ -181,7 +193,7 @@
         },
         "preview": {
             "saveToGallery": "Save to Gallery",
-            "sendToChat": "Send as File",
+            "sendToChat": "File",
             "shareRemix": "Share Remix",
             "publish": "Publish to Feed",
             "unpublish": "Remove from Feed",
@@ -194,8 +206,12 @@
             "promptPrivate": "Prompt hidden",
             "promptPublic": "Hide prompt",
             "hiddenByAuthor": "🔒 Hidden by author",
-            "sendWithPrompt": "Send with Refs",
+            "sendToSection": "Send to Chat",
+            "sendWithPrompt": "With Refs",
             "sendWithPromptHint": "Send to chat with prompt and referral link",
+            "sendWithWatermark": "Ref & Watermark",
+            "sendWithWatermarkHint": "Send with watermark and referral link",
+            "noWatermarkSettings": "First set up watermark in Settings",
             "buttonPrivate": "Private Prompt",
             "buttonPublic": "Open Prompt"
         },

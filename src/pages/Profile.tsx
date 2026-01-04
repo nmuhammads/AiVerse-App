@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift, Lock, Unlock, MessageSquare } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift, Lock, Unlock, MessageSquare, Droplets } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -61,6 +61,7 @@ const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: st
 }
 
 import { PaymentModal } from '@/components/PaymentModal'
+import { toast } from 'sonner'
 import { GenerationSelector } from '@/components/GenerationSelector'
 import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -528,6 +529,7 @@ export default function Profile() {
   const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
   const [remixShareLoading, setRemixShareLoading] = useState(false)
   const [sendWithPromptLoading, setSendWithPromptLoading] = useState(false)
+  const [sendWithWatermarkLoading, setSendWithWatermarkLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [showVariantDeleteConfirm, setShowVariantDeleteConfirm] = useState(false)
@@ -1278,67 +1280,106 @@ export default function Profile() {
                       )}
                     </div>
                     <div className="p-4 flex flex-col gap-3">
-                      {/* Row 1: Send File + Send Refs */}
-                      <div className="flex gap-3">
-                        <button
-                          onClick={async () => {
-                            if (!user?.id) return
-                            impact('light')
-                            try {
-                              const fileUrl = (preview.media_type === 'video' && preview.video_url) ? preview.video_url : preview.image_url
-                              const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: fileUrl, caption: cleanPrompt(preview.prompt) }) })
-                              const j = await r.json().catch(() => null)
-                              if (r.ok && j?.ok) { notify('success') }
-                              else {
+                      {/* Send to Chat Section */}
+                      <div className="border border-white/10 rounded-xl p-3 space-y-2">
+                        <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{t('profile.preview.sendToSection')}</h4>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!user?.id) return
+                              impact('light')
+                              try {
+                                const fileUrl = (preview.media_type === 'video' && preview.video_url) ? preview.video_url : preview.image_url
+                                const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: fileUrl, caption: cleanPrompt(preview.prompt) }) })
+                                const j = await r.json().catch(() => null)
+                                if (r.ok && j?.ok) { notify('success') }
+                                else {
+                                  notify('error')
+                                  shareImage(fileUrl, cleanPrompt(preview.prompt))
+                                }
+                              } catch {
                                 notify('error')
-                                shareImage(fileUrl, cleanPrompt(preview.prompt))
                               }
-                            } catch {
-                              notify('error')
-                            }
-                          }}
-                          className="flex-1 min-h-[48px] h-auto py-3 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]"
-                        >
-                          <Send size={16} />
-                          {t('profile.preview.sendToChat')}
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!user?.id || !preview) return
-                            setSendWithPromptLoading(true)
-                            impact('medium')
-                            try {
-                              const r = await fetch('/api/telegram/sendWithPrompt', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  chat_id: user.id,
-                                  photo_url: preview.image_url,
-                                  video_url: preview.video_url || null,
-                                  prompt: cleanPrompt(preview.prompt),
-                                  model: preview.model || '',
-                                  username: user.username || null,
-                                  user_id: user.id
+                            }}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98]"
+                          >
+                            <span className="flex items-center gap-2"><Send size={16} />{t('profile.preview.sendToChat')}</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id || !preview) return
+                              setSendWithPromptLoading(true)
+                              impact('medium')
+                              try {
+                                const r = await fetch('/api/telegram/sendWithPrompt', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    chat_id: user.id,
+                                    photo_url: preview.image_url,
+                                    video_url: preview.video_url || null,
+                                    prompt: cleanPrompt(preview.prompt),
+                                    model: preview.model || '',
+                                    username: user.username || null,
+                                    user_id: user.id
+                                  })
                                 })
-                              })
-                              if (r.ok) {
-                                notify('success')
-                              } else {
+                                if (r.ok) {
+                                  notify('success')
+                                } else {
+                                  notify('error')
+                                }
+                              } catch {
                                 notify('error')
+                              } finally {
+                                setSendWithPromptLoading(false)
                               }
-                            } catch {
-                              notify('error')
-                            } finally {
-                              setSendWithPromptLoading(false)
-                            }
-                          }}
-                          disabled={sendWithPromptLoading || !preview.prompt}
-                          className="flex-1 min-h-[48px] h-auto py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] disabled:opacity-50"
-                          title={t('profile.preview.sendWithPromptHint')}
-                        >
-                          {sendWithPromptLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
-                          {t('profile.preview.sendWithPrompt')}
-                        </button>
+                            }}
+                            disabled={sendWithPromptLoading || !preview.prompt}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                            title={t('profile.preview.sendWithPromptHint')}
+                          >
+                            <span className="flex items-center gap-2">{sendWithPromptLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}{t('profile.preview.sendWithPrompt')}</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id || !preview) return
+                              setSendWithWatermarkLoading(true)
+                              impact('medium')
+                              try {
+                                const r = await fetch('/api/telegram/sendWithWatermark', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    chat_id: user.id,
+                                    photo_url: preview.image_url,
+                                    prompt: cleanPrompt(preview.prompt),
+                                    model: preview.model || '',
+                                    username: user.username || null,
+                                    user_id: user.id
+                                  })
+                                })
+                                const data = await r.json()
+                                if (r.ok) {
+                                  notify('success')
+                                } else if (data.error === 'no_watermark_settings') {
+                                  toast.error(t('profile.preview.noWatermarkSettings'))
+                                } else {
+                                  notify('error')
+                                }
+                              } catch {
+                                notify('error')
+                              } finally {
+                                setSendWithWatermarkLoading(false)
+                              }
+                            }}
+                            disabled={sendWithWatermarkLoading || preview.media_type === 'video'}
+                            className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                            title={t('profile.preview.sendWithWatermarkHint')}
+                          >
+                            <span className="flex items-center gap-2">{sendWithWatermarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Droplets size={16} />}{t('profile.preview.sendWithWatermark')}</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Row 2: Save + Remix */}

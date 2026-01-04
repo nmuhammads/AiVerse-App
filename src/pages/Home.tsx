@@ -245,8 +245,8 @@ export default function Home() {
   }
 
   const filteredItems = items.filter(x =>
-    x.prompt.toLowerCase().includes(q.toLowerCase()) ||
-    x.author.username.toLowerCase().includes(q.toLowerCase())
+    (x.prompt || '').toLowerCase().includes(q.toLowerCase()) ||
+    (x.author?.username || '').toLowerCase().includes(q.toLowerCase())
   )
 
   const { platform } = useTelegram()
