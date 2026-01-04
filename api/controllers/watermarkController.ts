@@ -296,7 +296,7 @@ export async function generateWatermark(req: Request, res: Response) {
             // Fallback to original
         }
 
-        // 5. Upload to R2
+        // 5. Upload to R2 with fixed filename per user (overwrites previous watermark)
         console.log('[Watermark] Uploading to R2...')
         const base64 = `data:image/png;base64,${processedBuffer.toString('base64')}`
 
@@ -304,10 +304,14 @@ export async function generateWatermark(req: Request, res: Response) {
         const customBucket = process.env.R2_BUCKET_WATERMARKS
         const customUrl = process.env.R2_PUBLIC_URL_WATERMARKS
 
+        // Use fixed filename per user to ensure only one AI watermark is stored
+        // This overwrites the previous watermark when a new one is generated
+        const fixedFileName = `user_${userId}.png`
+
         const publicUrl = await uploadImageFromBase64(
             base64,
             'watermarks',
-            { bucket: customBucket, publicUrl: customUrl }
+            { bucket: customBucket, publicUrl: customUrl, customFileName: fixedFileName }
         )
         console.log('[Watermark] R2 URL:', publicUrl)
 

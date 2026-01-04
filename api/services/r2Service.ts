@@ -82,14 +82,14 @@ export async function uploadImageFromUrl(imageUrl: string, folder: string = ''):
 export async function uploadImageFromBase64(
     base64Data: string,
     folder: string = '',
-    options: { bucket?: string; publicUrl?: string } = {}
+    options: { bucket?: string; publicUrl?: string; customFileName?: string } = {}
 ): Promise<string> {
-    const { bucket, publicUrl: customUrl } = options
+    const { bucket, publicUrl: customUrl, customFileName } = options
     const R2_BUCKET_NAME = bucket || process.env.R2_BUCKET_NAME
     const R2_PUBLIC_URL = customUrl || process.env.R2_PUBLIC_URL
     const client = getS3Client()
 
-    console.log('Starting R2 upload for Base64 data')
+    console.log('Starting R2 upload for Base64 data', customFileName ? `(custom name: ${customFileName})` : '')
 
     if (!client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
         console.warn('R2 credentials missing for Base64 upload', {
@@ -113,10 +113,16 @@ export async function uploadImageFromBase64(
         const data = matches[2]
         const buffer = Buffer.from(data, 'base64')
 
-        // 2. Generate unique filename
-        const hash = crypto.randomBytes(16).toString('hex')
-        const ext = contentType.split('/')[1] || 'png'
-        const fileName = folder ? `${folder}/${hash}.${ext}` : `${hash}.${ext}`
+        // 2. Generate filename (use custom or generate unique)
+        let fileName: string
+        if (customFileName) {
+            // Use custom filename - allows overwriting existing files
+            fileName = folder ? `${folder}/${customFileName}` : customFileName
+        } else {
+            const hash = crypto.randomBytes(16).toString('hex')
+            const ext = contentType.split('/')[1] || 'png'
+            fileName = folder ? `${folder}/${hash}.${ext}` : `${hash}.${ext}`
+        }
 
         // 3. Upload to R2
         await client.send(new PutObjectCommand({
