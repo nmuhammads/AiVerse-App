@@ -58,7 +58,12 @@
         "saved": "Водяной знак сохранён",
         "deleted": "Водяной знак удалён",
         "generate": "Сгенерировать AI",
-        "previewPlaceholder": "Превью"
+        "previewPlaceholder": "Превью",
+        "generated": "✨ Водяной знак создан!",
+        "insufficientBalance": "Недостаточно токенов",
+        "switchToText": "Вернуться к тексту",
+        "switchToAi": "Вернуться к AI знаку",
+        "switchedToAi": "Переключено на AI знак"
     },
     "home": {
         "tabs": {

@@ -57,7 +57,12 @@
         "saved": "Watermark saved",
         "deleted": "Watermark deleted",
         "generate": "Generate AI",
-        "previewPlaceholder": "Preview"
+        "previewPlaceholder": "Preview",
+        "generated": "✨ Watermark created!",
+        "insufficientBalance": "Insufficient balance",
+        "switchToText": "Switch to text",
+        "switchToAi": "Switch to AI watermark",
+        "switchedToAi": "Switched to AI watermark"
     },
     "home": {
         "tabs": {

@@ -122,8 +122,36 @@ export async function applyImageWatermark(
     }
 }
 
+// Base64 encoded font cache (fetched once)
+let cachedFontBase64: string | null = null
+
+/**
+ * Fetch Noto Sans font (supports Cyrillic) and cache it
+ */
+async function getFontBase64(): Promise<string> {
+    if (cachedFontBase64) return cachedFontBase64
+
+    try {
+        // Use Google Fonts API to get Noto Sans which supports Cyrillic
+        const fontUrl = 'https://fonts.gstatic.com/s/notosans/v36/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A-9a6Vc.ttf'
+        const response = await fetch(fontUrl)
+        if (!response.ok) {
+            console.warn('Failed to fetch Noto Sans font, falling back to system fonts')
+            return ''
+        }
+        const buffer = await response.arrayBuffer()
+        cachedFontBase64 = Buffer.from(buffer).toString('base64')
+        console.log('Loaded Noto Sans font for watermarks')
+        return cachedFontBase64
+    } catch (e) {
+        console.error('Error fetching font:', e)
+        return ''
+    }
+}
+
 /**
  * Apply text watermark to image using Sharp
+ * Uses embedded Noto Sans font for Cyrillic support
  */
 export async function applyTextWatermark(
     imageBuffer: Buffer,
@@ -151,13 +179,31 @@ export async function applyTextWatermark(
     // If calculatePosition returns top-left corner of the bbox, we need to adjust y for SVG text baseline.
     // SVG text 'y' attribute usually specifies the baseline. 
     // If we want 'y' to be the top of the text, we add approx 0.8 * fontSize (ascender).
-    // Let's adjust y for text specific rendering.
     const svgY = y + (fontSize * 0.8)
+
+    // Get embedded font (supports Cyrillic)
+    const fontBase64 = await getFontBase64()
+
+    // Create font-face definition if we have embedded font
+    const fontFace = fontBase64 ? `
+        @font-face {
+            font-family: 'NotoSans';
+            src: url(data:font/truetype;base64,${fontBase64}) format('truetype');
+        }
+    ` : ''
+
+    // Use NotoSans if embedded, fallback to system fonts
+    const fontFamily = fontBase64
+        ? "'NotoSans', 'Noto Sans', Arial, sans-serif"
+        : "'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Arial, Helvetica, sans-serif"
 
     // Create SVG text overlay with shadow for better visibility
     const svgText = `
-    <svg width="${width}" height="${height}">
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        <style type="text/css">
+          ${fontFace}
+        </style>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.5"/>
         </filter>
@@ -168,14 +214,13 @@ export async function applyTextWatermark(
         font-size="${fontSize}" 
         fill="${fontColor}" 
         opacity="${opacity}"
-        font-family="Arial, Helvetica, sans-serif"
+        font-family="${fontFamily}"
         font-weight="bold"
         text-anchor="middle"
         filter="url(#shadow)"
       >${escapeXml(text)}</text>
     </svg>
   `
-    // Note: I changed text-anchor to middle and x to center of rect to center text horizontally better
 
     return image
         .composite([{ input: Buffer.from(svgText), top: 0, left: 0 }])

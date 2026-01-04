@@ -205,10 +205,14 @@ export default function WatermarkEditor() {
                     // logic handles display based on type.
                     opacity: 0.8 // Reset opacity for image
                 }))
+                // Update balance in UI
+                if (typeof data.balance === 'number') {
+                    setBalance(data.balance)
+                }
                 toast.success(t('watermark.generated'))
             } else {
                 if (data.error === 'insufficient_balance') {
-                    toast.error(t('watermark.insufficientBalance') || 'Недостаточно токенов')
+                    toast.error(t('watermark.insufficientBalance'))
                 } else {
                     toast.error(t('common.error') + (data.details ? `: ${JSON.stringify(data.details)}` : ''))
                 }
@@ -432,6 +436,8 @@ export default function WatermarkEditor() {
                             </>
                         )}
                     </button>
+
+                    {/* Switch between AI and Text modes */}
                     {settings.type === 'ai_generated' && (
                         <button
                             onClick={() => {
@@ -440,7 +446,22 @@ export default function WatermarkEditor() {
                             }}
                             className="w-full py-2 text-sm text-zinc-500 hover:text-white transition-colors"
                         >
-                            Вернуться к тексту
+                            {t('watermark.switchToText') || 'Вернуться к тексту'}
+                        </button>
+                    )}
+
+                    {/* Show "Return to AI" button if user has saved AI watermark but currently in text mode */}
+                    {settings.type === 'text' && settings.image_url && (
+                        <button
+                            onClick={() => {
+                                impact('light')
+                                setSettings(s => ({ ...s, type: 'ai_generated' }))
+                                toast.success(t('watermark.switchedToAi') || 'Переключено на AI знак')
+                            }}
+                            className="w-full py-2 text-sm text-violet-400 hover:text-violet-300 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Sparkles size={14} />
+                            {t('watermark.switchToAi') || 'Вернуться к AI знаку'}
                         </button>
                     )}
                 </div>
