@@ -410,6 +410,18 @@ async function completeGeneration(
       updatePayload.image_url = imageUrl
     }
 
+    // Inherit is_prompt_private from parent generation (for blind remix)
+    if (parentId) {
+      const parentPrivacyCheck = await supaSelect('generations', `?id=eq.${parentId}&select=is_prompt_private`)
+      if (parentPrivacyCheck.ok && Array.isArray(parentPrivacyCheck.data) && parentPrivacyCheck.data.length > 0) {
+        const parentIsPrivate = parentPrivacyCheck.data[0].is_prompt_private
+        if (parentIsPrivate) {
+          updatePayload.is_prompt_private = true
+          console.log(`[DB] Inheriting is_prompt_private=true from parent generation ${parentId}`)
+        }
+      }
+    }
+
     const updateRes = await supaPatch('generations', `?id=eq.${generationId}`, updatePayload)
     console.log(`[DB] Generation ${generationId} status updated (media_type: ${mediaType}, url field: ${mediaType === 'video' ? 'video_url' : 'image_url'}):`, updateRes.ok)
 
