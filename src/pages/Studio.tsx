@@ -3,9 +3,9 @@ import { useTranslation, Trans } from 'react-i18next'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality } from '@/store/generationStore'
+import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality, type ImageCount } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
@@ -148,6 +148,11 @@ export default function Studio() {
     // GPT Image 1.5 параметры
     gptImageQuality,
     setGptImageQuality,
+    // Множественная генерация
+    imageCount,
+    setImageCount,
+    generatedImages,
+    setGeneratedImages,
   } = useGenerationStore()
 
   const { shareImage, saveToGallery, user, platform, tg } = useTelegram()
@@ -167,6 +172,8 @@ export default function Studio() {
   const [inputKey, setInputKey] = useState(0) // Key for forcing input re-render after Face ID
   const [showSourceMenu, setShowSourceMenu] = useState(false)
   const [showTimeoutModal, setShowTimeoutModal] = useState(false)
+  const [showCountSelector, setShowCountSelector] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -409,7 +416,8 @@ export default function Studio() {
         user_id: user?.id || null,
         parent_id: parentGenerationId || undefined,
         resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined,
-        contest_entry_id: contestEntryId || undefined
+        contest_entry_id: contestEntryId || undefined,
+        image_count: mediaType === 'image' ? imageCount : 1
       }
 
       // Добавить параметры видео для Seedance 1.5 Pro
@@ -456,8 +464,17 @@ export default function Studio() {
       if (mediaType === 'video') {
         setGeneratedVideo(data.image) // API возвращает URL в поле image
         setGeneratedImage(null)
+        setGeneratedImages([])
       } else {
-        setGeneratedImage(data.image)
+        // Поддержка множественной генерации: API может вернуть images[] или image
+        const images = data.images || (data.image ? [data.image] : [])
+        if (images.length > 1) {
+          setGeneratedImages(images)
+          setGeneratedImage(images[0]) // Первое изображение для совместимости
+        } else {
+          setGeneratedImage(images[0] || data.image)
+          setGeneratedImages([])
+        }
         setGeneratedVideo(null)
       }
 
@@ -494,13 +511,18 @@ export default function Studio() {
   }
 
   // Показать результат для изображения ИЛИ видео
-  const hasResult = currentScreen === 'result' && (generatedImage || generatedVideo)
+  const hasMultipleImages = generatedImages.length > 1
+  const hasResult = currentScreen === 'result' && (generatedImage || generatedVideo || hasMultipleImages)
   const isVideoResult = !!generatedVideo
-  // Для видео используем generatedVideo, для изображений - generatedImage
-  const resultUrl = isVideoResult ? generatedVideo : (generatedImage || '')
+  // Для видео используем generatedVideo, для изображений - проверяем множественные или одиночные
+  const resultUrl = isVideoResult
+    ? generatedVideo
+    : hasMultipleImages
+      ? generatedImages[currentImageIndex] || generatedImages[0]
+      : (generatedImage || '')
 
   // Debug log
-  console.log('[Studio Result]', { generatedImage, generatedVideo, isVideoResult, resultUrl })
+  console.log('[Studio Result]', { generatedImage, generatedImages, generatedVideo, isVideoResult, hasMultipleImages, currentImageIndex, resultUrl })
 
   if (hasResult) {
     return (
@@ -508,7 +530,7 @@ export default function Studio() {
         <div className="mx-auto max-w-3xl w-full px-4">
           <Card className="bg-zinc-900/90 border-white/10 backdrop-blur-xl relative">
             <button
-              onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setGeneratedVideo(null); setError(null) }}
+              onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setGeneratedVideo(null); setGeneratedImages([]); setCurrentImageIndex(0); setError(null) }}
               className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white transition-colors z-10"
             >
               <X size={20} />
@@ -517,6 +539,11 @@ export default function Studio() {
               <CardTitle className="text-white flex items-center gap-2">
                 {isVideoResult && <Video size={20} className="text-orange-400" />}
                 {isVideoResult ? t('studio.result.videoTitle') : t('studio.result.title')}
+                {hasMultipleImages && (
+                  <span className="text-sm font-normal text-zinc-400 ml-1">
+                    ({currentImageIndex + 1}/{generatedImages.length})
+                  </span>
+                )}
               </CardTitle>
               <CardDescription className="text-white/60">
                 {isVideoResult ? 'Seedance Pro' : MODELS.find(m => m.id === selectedModel)?.name}
@@ -552,7 +579,56 @@ export default function Studio() {
                 ) : (
                   <img src={resultUrl} alt="result" className="max-h-[45vh] w-auto object-contain shadow-lg rounded-md" />
                 )}
-                {!isVideoResult && (
+
+                {/* Навигация для множественных изображений */}
+                {hasMultipleImages && !isVideoResult && (
+                  <>
+                    {/* Кнопка влево */}
+                    <button
+                      onClick={() => {
+                        impact('light')
+                        setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : generatedImages.length - 1))
+                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    {/* Кнопка вправо */}
+                    <button
+                      onClick={() => {
+                        impact('light')
+                        setCurrentImageIndex((prev) => (prev < generatedImages.length - 1 ? prev + 1 : 0))
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                    {/* Индикаторы */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {generatedImages.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => { impact('light'); setCurrentImageIndex(idx) }}
+                          className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white w-4' : 'bg-white/50'
+                            }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {!isVideoResult && !hasMultipleImages && (
+                  <button
+                    onClick={() => {
+                      impact('light')
+                      setIsFullScreen(true)
+                    }}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                  >
+                    <Maximize2 size={16} />
+                  </button>
+                )}
+                {hasMultipleImages && !isVideoResult && (
                   <button
                     onClick={() => {
                       impact('light')
@@ -1322,38 +1398,87 @@ export default function Studio() {
           </div>
         )}
 
-        {/* 6. Generate Button (Moved Up) */}
+
+        {/* 6. Generate Button with Image Count Selector */}
         <div className="">
           {isGenerating && (
             <p className="text-xs text-zinc-500 text-center mb-3 animate-in fade-in slide-in-from-bottom-1 px-4 leading-relaxed">
               <Trans i18nKey="studio.generate.waitMessage" components={[<br />, <span className="text-zinc-400 font-medium" />, <br />, <span className="text-zinc-400 font-medium" />]} />
             </p>
           )}
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating || (!prompt.trim() && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0)}
-            className={`w-full py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900/80 text-violet-200 cursor-wait border border-violet-500/20' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
-          >
-            {isGenerating ? (
-              <div className="absolute inset-0 bg-violet-500/10 animate-pulse" />
-            ) : (
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+          <div className="flex gap-2">
+            {/* Image Count Selector - only for images, not video */}
+            {mediaType === 'image' && (
+              <div className="relative">
+                <button
+                  onClick={() => { setShowCountSelector(!showCountSelector); impact('light') }}
+                  className="h-full px-4 rounded-xl bg-zinc-800 border border-white/10 text-white font-bold flex items-center gap-1.5 hover:bg-zinc-700 transition-colors min-w-[56px] justify-center"
+                >
+                  <span className="text-lg">{imageCount}</span>
+                  <span className="text-[10px] text-zinc-400">×</span>
+                </button>
+
+                {/* Dropdown menu - opens upward */}
+                {showCountSelector && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowCountSelector(false)}
+                    />
+                    <div className="absolute bottom-full left-0 mb-2 bg-zinc-800 border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                      {([1, 2, 3, 4] as ImageCount[]).map((count) => (
+                        <button
+                          key={count}
+                          onClick={() => {
+                            setImageCount(count)
+                            setShowCountSelector(false)
+                            impact('light')
+                          }}
+                          className={`w-full px-5 py-2.5 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${imageCount === count
+                            ? 'bg-violet-600 text-white'
+                            : 'text-zinc-300 hover:bg-zinc-700'
+                            }`}
+                        >
+                          <span className="text-lg">{count}</span>
+                          <span className="text-[10px] text-zinc-400">×</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
-            <div className="relative flex items-center gap-2">
-              {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
-              <span>{isGenerating ? t('studio.generate.generating') : t('studio.generate.button')}</span>
-              {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
-                {mediaType === 'video'
-                  ? `${calculateVideoCost(videoResolution, videoDuration, generateAudio)} ${t('studio.tokens')}`
-                  : `${selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10
-                    : selectedModel === 'gpt-image-1.5' ? GPT_IMAGE_PRICES[gptImageQuality]
-                      : MODEL_PRICES[selectedModel]
-                  } ${t('studio.tokens')}`
-                }
-              </span>}
-            </div>
-          </Button>
+
+            {/* Generate Button */}
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating || (!prompt.trim() && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0)}
+              className={`flex-1 py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900/80 text-violet-200 cursor-wait border border-violet-500/20' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
+            >
+              {isGenerating ? (
+                <div className="absolute inset-0 bg-violet-500/10 animate-pulse" />
+              ) : (
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+              )}
+              <div className="relative flex items-center gap-2">
+                {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
+                <span>{isGenerating ? t('studio.generate.generating') : t('studio.generate.button')}</span>
+                {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
+                  {(() => {
+                    const basePrice = mediaType === 'video'
+                      ? calculateVideoCost(videoResolution, videoDuration, generateAudio)
+                      : selectedModel === 'nanobanana-pro' && resolution === '2K' ? 10
+                        : selectedModel === 'gpt-image-1.5' ? GPT_IMAGE_PRICES[gptImageQuality]
+                          : MODEL_PRICES[selectedModel]
+                    const totalPrice = mediaType === 'video' ? basePrice : basePrice * imageCount
+                    return `${totalPrice} ${t('studio.tokens')}`
+                  })()}
+                </span>}
+              </div>
+            </Button>
+          </div>
         </div>
+
 
       </div>
       {/* Insufficient Balance Popup */}

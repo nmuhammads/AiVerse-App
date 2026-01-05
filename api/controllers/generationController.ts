@@ -772,8 +772,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
     let {
       prompt, model, aspect_ratio, images, negative_prompt, user_id, resolution, contest_entry_id,
       // Параметры для видео (Seedance 1.5 Pro)
-      video_duration, video_resolution, fixed_lens, generate_audio
+      video_duration, video_resolution, fixed_lens, generate_audio,
+      // Количество изображений для множественной генерации
+      image_count = 1
     } = req.body
+
+    // Ограничить image_count до 1-4, и только для изображений (не для видео)
+    const imageCount = model === 'seedance-1.5-pro' ? 1 : Math.max(1, Math.min(4, Number(image_count) || 1))
 
     const parent_id = req.body.parent_id
 
@@ -926,6 +931,19 @@ export async function handleGenerateImage(req: Request, res: Response) {
           error: `Insufficient balance. Required: ${cost}, Available: ${balance}`
         })
       }
+
+      // Умножить стоимость на количество изображений
+      const totalCost = cost * imageCount
+
+      if (balance < totalCost) {
+        console.warn(`Insufficient balance for ${imageCount} images. Required: ${totalCost}, Available: ${balance}`)
+        return res.status(403).json({
+          error: `Insufficient balance. Required: ${totalCost}, Available: ${balance}`
+        })
+      }
+
+      // Использовать totalCost для дальнейших операций
+      cost = totalCost
     }
 
     // Create Pending Generation Record
@@ -1004,42 +1022,68 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // For video, use 6 min timeout
     const GENERATION_TIMEOUT_MS = model === 'seedance-1.5-pro' ? 360000 : 300000
 
-    const generationPromise = generateImageWithKieAI(apiKey, {
-      model,
-      prompt,
-      aspect_ratio,
-      images,
-      negative_prompt,
-      meta: generationId ? {
-        generationId,
-        tokens: cost,
-        userId: Number(user_id)
-      } : undefined,
-      resolution,
-      // Параметры для видео
-      video_duration,
-      video_resolution,
-      fixed_lens,
-      generate_audio,
-      // Параметры для GPT Image 1.5
-      gpt_image_quality: req.body.gpt_image_quality,
-    }, async (taskId) => {
-      if (generationId) {
-        console.log(`[API] Task ID received: ${taskId} for generation ${generationId}`)
-        await supaPatch('generations', `?id=eq.${generationId}`, { task_id: taskId })
+    console.log(`[API] Starting generation (imageCount: ${imageCount}) with timeout protection...`)
+
+    // Для множественной генерации выполняем параллельные запросы
+    const generateSingleImage = async (index: number) => {
+      const singleGenPromise = generateImageWithKieAI(apiKey, {
+        model,
+        prompt,
+        aspect_ratio,
+        images,
+        negative_prompt,
+        meta: generationId && index === 0 ? {
+          generationId,
+          tokens: cost / imageCount,
+          userId: Number(user_id)
+        } : undefined,
+        resolution,
+        video_duration,
+        video_resolution,
+        fixed_lens,
+        generate_audio,
+        gpt_image_quality: req.body.gpt_image_quality,
+      }, async (taskId) => {
+        if (generationId && index === 0) {
+          console.log(`[API] Task ID received: ${taskId} for generation ${generationId}`)
+          await supaPatch('generations', `?id=eq.${generationId}`, { task_id: taskId })
+        }
+      })
+
+      const timeoutPromise = new Promise<KieAIResponse>((_, reject) => {
+        setTimeout(() => reject(new Error('Generation process timed out')), GENERATION_TIMEOUT_MS)
+      })
+
+      return Promise.race([singleGenPromise, timeoutPromise])
+    }
+
+    // Выполняем параллельные генерации
+    const generationPromises = Array.from({ length: imageCount }, (_, i) => generateSingleImage(i))
+    const results = await Promise.allSettled(generationPromises)
+
+    // Собираем успешные результаты
+    const successfulImages: string[] = []
+    let hasTimeout = false
+    let lastError: string | null = null
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const kieResult = result.value
+        if (kieResult.timeout) {
+          hasTimeout = true
+        } else if (kieResult.error) {
+          lastError = kieResult.error
+        } else if (kieResult.images && kieResult.images.length > 0) {
+          successfulImages.push(kieResult.images[0])
+        }
+      } else {
+        lastError = result.reason?.message || 'Generation failed'
       }
-    })
+    }
 
-    const timeoutPromise = new Promise<KieAIResponse>((_, reject) => {
-      setTimeout(() => reject(new Error('Generation process timed out')), GENERATION_TIMEOUT_MS)
-    })
-
-    console.log('[API] Starting generation with timeout protection...')
-    const result = await Promise.race([generationPromise, timeoutPromise])
-
-    // Обработка таймаута — оставляем pending, не помечаем как failed
-    if (result.timeout) {
-      console.log('[API] Generation timed out but staying pending, generationId:', generationId)
+    // Если все запросы завершились таймаутом
+    if (successfulImages.length === 0 && hasTimeout) {
+      console.log('[API] All generations timed out, generationId:', generationId)
       return res.json({
         status: 'pending',
         generationId: generationId,
@@ -1047,101 +1091,74 @@ export async function handleGenerateImage(req: Request, res: Response) {
       })
     }
 
-    if (result.error) {
-      console.error('[API] Generation failed with error:', result.error)
+    // Если все запросы завершились с ошибкой
+    if (successfulImages.length === 0 && lastError) {
+      console.error('[API] All generations failed with error:', lastError)
 
-      // Localization (Backup for frontend)
-      let finalError = result.error
+      let finalError = lastError
       if (finalError.toLowerCase().includes('text length') || finalError.toLowerCase().includes('limit')) {
         finalError = 'Длина текста превышает максимально допустимый лимит'
       } else if (finalError.toLowerCase().includes('nsfw') || finalError.toLowerCase().includes('flagged as sensitive')) {
         finalError = 'Из-за политик разработчика нейросети модель вернула ошибку. Попробуйте сгенерировать, выбрав модель Seedream (рекомендуем Seedream 4.5 для лучшего качества).'
       }
 
-      // Mark as failed and REFUND tokens if we created a record
+      // Mark as failed and REFUND tokens
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
           error_message: finalError
         })
-        console.log(`[DB] Generation ${generationId} marked as failed`)
 
-        // Возврат токенов при ошибке
         if (cost > 0 && user_id) {
           const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
           const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
           const nextBal = currBal + cost
           await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
           console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
-
-          // Уведомление об ошибке и возврате токенов
-          try {
-            await createNotification(
-              Number(user_id),
-              'generation_failed',
-              'Ошибка генерации ⚠️',
-              `Токены возвращены: +${cost}`,
-              { refunded: cost }
-            )
-          } catch (e) {
-            console.error('[Notification] Failed to create in-app notification:', e)
-          }
-
-          // Telegram уведомление об ошибке (if enabled in settings)
-          try {
-            const settings = await getUserNotificationSettings(Number(user_id))
-            if (settings.telegram_generation) {
-              await tg('sendMessage', {
-                chat_id: user_id,
-                text: `⚠️ <b>Ошибка генерации</b>\n\nГенерация не удалась. Токены возвращены: <b>+${cost}</b>\n\n<i>Попробуйте другой промпт или модель.</i>`,
-                parse_mode: 'HTML'
-              })
-              console.log(`[Notification] Sent error telegram to user ${user_id}`)
-            } else {
-              console.log(`[Notification] Telegram generation disabled for user ${user_id}`)
-            }
-          } catch (e) {
-            console.error('[Notification] Failed to send error telegram:', e)
-          }
         }
       }
       return res.status(500).json({ error: finalError })
     }
 
-    if (result.images && result.images.length > 0) {
-      const imageUrl = result.images[0]
-      if (generationId) {
-        // Complete generation (update DB, rewards)
-        // IMPORTANT: Await this to ensure DB is updated before response
-        await completeGeneration(generationId, Number(user_id), imageUrl, model, cost, req.body.parent_id, req.body.contest_entry_id, result.inputImages)
-      }
-      console.log('[API] Generation successful, sending response')
-      return res.json({
-        image: imageUrl,
-        prompt: prompt,
-        model: model
-      })
-    } else {
-      console.error('[API] No images generated in result')
-      if (generationId) {
-        await supaPatch('generations', `?id=eq.${generationId}`, {
-          status: 'failed',
-          error_message: 'No images generated'
-        })
+    // Успешная генерация
+    console.log(`[API] Generation successful: ${successfulImages.length}/${imageCount} images`)
 
-        // Возврат токенов при ошибке "No images"
-        if (cost > 0 && user_id) {
-          const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
-          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-          const nextBal = currBal + cost
-          await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
-          console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
+    // Первое изображение обрабатываем через completeGeneration (для основной записи в БД)
+    if (successfulImages.length > 0 && generationId) {
+      const firstImage = successfulImages[0]
+      await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, req.body.parent_id, req.body.contest_entry_id, r2Images)
+
+      // Для дополнительных изображений создаём отдельные записи
+      for (let i = 1; i < successfulImages.length; i++) {
+        const extraImage = successfulImages[i]
+        // Подготовить prompt с метаданными
+        const metaStr = ` [type=${images && images.length > 0 ? 'text_photo' : 'text'}; ratio=${aspect_ratio || '1:1'}; photos=${images ? images.length : 0}; avatars=0]`
+        const extraPrompt = isBlindRemix ? `🔒 Prompt from @${blindRemixAuthorUsername}` + metaStr : prompt + metaStr
+        // Создать новую запись generation для дополнительного изображения
+        const extraGenBody = {
+          user_id: Number(user_id),
+          prompt: extraPrompt,
+          model: model === 'gpt-image-1.5' ? 'gptimage1.5' : model,
+          status: 'completed',
+          image_url: extraImage,
+          completed_at: new Date().toISOString(),
+          input_images: r2Images.length > 0 ? r2Images : undefined,
+          cost: cost / imageCount,
+          resolution: resolution,
+          media_type: 'image'
         }
+        await supaPost('generations', extraGenBody)
+        console.log(`[DB] Created extra generation record for image ${i + 1}`)
       }
-      return res.status(500).json({
-        error: 'No images generated'
-      })
     }
+
+    // Вернуть все успешные изображения
+    return res.json({
+      image: successfulImages[0], // Обратная совместимость
+      images: successfulImages,   // Новый формат для множественной генерации
+      prompt: prompt,
+      model: model
+    })
 
   } catch (error) {
     console.error('Generation error:', error)
