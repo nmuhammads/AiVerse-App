@@ -1128,6 +1128,15 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const firstImage = successfulImages[0]
       await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, req.body.parent_id, req.body.contest_entry_id, r2Images)
 
+
+      // Fetch user settings once for all extra notifications
+      let userSettings: any = null
+      try {
+        if (Number(user_id)) {
+          userSettings = await getUserNotificationSettings(Number(user_id))
+        }
+      } catch (e) { console.error('Failed to get user settings for extra notifications', e) }
+
       // Для дополнительных изображений создаём отдельные записи
       for (let i = 1; i < successfulImages.length; i++) {
         const extraImage = successfulImages[i]
@@ -1147,8 +1156,39 @@ export async function handleGenerateImage(req: Request, res: Response) {
           resolution: resolution,
           media_type: 'image'
         }
-        await supaPost('generations', extraGenBody)
+        const extraGenRes = await supaPost('generations', extraGenBody)
+        let extraGenId = 0
+        if (extraGenRes.ok && Array.isArray(extraGenRes.data) && extraGenRes.data.length > 0) {
+          extraGenId = extraGenRes.data[0].id
+        }
         console.log(`[DB] Created extra generation record for image ${i + 1}`)
+
+        // Send Telegram Notification for extra image
+        if (userSettings && userSettings.telegram_generation) {
+          try {
+            await tg('sendDocument', {
+              chat_id: Number(user_id),
+              document: extraImage,
+              caption: '✨ Генерация завершена!'
+            })
+            console.log(`[Notification] Sent extra photo ${i + 1} to user ${user_id}`)
+          } catch (e) {
+            console.error(`[Notification] Failed to send extra photo ${i + 1} to Telegram:`, e)
+          }
+        }
+
+        // Create in-app notification for extra image
+        if (extraGenId) {
+          try {
+            await createNotification(
+              Number(user_id),
+              'generation_completed',
+              'Генерация готова ✨',
+              'Ваше изображение создано',
+              { generation_id: extraGenId, deep_link: `/profile?gen=${extraGenId}` }
+            )
+          } catch (e) { console.error('[Notification] Failed to create in-app notification for extra image:', e) }
+        }
       }
     }
 
