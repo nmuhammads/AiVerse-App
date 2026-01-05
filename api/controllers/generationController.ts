@@ -1669,3 +1669,141 @@ export async function handleRemoveBackground(req: Request, res: Response) {
     })
   }
 }
+
+// Upscale (crisp-upscale) - Улучшение качества
+export async function handleUpscale(req: Request, res: Response) {
+  console.log('[Editor] Upscale request received')
+  try {
+    const { user_id, images, source_generation_id } = req.body
+
+    const userId = Number(user_id)
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    if (!images || images.length === 0) {
+      return res.status(400).json({ error: 'No image provided' })
+    }
+
+    const price = 1
+
+    // 1. Check balance
+    const userRes = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
+    const balance = userRes?.data?.[0]?.balance || 0
+
+    if (balance < price) {
+      return res.status(403).json({ error: 'insufficient_balance', required: price, current: balance })
+    }
+
+    // 2. Prepare image URL
+    const imageData = images[0]
+    let imageUrl = imageData
+
+    // If base64, upload temporarily to R2 for API consumption
+    if (imageData.startsWith('data:')) {
+      const base64Match = imageData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+      const base64Data = base64Match ? base64Match[2] : imageData
+      const inputBuffer = Buffer.from(base64Data, 'base64')
+
+      const pngBuffer = await sharp(inputBuffer).png().toBuffer()
+      const base64Png = `data:image/png;base64,${pngBuffer.toString('base64')}`
+
+      imageUrl = await uploadImageFromBase64(base64Png, 'editor-source')
+    }
+
+    // 3. Create Kie.ai task
+    const kieApiKey = process.env.KIE_API_KEY
+    if (!kieApiKey) {
+      throw new Error('KIE_API_KEY not configured')
+    }
+
+    console.log('[Upscale] Image URL for API:', imageUrl)
+
+    const createTaskRes = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${kieApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'recraft/crisp-upscale',
+        input: { image: imageUrl }
+      })
+    })
+
+    const createTaskData = await createTaskRes.json()
+    console.log('[Upscale] Create task response:', JSON.stringify(createTaskData))
+
+    if (createTaskData.code !== 200 || !createTaskData.data?.taskId) {
+      throw new Error(createTaskData.msg || 'Failed to create upscale task')
+    }
+
+    const taskId = createTaskData.data.taskId
+
+    // 4. Poll for result
+    const timeout = 120000 // 2 minutes for upscale
+    const startTime = Date.now()
+    let resultUrl = null
+
+    while (Date.now() - startTime < timeout) {
+      await new Promise(r => setTimeout(r, 2000))
+
+      const statusRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
+        headers: { 'Authorization': `Bearer ${kieApiKey}` }
+      })
+      const statusData = await statusRes.json()
+
+      if (statusData.data?.state === 'success' && statusData.data.resultJson) {
+        const result = JSON.parse(statusData.data.resultJson)
+        resultUrl = result.resultUrls?.[0]
+        break
+      } else if (statusData.data?.state === 'fail') {
+        throw new Error(statusData.data.failMsg || 'Upscale failed')
+      }
+    }
+
+    if (!resultUrl) {
+      throw new Error('Timeout waiting for upscale')
+    }
+
+    // 5. Deduct balance
+    await supaPatch('users', `?user_id=eq.${userId}`, { balance: balance - price })
+
+    // 6. Record in generations table (store API result URL directly)
+    let newGenId = null
+    if (source_generation_id) {
+      // Append to existing variants
+      const genRes = await supaSelect('generations', `?id=eq.${source_generation_id}&select=edit_variants`)
+      const existingVariants = genRes?.data?.[0]?.edit_variants || []
+      const newVariants = [...existingVariants, resultUrl]
+
+      await supaPatch('generations', `?id=eq.${source_generation_id}`, {
+        edit_variants: newVariants
+      })
+    } else {
+      // Create new generation record
+      const genBody = {
+        user_id: userId,
+        image_url: resultUrl,
+        model: 'upscale',
+        prompt: 'Upscale',
+        is_edited: true,
+        status: 'completed'
+      }
+      const insertRes = await supaPost('generations', genBody)
+      newGenId = insertRes?.data?.[0]?.id
+    }
+
+    return res.json({
+      image: resultUrl,
+      generation_id: newGenId,
+      source_generation_id: source_generation_id || null
+    })
+
+  } catch (error) {
+    console.error('handleUpscale error:', error)
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Upscale failed'
+    })
+  }
+}

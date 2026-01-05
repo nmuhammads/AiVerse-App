@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box, Send, Scissors } from 'lucide-react'
+import { X, Pencil, Loader2, Zap, Download, Grid, Upload, ChevronLeft, Paintbrush, Box, Send, Scissors, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -15,6 +15,7 @@ import { compressImage } from '@/utils/imageCompression'
 
 const EDITOR_PRICE = 2
 const ANGLES_PRICE = 4
+const UPSCALE_PRICE = 1
 
 export default function ImageEditorPage() {
     const { t } = useTranslation()
@@ -37,7 +38,7 @@ export default function ImageEditorPage() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showBalancePopup, setShowBalancePopup] = useState(false)
     const [showGenerationSelector, setShowGenerationSelector] = useState(false)
-    const [mode, setMode] = useState<'edit' | 'inpaint' | 'angles' | 'remove-bg'>('edit')
+    const [mode, setMode] = useState<'edit' | 'inpaint' | 'angles' | 'remove-bg' | 'upscale'>('edit')
     const [maskImage, setMaskImage] = useState<string | null>(null)
     const [showMaskEditor, setShowMaskEditor] = useState(false)
     const [isSending, setIsSending] = useState(false)
@@ -132,8 +133,8 @@ export default function ImageEditorPage() {
     }
 
     const handleGenerate = async () => {
-        // Для angles и remove-bg режима промпт не нужен
-        if (!sourceImage || ((mode !== 'angles' && mode !== 'remove-bg') && !prompt.trim())) {
+        // Для angles, remove-bg и upscale режимов промпт не нужен
+        if (!sourceImage || ((mode !== 'angles' && mode !== 'remove-bg' && mode !== 'upscale') && !prompt.trim())) {
             setError(t('editor.error.required'))
             notify('error')
             return
@@ -168,6 +169,13 @@ export default function ImageEditorPage() {
                     images: [sourceImage],
                     source_generation_id: sourceGenerationId
                 }
+            } else if (mode === 'upscale') {
+                endpoint = '/api/editor/upscale'
+                body = {
+                    user_id: user?.id || null,
+                    images: [sourceImage],
+                    source_generation_id: sourceGenerationId
+                }
             }
 
             const res = await fetch(endpoint, {
@@ -192,7 +200,7 @@ export default function ImageEditorPage() {
 
             // Автоматически отправляем результат в чат
             if (user?.id && data.image) {
-                const tgEndpoint = mode === 'remove-bg' ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
+                const tgEndpoint = (mode === 'remove-bg' || mode === 'upscale') ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
                 fetch(tgEndpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -203,7 +211,9 @@ export default function ImageEditorPage() {
                             ? `🎨 ${t('editor.mode.angles')}`
                             : mode === 'remove-bg'
                                 ? `✂️ ${t('editor.mode.removeBg', 'Remove BG')}`
-                                : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                                : mode === 'upscale'
+                                    ? `✨ ${t('editor.mode.upscale', 'Улучшить')}`
+                                    : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
                     })
                 }).catch(err => console.error('Auto send to chat failed:', err))
             }
@@ -231,7 +241,7 @@ export default function ImageEditorPage() {
         impact('medium')
 
         try {
-            const tgEndpoint = mode === 'remove-bg' ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
+            const tgEndpoint = (mode === 'remove-bg' || mode === 'upscale') ? '/api/telegram/sendDocument' : '/api/telegram/sendPhoto'
             const response = await fetch(tgEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -242,7 +252,9 @@ export default function ImageEditorPage() {
                         ? `🎨 ${t('editor.mode.angles')}`
                         : mode === 'remove-bg'
                             ? `✂️ ${t('editor.mode.removeBg', 'Remove BG')}`
-                            : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
+                            : mode === 'upscale'
+                                ? `✨ ${t('editor.mode.upscale', 'Улучшить')}`
+                                : `✏️ ${prompt.slice(0, 200)}${prompt.length > 200 ? '...' : ''}`
                 })
             })
 
@@ -265,62 +277,55 @@ export default function ImageEditorPage() {
     // Экран результата
     if (result) {
         return (
-            <div className="min-h-dvh bg-black flex flex-col justify-center px-4 pb-24" style={{ paddingTop: getPaddingTop() }}>
-                <Card className="bg-zinc-900/90 border-white/10 max-w-xl mx-auto w-full">
-                    <CardHeader className="relative">
+            <div className="min-h-dvh bg-black flex flex-col justify-end px-4 pb-24" style={{ paddingTop: getPaddingTop() }}>
+                {/* Image Preview */}
+                <div className="flex-1 flex items-center justify-center mb-4">
+                    <img
+                        src={result}
+                        alt="result"
+                        className="max-w-full max-h-[60vh] object-contain rounded-xl"
+                    />
+                </div>
+
+                {/* Compact Bottom Panel */}
+                <div className="bg-zinc-900/95 backdrop-blur-lg border border-white/10 rounded-2xl p-4 space-y-3">
+                    {/* Action Buttons Row */}
+                    <div className="flex gap-2">
                         <button
-                            onClick={() => setResult(null)}
-                            className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white"
+                            onClick={() => saveToGallery(result, `edit-${Date.now()}.jpg`)}
+                            className="flex-1 py-3 rounded-xl bg-white text-black font-medium flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors"
                         >
-                            <X size={20} />
+                            <Download size={18} />
+                            <span className="text-sm">{t('editor.save')}</span>
                         </button>
-                        <CardTitle className="text-white">{t('editor.result')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="rounded-lg overflow-hidden bg-black/20">
-                            <img
-                                src={result}
-                                alt="result"
-                                className="w-full max-h-[50vh] object-contain"
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => saveToGallery(result, `edit-${Date.now()}.jpg`)}
-                                className="flex-1 bg-white text-black hover:bg-zinc-200"
-                            >
-                                <Download size={16} className="mr-2" />
-                                {t('editor.save')}
-                            </Button>
-                            <Button
-                                onClick={handleSendToChat}
-                                disabled={isSending}
-                                className="flex-1 bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50"
-                            >
-                                {isSending ? (
-                                    <Loader2 size={16} className="mr-2 animate-spin" />
-                                ) : (
-                                    <Send size={16} className="mr-2" />
-                                )}
-                                {t('studio.result.sendToChat')}
-                            </Button>
-                        </div>
-                        <Button
+                        <button
+                            onClick={handleSendToChat}
+                            disabled={isSending}
+                            className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-violet-500 disabled:opacity-50 transition-colors"
+                        >
+                            {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                            <span className="text-sm">{t('studio.result.sendToChat')}</span>
+                        </button>
+                    </div>
+
+                    {/* Secondary Actions */}
+                    <div className="flex gap-2">
+                        <button
                             onClick={handleUseResult}
-                            className="w-full bg-cyan-600 text-white hover:bg-cyan-700"
+                            className="flex-1 py-2.5 rounded-xl bg-cyan-600/20 text-cyan-400 text-sm font-medium flex items-center justify-center gap-2 border border-cyan-500/30 hover:bg-cyan-600/30 transition-colors"
                         >
-                            <Pencil size={16} className="mr-2" />
+                            <Pencil size={16} />
                             {t('editor.continue')}
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                             onClick={() => { setResult(null); navigate(-1) }}
-                            variant="outline"
-                            className="w-full border-white/20 bg-zinc-800 text-white hover:bg-zinc-700"
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-400 text-sm font-medium flex items-center justify-center gap-2 border border-white/10 hover:bg-zinc-700 hover:text-white transition-colors"
                         >
+                            <X size={16} />
                             {t('editor.close')}
-                        </Button>
-                    </CardContent>
-                </Card>
+                        </button>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -387,14 +392,14 @@ export default function ImageEditorPage() {
                     </button>
 
                     <button
-                        disabled={true}
-                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border opacity-50 cursor-not-allowed bg-zinc-800/30 text-zinc-500 border-white/5`}
+                        onClick={() => { setMode('upscale'); setMaskImage(null); impact('light') }}
+                        className={`px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border ${mode === 'upscale'
+                            ? 'bg-violet-600 text-white border-violet-500 shadow-lg shadow-violet-500/20'
+                            : 'bg-zinc-800/50 text-zinc-400 border-white/5 hover:bg-zinc-800 hover:text-white'
+                            }`}
                     >
-                        <Paintbrush size={16} />
-                        {t('editor.mode.inpaint')}
-                        <span className="text-[10px] bg-zinc-700/50 px-1.5 py-0.5 rounded ml-1">
-                            {t('common.soon', 'Soon')}
-                        </span>
+                        <Sparkles size={16} />
+                        {t('editor.mode.upscale', 'Улучшить')}
                     </button>
                 </div>
 
@@ -522,7 +527,7 @@ export default function ImageEditorPage() {
                 )}
 
                 {/* Prompt - only for edit/inpaint modes */}
-                {mode !== 'angles' && mode !== 'remove-bg' && (
+                {mode !== 'angles' && mode !== 'remove-bg' && mode !== 'upscale' && (
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
                             {t('editor.instruction')}
@@ -537,7 +542,7 @@ export default function ImageEditorPage() {
                 )}
 
                 {/* Hints - only for edit/inpaint modes */}
-                {mode !== 'angles' && mode !== 'remove-bg' && (
+                {mode !== 'angles' && mode !== 'remove-bg' && mode !== 'upscale' && (
                     <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-200 text-xs">
                         <p className="font-medium mb-1.5">💡 {t('editor.hints.title')}</p>
                         <ul className="list-disc list-inside space-y-0.5 text-cyan-300/80">
@@ -558,7 +563,7 @@ export default function ImageEditorPage() {
                 {/* Generate Button */}
                 <Button
                     onClick={handleGenerate}
-                    disabled={isGenerating || !sourceImage || ((mode !== 'angles' && mode !== 'remove-bg') && !prompt.trim())}
+                    disabled={isGenerating || !sourceImage || ((mode !== 'angles' && mode !== 'remove-bg' && mode !== 'upscale') && !prompt.trim())}
                     className="w-full py-6 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isGenerating ? (
@@ -568,10 +573,10 @@ export default function ImageEditorPage() {
                         </>
                     ) : (
                         <>
-                            {mode === 'angles' ? <Box size={20} className="mr-2" /> : mode === 'remove-bg' ? <Scissors size={20} className="mr-2" /> : <Pencil size={20} className="mr-2" />}
-                            {mode === 'remove-bg' ? t('editor.removeBg', 'Remove Background') : t('editor.generate')}
+                            {mode === 'angles' ? <Box size={20} className="mr-2" /> : mode === 'remove-bg' ? <Scissors size={20} className="mr-2" /> : mode === 'upscale' ? <Sparkles size={20} className="mr-2" /> : <Pencil size={20} className="mr-2" />}
+                            {mode === 'remove-bg' ? t('editor.removeBg', 'Remove Background') : mode === 'upscale' ? t('editor.upscale', 'Улучшить качество') : t('editor.generate')}
                             <span className="ml-2 bg-black/20 px-2 py-0.5 rounded text-xs">
-                                {mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : EDITOR_PRICE} {t('editor.tokens')}
+                                {mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : mode === 'upscale' ? UPSCALE_PRICE : EDITOR_PRICE} {t('editor.tokens')}
                             </span>
                         </>
                     )}
@@ -599,7 +604,7 @@ export default function ImageEditorPage() {
                             {t('editor.insufficientBalance')}
                         </h3>
                         <p className="text-zinc-400 text-sm mb-4">
-                            {t('editor.needTokens', { count: mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : EDITOR_PRICE })}
+                            {t('editor.needTokens', { count: mode === 'angles' ? ANGLES_PRICE : mode === 'remove-bg' ? 1 : mode === 'upscale' ? UPSCALE_PRICE : EDITOR_PRICE })}
                         </p>
                         <div className="flex gap-2">
                             <Button
@@ -618,19 +623,22 @@ export default function ImageEditorPage() {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Inpaint Canvas Modal */}
-            {showMaskEditor && sourceImage && (
-                <InpaintCanvas
-                    imageUrl={sourceImage}
-                    onMaskGenerated={(mask) => {
-                        setMaskImage(mask)
-                        setShowMaskEditor(false)
-                    }}
-                    onClose={() => setShowMaskEditor(false)}
-                />
-            )}
-        </div>
+            {
+                showMaskEditor && sourceImage && (
+                    <InpaintCanvas
+                        imageUrl={sourceImage}
+                        onMaskGenerated={(mask) => {
+                            setMaskImage(mask)
+                            setShowMaskEditor(false)
+                        }}
+                        onClose={() => setShowMaskEditor(false)}
+                    />
+                )
+            }
+        </div >
     )
 }
