@@ -1,5 +1,5 @@
-# Используем Node.js 18 как базовый образ
-FROM node:18-alpine
+# Используем Node.js 22 LTS как базовый образ
+FROM node:22-alpine
 
 # Устанавливаем fontconfig и шрифты для поддержки кириллицы в водяных знаках
 RUN apk add --no-cache fontconfig font-noto font-noto-cjk ttf-dejavu \

@@ -979,10 +979,31 @@ export async function sendWithWatermark(req: Request, res: Response) {
     const isCaptionTooLong = fullCaption.length > 1024
     const caption = isCaptionTooLong ? headerHtml : fullCaption
 
+    // Compress image if too large for Telegram (10MB limit for photos)
+    const MAX_PHOTO_SIZE = 10 * 1024 * 1024 // 10MB
+    let finalBuffer = watermarkedBuffer
+
+    if (watermarkedBuffer.length > MAX_PHOTO_SIZE) {
+      console.info('sendWithWatermark:compressing', { originalSize: watermarkedBuffer.length })
+      // Compress to JPEG with reduced quality
+      finalBuffer = await sharp(watermarkedBuffer)
+        .jpeg({ quality: 85 })
+        .toBuffer()
+      console.info('sendWithWatermark:compressed', { newSize: finalBuffer.length })
+
+      // If still too large, compress more aggressively
+      if (finalBuffer.length > MAX_PHOTO_SIZE) {
+        finalBuffer = await sharp(watermarkedBuffer)
+          .jpeg({ quality: 70 })
+          .toBuffer()
+        console.info('sendWithWatermark:compressed_more', { newSize: finalBuffer.length })
+      }
+    }
+
     // Send photo with watermark as file upload
     const formData = new FormData()
     formData.append('chat_id', String(chat_id))
-    formData.append('photo', new Blob([new Uint8Array(watermarkedBuffer)], { type: 'image/jpeg' }), 'watermarked.jpg')
+    formData.append('photo', new Blob([new Uint8Array(finalBuffer)], { type: 'image/jpeg' }), 'watermarked.jpg')
     formData.append('caption', caption)
     formData.append('parse_mode', 'HTML')
 

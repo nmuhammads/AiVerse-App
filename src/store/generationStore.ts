@@ -12,6 +12,8 @@ export type VideoResolution = '480p' | '720p'
 
 export type GptImageQuality = 'medium' | 'high'
 
+export type ImageCount = 1 | 2 | 3 | 4
+
 export interface GenerationState {
   // Текущая выбранная модель
   selectedModel: ModelType
@@ -35,6 +37,10 @@ export interface GenerationState {
   isGenerating: boolean
   // Ошибка
   error: string | null
+  // Количество генерируемых изображений (1-4)
+  imageCount: ImageCount
+  // Массив сгенерированных изображений (для множественной генерации)
+  generatedImages: string[]
   // ID родительской генерации (для ремиксов)
   parentGenerationId: number | null
   // Имя автора родительской генерации
@@ -86,6 +92,10 @@ export interface GenerationActions {
   setIsGenerating: (isGenerating: boolean) => void
   // Установить ошибку
   setError: (error: string | null) => void
+  // Установить количество изображений
+  setImageCount: (count: ImageCount) => void
+  // Установить массив сгенерированных изображений
+  setGeneratedImages: (images: string[]) => void
   // Переключить экран
   setCurrentScreen: (screen: 'form' | 'result') => void
   // Установить родительскую генерацию
@@ -125,6 +135,8 @@ const initialState: GenerationState = {
   parentGenerationId: null,
   parentAuthorUsername: null,
   isPromptPrivate: false,
+  imageCount: 1,
+  generatedImages: [],
   // Видео параметры по умолчанию (первые пункты)
   videoDuration: '4',
   videoResolution: '480p',
@@ -151,6 +163,8 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
     setGeneratedVideo: (video) => set({ generatedVideo: video }),
     setIsGenerating: (isGenerating) => set({ isGenerating }),
     setError: (error) => set({ error }),
+    setImageCount: (count) => set({ imageCount: count }),
+    setGeneratedImages: (images) => set({ generatedImages: images }),
     setCurrentScreen: (screen) => set({ currentScreen: screen }),
     setParentGeneration: (id, username, isPrivate = false) => set({ parentGenerationId: id, parentAuthorUsername: username, isPromptPrivate: isPrivate }),
 
@@ -176,6 +190,8 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
       parentGenerationId: null,
       parentAuthorUsername: null,
       isPromptPrivate: false,
+      imageCount: 1,
+      generatedImages: [],
       videoDuration: '8',
       videoResolution: '720p',
       fixedLens: false,
