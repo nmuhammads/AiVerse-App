@@ -13,6 +13,7 @@ import Accumulations from "@/pages/Accumulations";
 import EventsPage from "@/pages/EventsPage";
 import SpinPage from "@/pages/SpinPage";
 import ImageEditorPage from "@/pages/ImageEditorPage";
+import MultiGeneration from "@/pages/MultiGeneration";
 import WatermarkEditor from "@/pages/WatermarkEditor";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
@@ -172,6 +173,7 @@ export default function App() {
               <Route path="/events" element={<EventsPage />} />
               <Route path="/spin" element={<SpinPage />} />
               <Route path="/editor" element={<ImageEditorPage />} />
+              <Route path="/multi-generation" element={<MultiGeneration />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/watermark" element={<WatermarkEditor />} />
               <Route path="*" element={<Navigate to="/" replace />} />

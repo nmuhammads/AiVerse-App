@@ -3,7 +3,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality, type ImageCount } from '@/store/generationStore'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -822,6 +822,29 @@ export default function Studio() {
             })}
 
           </div>
+        )}
+
+        {/* Multi Generation Button */}
+        {mediaType === 'image' && (
+          <button
+            onClick={() => { impact('light'); navigate('/multi-generation') }}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 flex items-center justify-between group active:scale-[0.99] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                <Layers size={20} />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-white group-hover:text-pink-200 transition-colors">
+                  {t('multiGeneration.title')}
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  {t('multiGeneration.desc')}
+                </div>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-zinc-500 group-hover:text-white transition-colors" />
+          </button>
         )}
 
         {/* 1.5 Video Model Info (показываем когда выбрано видео) */}

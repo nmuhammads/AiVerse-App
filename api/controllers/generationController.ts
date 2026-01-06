@@ -1864,3 +1864,324 @@ export async function handleUpscale(req: Request, res: Response) {
     })
   }
 }
+
+// ============================================================================
+// Multi-Model Generation - Генерация на нескольких моделях параллельно
+// ============================================================================
+
+interface MultiModelRequest {
+  model: string
+  aspect_ratio: string
+  resolution?: '2K' | '4K'
+  gpt_image_quality?: 'medium' | 'high'
+}
+
+// Цены моделей для мульти-генерации
+function getMultiModelPrice(model: string, gptQuality?: string, resolution?: string): number {
+  if (model === 'gpt-image-1.5') {
+    return GPT_IMAGE_PRICES[gptQuality || 'medium'] || 5
+  }
+  if (model === 'nanobanana-pro' && resolution === '2K') {
+    return 10
+  }
+  return MODEL_PRICES[model] || 0
+}
+
+// Возврат токенов пользователю
+async function refundTokens(userId: number, amount: number): Promise<void> {
+  if (!userId || amount <= 0) return
+
+  try {
+    const userResult = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
+    if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
+      const currentBalance = userResult.data[0].balance || 0
+      const newBalance = currentBalance + amount
+      await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: newBalance })
+      console.log(`[Refund] Returned ${amount} tokens to user ${userId}: ${currentBalance} -> ${newBalance}`)
+    }
+  } catch (e) {
+    console.error('[Refund] Failed to refund tokens:', e)
+  }
+}
+
+// Генерация одной модели (обёртка для параллельного вызова)
+async function generateSingleModel(
+  apiKey: string,
+  modelRequest: MultiModelRequest,
+  prompt: string,
+  images: string[],
+  userId: number,
+  generationId: number
+): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
+  try {
+    const { model, aspect_ratio, resolution, gpt_image_quality } = modelRequest
+
+    // Подготовить input images
+    let imageUrls: string[] = []
+    if (images && images.length > 0) {
+      imageUrls = images.map(img => {
+        if (typeof img === 'string') {
+          if (img.startsWith('http')) return img
+          const saved = saveBase64Image(img)
+          return saved.publicUrl
+        }
+        return ''
+      }).filter(Boolean)
+    }
+
+    // Prepare metadata
+    const cost = getMultiModelPrice(model, gpt_image_quality, resolution)
+    const metaPayload = prepareKieMeta({
+      generationId,
+      tokens: cost,
+      userId
+    })
+
+    // Вызов API в зависимости от модели
+    const result = await generateImageWithKieAI(apiKey, {
+      model,
+      prompt,
+      aspect_ratio,
+      images: imageUrls,
+      resolution,
+      gpt_image_quality,
+      meta: { generationId, tokens: cost, userId }
+    }, async (taskId) => {
+      if (generationId) {
+        await supaPatch('generations', `?id=eq.${generationId}`, { task_id: taskId })
+      }
+    })
+
+    if (result.timeout) {
+      // Оставляем pending — webhook обработает
+      console.log(`[MultiGen] Model ${model} timed out, staying pending`)
+      return { success: false, error: 'Generation pending - will complete later' }
+    }
+
+    if (result.error) {
+      console.error(`[MultiGen] Model ${model} failed:`, result.error)
+      return { success: false, error: result.error }
+    }
+
+    if (result.images && result.images.length > 0) {
+      return { success: true, imageUrl: result.images[0] }
+    }
+
+    return { success: false, error: 'No image returned' }
+
+  } catch (e) {
+    console.error(`[MultiGen] Exception for model:`, e)
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
+  }
+}
+
+/**
+ * /api/generation/generate/multi
+ * Мульти-генерация на 1-3 моделях параллельно
+ */
+export async function handleMultiGenerate(req: Request, res: Response) {
+  console.log('[MultiGen] Request received:', {
+    modelsCount: req.body.models?.length,
+    userId: req.body.user_id,
+    hasImages: req.body.images?.length > 0
+  })
+
+  try {
+    const { prompt, models, images, user_id } = req.body as {
+      prompt: string
+      models: MultiModelRequest[]
+      images?: string[]
+      user_id?: number
+    }
+
+    // 1. Валидация
+    if (!models || !Array.isArray(models) || models.length < 1 || models.length > 3) {
+      return res.status(400).json({ error: 'Select 1-3 models' })
+    }
+
+    if (!prompt?.trim()) {
+      return res.status(400).json({ error: 'Prompt is required' })
+    }
+
+    // Исключить видео-модели
+    const hasVideoModel = models.some(m => m.model === 'seedance-1.5-pro')
+    if (hasVideoModel) {
+      return res.status(400).json({ error: 'Video models not supported in multi-generation' })
+    }
+
+    // Проверить что все модели валидны
+    for (const m of models) {
+      if (!MODEL_CONFIGS[m.model as keyof typeof MODEL_CONFIGS]) {
+        return res.status(400).json({ error: `Invalid model: ${m.model}` })
+      }
+    }
+
+    // 2. Подсчёт общей стоимости
+    const totalCost = models.reduce((acc, m) => {
+      return acc + getMultiModelPrice(m.model, m.gpt_image_quality, m.resolution)
+    }, 0)
+
+    console.log(`[MultiGen] Total cost: ${totalCost} tokens for ${models.length} models`)
+
+    // 3. Проверка баланса
+    if (!user_id) {
+      return res.status(400).json({ error: 'User ID is required' })
+    }
+
+    const userResult = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+    if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const currentBalance = userResult.data[0].balance || 0
+    if (currentBalance < totalCost) {
+      console.warn(`[MultiGen] Insufficient balance. Required: ${totalCost}, Available: ${currentBalance}`)
+      return res.status(403).json({
+        error: `Insufficient balance. Required: ${totalCost}, Available: ${currentBalance}`
+      })
+    }
+
+    // 4. Списать токены сразу
+    await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, {
+      balance: currentBalance - totalCost
+    })
+    console.log(`[MultiGen] Balance debited: ${currentBalance} -> ${currentBalance - totalCost}`)
+
+    // 5. Создать записи generations для каждой модели (status: pending)
+    const generationIds: number[] = []
+    const modelCosts: number[] = []
+
+    for (const m of models) {
+      const cost = getMultiModelPrice(m.model, m.gpt_image_quality, m.resolution)
+      modelCosts.push(cost)
+
+      // Для GPT Image 1.5 используем gptimage1.5 в БД
+      const dbModel = m.model === 'gpt-image-1.5' ? 'gptimage1.5' : m.model
+
+      const genBody: any = {
+        user_id: Number(user_id),
+        prompt: prompt + ` [multi-gen; model=${m.model}; ratio=${m.aspect_ratio}]`,
+        model: dbModel,
+        status: 'pending',
+        cost: cost,
+        resolution: m.resolution
+      }
+
+      const genRes = await supaPost('generations', genBody)
+      if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
+        generationIds.push(genRes.data[0].id)
+        console.log(`[MultiGen] Created pending generation ${genRes.data[0].id} for model ${m.model}`)
+      } else {
+        console.error(`[MultiGen] Failed to create generation for model ${m.model}`)
+        generationIds.push(0)
+      }
+    }
+
+    // 6. API Key
+    const apiKey = process.env.KIE_API_KEY
+    if (!apiKey) {
+      // Вернуть токены
+      await refundTokens(user_id, totalCost)
+      return res.status(500).json({ error: 'API key not configured' })
+    }
+
+    // 7. Ответить сразу с generation_ids (не ждём завершения)
+    res.json({
+      status: 'started',
+      generation_ids: generationIds,
+      total_cost: totalCost
+    })
+
+    // 8. Запустить генерации параллельно в фоне
+    Promise.allSettled(
+      models.map((m, i) =>
+        generateSingleModel(apiKey, m, prompt, images || [], user_id, generationIds[i])
+      )
+    ).then(async (results) => {
+      console.log(`[MultiGen] All generations completed`)
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const genId = generationIds[i]
+        const modelCost = modelCosts[i]
+        const model = models[i].model
+
+        if (result.status === 'fulfilled' && result.value.success && result.value.imageUrl) {
+          // Успех — обновить generation
+          const mediaType = 'image'
+          await supaPatch('generations', `?id=eq.${genId}`, {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            image_url: result.value.imageUrl,
+            media_type: mediaType
+          })
+          console.log(`[MultiGen] Model ${model} completed successfully, genId: ${genId}`)
+
+          // Уведомление
+          try {
+            await createNotification(
+              user_id,
+              'generation_completed',
+              'Генерация готова ✨',
+              `${model} завершена`,
+              { generation_id: genId, deep_link: `/profile?gen=${genId}` }
+            )
+          } catch (e) {
+            console.error('[MultiGen] Notification error:', e)
+          }
+
+          // Telegram уведомление
+          try {
+            const settings = await getUserNotificationSettings(user_id)
+            if (settings.telegram_generation) {
+              await tg('sendDocument', {
+                chat_id: user_id,
+                document: result.value.imageUrl,
+                caption: `✨ Multi-Gen: ${model}`
+              })
+            }
+          } catch (e) {
+            console.error('[MultiGen] Telegram notification error:', e)
+          }
+
+        } else {
+          // Ошибка — вернуть токены за эту модель
+          const errorMsg = result.status === 'rejected'
+            ? (result.reason?.message || 'Generation failed')
+            : (result.value?.error || 'Unknown error')
+
+          // Обновить статус на failed
+          await supaPatch('generations', `?id=eq.${genId}`, {
+            status: 'failed',
+            error_message: errorMsg
+          })
+          console.log(`[MultiGen] Model ${model} failed: ${errorMsg}, genId: ${genId}`)
+
+          // Вернуть токены за эту модель
+          await refundTokens(user_id, modelCost)
+
+          // Уведомление об ошибке
+          try {
+            await createNotification(
+              user_id,
+              'generation_failed',
+              'Ошибка генерации ⚠️',
+              `${model}: токены возвращены (+${modelCost})`,
+              { generation_id: genId, refunded: modelCost }
+            )
+          } catch (e) {
+            console.error('[MultiGen] Error notification failed:', e)
+          }
+        }
+      }
+    }).catch(err => {
+      console.error('[MultiGen] Background processing error:', err)
+    })
+
+  } catch (error) {
+    console.error('[MultiGen] Handler error:', error)
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Multi-generation failed'
+    })
+  }
+}
