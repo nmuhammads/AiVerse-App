@@ -409,12 +409,13 @@ export default function MultiGeneration() {
                 )}
 
                 {/* 4. Промпт */}
-                <div className="relative">
+                {/* 4. Промпт */}
+                <div className="prompt-container group relative">
                     <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         placeholder={t('studio.prompt.placeholder')}
-                        className="w-full min-h-[100px] bg-zinc-900/30 backdrop-blur-sm rounded-xl border border-white/10 p-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500/50 resize-none no-scrollbar"
+                        className="prompt-input min-h-[100px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar text-white placeholder:text-zinc-500 focus:outline-none resize-none"
                     />
                     {prompt && (
                         <button
