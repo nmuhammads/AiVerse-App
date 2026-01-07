@@ -143,7 +143,7 @@ export default function App() {
         loader.style.opacity = '0'
         setTimeout(() => {
           loader.remove()
-        }, 500)
+        }, 3500)
       }
     } catch { void 0 }
     return () => {
