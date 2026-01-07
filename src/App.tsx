@@ -135,6 +135,16 @@ export default function App() {
       ensureExpand()
       WebApp.onEvent("activated", ensureExpand)
       WebApp.onEvent("viewportChanged", ensureExpand)
+
+      // Remove preloader
+      const loader = document.getElementById('app-loader')
+      if (loader) {
+        // Add fade out effect
+        loader.style.opacity = '0'
+        setTimeout(() => {
+          loader.remove()
+        }, 500)
+      }
     } catch { void 0 }
     return () => {
       try {
