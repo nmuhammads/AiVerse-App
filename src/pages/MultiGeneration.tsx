@@ -44,7 +44,8 @@ const RATIO_EMOJIS: Record<AspectRatio, string> = {
 export default function MultiGeneration() {
     const { t } = useTranslation()
     const navigate = useNavigate()
-    const { user, platform, saveToGallery } = useTelegram()
+    const { user, platform, saveToGallery, tg } = useTelegram()
+    const isMobile = platform === 'ios' || platform === 'android'
     const { impact, notify } = useHaptics()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -74,6 +75,22 @@ export default function MultiGeneration() {
     const [showBalancePopup, setShowBalancePopup] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [expandedModels, setExpandedModels] = useState<Set<ModelType>>(new Set())
+
+    // BackButton для мобилок
+    useEffect(() => {
+        if (isMobile) {
+            tg.BackButton.show()
+            const handleBack = () => {
+                impact('light')
+                navigate('/studio')
+            }
+            tg.BackButton.onClick(handleBack)
+            return () => {
+                tg.BackButton.hide()
+                tg.BackButton.offClick(handleBack)
+            }
+        }
+    }, [isMobile, navigate, tg, impact])
 
     // Загрузить баланс
     useEffect(() => {
