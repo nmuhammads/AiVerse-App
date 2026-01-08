@@ -13,6 +13,7 @@ import Accumulations from "@/pages/Accumulations";
 import EventsPage from "@/pages/EventsPage";
 import SpinPage from "@/pages/SpinPage";
 import ImageEditorPage from "@/pages/ImageEditorPage";
+import MultiGeneration from "@/pages/MultiGeneration";
 import WatermarkEditor from "@/pages/WatermarkEditor";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
@@ -125,21 +126,26 @@ function StartParamRouter() {
   return null;
 }
 
+
 export default function App() {
   useEffect(() => {
     const ensureExpand = () => {
       try { WebApp.expand() } catch { void 0 }
     }
     try {
-      WebApp.ready();
-      const ver = Number((WebApp as unknown as { version?: string }).version || '0')
-      if (WebApp.platform === 'ios' || WebApp.platform === 'android') {
-        if (ver >= 8) { try { (WebApp as unknown as { requestFullscreen?: () => void }).requestFullscreen?.() } catch { void 0 } }
-      }
       ensureExpand()
       WebApp.onEvent("activated", ensureExpand)
       WebApp.onEvent("viewportChanged", ensureExpand)
-      WebApp.setHeaderColor("bg_color");
+
+      // Remove preloader
+      const loader = document.getElementById('app-loader')
+      if (loader) {
+        // Add fade out effect
+        loader.style.opacity = '0'
+        setTimeout(() => {
+          loader.remove()
+        }, 500)
+      }
     } catch { void 0 }
     return () => {
       try {
@@ -151,10 +157,6 @@ export default function App() {
   return (
     <CloudflareProxyProvider>
       <Router>
-        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute -top-20 -left-10 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[120px]"></div>
-          <div className="absolute -bottom-20 -right-10 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]"></div>
-        </div>
         <div className={`${WebApp.platform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : 'pt-[env(safe-area-inset-top)]'} min-h-screen flex flex-col`}>
           <Header />
           <StartParamRouter />
@@ -172,6 +174,7 @@ export default function App() {
               <Route path="/events" element={<EventsPage />} />
               <Route path="/spin" element={<SpinPage />} />
               <Route path="/editor" element={<ImageEditorPage />} />
+              <Route path="/multi-generation" element={<MultiGeneration />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/watermark" element={<WatermarkEditor />} />
               <Route path="*" element={<Navigate to="/" replace />} />

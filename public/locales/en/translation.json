@@ -610,5 +610,26 @@
         "title": "⚠️ Test Environment",
         "description": "This is a test version of the app. Errors and instability may occur.",
         "warning": "Tokens are not refunded for errors."
+    },
+    "multiGeneration": {
+        "title": "Multi-Generation",
+        "button": "Multi-Generation",
+        "selectModels": "Select up to 3 models",
+        "generate": "Generate",
+        "generating": "Generating...",
+        "tokens": "tokens",
+        "limitReached": "Maximum 3 models",
+        "noModelsSelected": "Select at least one model",
+        "error": "Generation error",
+        "resultWillAppear": "Result will appear here",
+        "desc": "Create up to 3 variants in different AI models at once"
+    },
+    "activeGenerations": {
+        "title": "Active generations",
+        "noPrompt": "No prompt",
+        "completed": "Done",
+        "error": "Error",
+        "clearCompleted": "Clear",
+        "maxReached": "Maximum 4 parallel generations reached"
     }
 }

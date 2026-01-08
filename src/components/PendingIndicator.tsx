@@ -4,15 +4,26 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTranslation } from 'react-i18next'
+import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
 
 export function PendingIndicator() {
     const { t } = useTranslation()
-    const [count, setCount] = useState(0)
+    const [serverCount, setServerCount] = useState(0)
     const [showHint, setShowHint] = useState(false)
     const { user } = useTelegram()
     const { impact, notify } = useHaptics()
     const navigate = useNavigate()
     const location = useLocation()
+
+    // Локальные активные генерации из store (считаем количество изображений)
+    const localActiveCount = useActiveGenerationsStore(
+        (state) => state.generations
+            .filter((g) => g.status === 'processing')
+            .reduce((sum, g) => sum + g.imageCount, 0)
+    )
+
+    // Общий count = серверные + локальные
+    const totalCount = serverCount + localActiveCount
 
     const fetchPendingCount = useCallback(async () => {
         if (!user?.id) return
@@ -29,7 +40,7 @@ export function PendingIndicator() {
             const res = await fetch(`/api/generation/pending-count?user_id=${user.id}`)
             const data = await res.json()
             if (typeof data.count === 'number') {
-                setCount(data.count)
+                setServerCount(data.count)
             }
         } catch (e) {
             console.error('Failed to fetch pending count', e)
@@ -66,13 +77,16 @@ export function PendingIndicator() {
         }
     }, [showHint])
 
-    if (count === 0) return null
+    if (totalCount === 0) return null
 
     const handleClick = () => {
         impact('light')
 
-        // If already on profile page, show hint popup
-        if (location.pathname === '/profile') {
+        // If on Studio page, just show hint (panel is already visible there)
+        if (location.pathname === '/studio') {
+            notify('warning')
+            setShowHint(true)
+        } else if (location.pathname === '/profile') {
             notify('warning')
             setShowHint(true)
         } else {
@@ -89,7 +103,7 @@ export function PendingIndicator() {
                     : 'opacity-0 scale-90 translate-y-2 pointer-events-none'
                     }`}
             >
-                {t('pending.hint', { count })}
+                {t('pending.hint', { count: totalCount })}
             </div>
 
             {/* Button */}
@@ -98,7 +112,7 @@ export function PendingIndicator() {
                 className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-violet-600/90 hover:bg-violet-500 backdrop-blur-md border border-violet-400/30 shadow-lg shadow-violet-500/20 active:scale-95 transition-all"
             >
                 <Loader2 size={16} className="text-white animate-spin" />
-                <span className="text-white text-xs font-bold">{count}</span>
+                <span className="text-white text-xs font-bold">{totalCount}</span>
             </button>
         </div>
     )

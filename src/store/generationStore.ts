@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro' | 'gpt-image-1.5'
+export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro' | 'gpt-image-1.5' | 'test-model'
 
 export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto' | 'square_hd' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | '2:3' | '3:2'
 

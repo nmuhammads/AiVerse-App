@@ -8,10 +8,10 @@ import { useNavigate } from 'react-router-dom'
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
     enabled: true, // Set to true to enable the announcement
-    id: 'announcement_gpt_image_1_5', // Updated ID to force show again
-    title: 'Встречайте GPT Image 1.5 🚀',
-    description: 'Новая модель от OpenAI уже здесь! Невероятное качество, понимание сложных промптов и поддержка текста на фото.',
-    image: '/announcements/gpt-image-launch.png', // New launch image
+    id: 'announcement_update_3_1_2',
+    title: 'Обновление AiVerse 3.1.2 ⚡️',
+    description: 'Запускайте генерации одну за другой в Студии (до 4-х процессов одновременно).\n\nНовый режим Мульти-генерации: создавайте варианты сразу в нескольких нейросетях!\n\nУлучшенный интерфейс модальных окон и исправления багов.',
+    image: '/announcements/update_3_1_2.png',
     buttonText: 'Попробовать',
     link: '/studio', // Redirect to studio
     secondaryButtonText: 'Закрыть',

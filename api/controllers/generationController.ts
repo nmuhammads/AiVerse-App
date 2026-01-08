@@ -46,6 +46,7 @@ const MODEL_CONFIGS = {
   'qwen-edit': { kind: 'jobs' as const, model: 'qwen/text-or-image' },
   'seedance-1.5-pro': { kind: 'jobs' as const, model: 'bytedance/seedance-1.5-pro', mediaType: 'video' as const },
   'gpt-image-1.5': { kind: 'jobs' as const, model: 'gpt-image/1.5-text-to-image', dbModel: 'gptimage1.5' },
+  'test-model': { kind: 'test' as const, model: 'test-model' }, // Тестовая модель (не вызывает API)
 }
 
 function mapSeedreamImageSize(ratio?: string): string | undefined {
@@ -338,6 +339,7 @@ const MODEL_PRICES: Record<string, number> = {
   'seedream4-5': 7,
   flux: 4,
   'gpt-image-1.5': 5, // Default: medium quality
+  'test-model': 0, // Тестовая модель — бесплатно
 }
 
 // Цены для GPT Image 1.5 по качеству
@@ -381,7 +383,9 @@ async function completeGeneration(
   cost: number,
   parentId?: number,
   contestEntryId?: number,
-  inputImages?: string[]
+  inputImages?: string[],
+  resolution?: string,
+  languageCode?: string
 ) {
   if (!SUPABASE_URL || !SUPABASE_KEY || !userId || !generationId) return
 
@@ -497,7 +501,14 @@ async function completeGeneration(
       if (userId) {
         const settings = await getUserNotificationSettings(userId)
         if (settings.telegram_generation) {
-          const caption = `✨ Генерация завершена!`
+          let caption = `✨ Генерация завершена!`
+          if (model === 'nanobanana-pro' && (resolution === '2K' || resolution === '4K')) {
+            if (languageCode === 'en') {
+              caption += "\n\n⚠️ The file is too large. Telegram does not show it in full quality. Save to gallery to view in detail."
+            } else {
+              caption += "\n\n⚠️ Файл слишком большой. Telegram не показывает его в полном качестве. Сохраните в галерею для детального просмотра."
+            }
+          }
           await tg('sendDocument', {
             chat_id: userId,
             document: imageUrl,
@@ -578,6 +589,15 @@ async function generateImageWithKieAI(
     let metaPayload: KieMetaPayload | undefined
     if (requestData.meta) {
       metaPayload = prepareKieMeta(requestData.meta)
+    }
+
+    // Тестовая модель — возвращает placeholder изображение без вызова API
+    if (model === 'test-model') {
+      console.log('[Test Model] Simulating generation...')
+      await new Promise(resolve => setTimeout(resolve, 5000)) // Симуляция задержки 5 сек
+      const testImage = `https://placehold.co/1024x1024/8b5cf6/ffffff/png?text=Test+${Date.now()}`
+      console.log('[Test Model] Returning test image:', testImage)
+      return { images: [testImage], inputImages: imageUrls }
     }
 
     if (cfg.kind === 'flux-kontext') {
@@ -902,6 +922,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
     }
 
     // Проверка баланса пользователя
+    let languageCode = 'ru'
     let cost = 0
     if (user_id) {
       cost = MODEL_PRICES[model] ?? 0
@@ -922,8 +943,11 @@ export async function handleGenerateImage(req: Request, res: Response) {
         const gpt_image_quality = req.body.gpt_image_quality || 'medium'
         cost = calculateGptImageCost(gpt_image_quality)
       }
-      const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+      const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance,language_code`)
       const balance = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : 0
+      if (Array.isArray(q.data) && q.data[0]?.language_code) {
+        languageCode = String(q.data[0].language_code)
+      }
 
       if (balance < cost) {
         console.warn(`Insufficient balance for user ${user_id}. Required: ${cost}, Available: ${balance}`)
@@ -1126,7 +1150,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // Первое изображение обрабатываем через completeGeneration (для основной записи в БД)
     if (successfulImages.length > 0 && generationId) {
       const firstImage = successfulImages[0]
-      await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, req.body.parent_id, req.body.contest_entry_id, r2Images)
+      await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, req.body.parent_id, req.body.contest_entry_id, r2Images, resolution, languageCode)
 
 
       // Fetch user settings once for all extra notifications
@@ -1166,10 +1190,18 @@ export async function handleGenerateImage(req: Request, res: Response) {
         // Send Telegram Notification for extra image
         if (userSettings && userSettings.telegram_generation) {
           try {
+            let caption = '✨ Генерация завершена!'
+            if (model === 'nanobanana-pro' && (resolution === '2K' || resolution === '4K')) {
+              if (languageCode === 'en') {
+                caption += "\n\n⚠️ The file is too large. Telegram does not show it in full quality. Save to gallery to view in detail."
+              } else {
+                caption += "\n\n⚠️ Файл слишком большой. Telegram не показывает его в полном качестве. Сохраните в галерею для детального просмотра."
+              }
+            }
             await tg('sendDocument', {
               chat_id: Number(user_id),
               document: extraImage,
-              caption: '✨ Генерация завершена!'
+              caption: caption
             })
             console.log(`[Notification] Sent extra photo ${i + 1} to user ${user_id}`)
           } catch (e) {
@@ -1215,6 +1247,17 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
   if (!user_id) return res.status(400).json({ error: 'user_id is required' })
 
   console.log(`[CheckStatus] Checking pending generations for user ${user_id}`)
+
+  // Fetch user language code
+  let languageCode = 'ru'
+  try {
+    const uQ = await supaSelect('users', `?user_id=eq.${user_id}&select=language_code`)
+    if (uQ.ok && Array.isArray(uQ.data) && uQ.data[0]) {
+      languageCode = uQ.data[0].language_code || 'ru'
+    }
+  } catch (e) {
+    console.error('[CheckStatus] Failed to fetch language code', e)
+  }
 
   // Get pending generations (all of them, to handle missing task_id too)
   const q = await supaSelect('generations', `?user_id=eq.${user_id}&status=eq.pending&select=*,input_images`)
@@ -1293,7 +1336,7 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
           }
         }
 
-        await completeGeneration(gen.id, gen.user_id, result.imageUrl, gen.model, cost, gen.parent_id, undefined, gen.input_images)
+        await completeGeneration(gen.id, gen.user_id, result.imageUrl, gen.model, cost, gen.parent_id, undefined, gen.input_images, gen.resolution, languageCode)
         updated++
       } else if (result.status === 'failed') {
         // Возврат токенов при fail от провайдера
@@ -1339,7 +1382,7 @@ export async function getGenerationById(req: Request, res: Response) {
 
     // Fetch generation - include video_url for video generations
     // Note: aspect_ratio not in DB, extracted from prompt metadata
-    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,video_url,user_id,status,media_type,is_prompt_private,users(username,first_name)`
+    const query = `?id=eq.${id}&select=id,prompt,model,input_images,image_url,video_url,user_id,status,media_type,is_prompt_private,error_message,users(username,first_name)`
     console.log('[getGenerationById] Query:', query)
 
     const result = await supaSelect('generations', query)
@@ -1397,6 +1440,8 @@ export async function getGenerationById(req: Request, res: Response) {
       generation_type: type,
       media_type: gen.media_type || (gen.model === 'seedance-1.5-pro' ? 'video' : 'image'),
       users: gen.users,
+      status: gen.status, // Для polling в мульти-генерации
+      error_message: gen.error_message || null, // Для отображения ошибок
     }
 
     console.log('[getGenerationById] Sending response:', {
@@ -1861,6 +1906,327 @@ export async function handleUpscale(req: Request, res: Response) {
     console.error('handleUpscale error:', error)
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Upscale failed'
+    })
+  }
+}
+
+// ============================================================================
+// Multi-Model Generation - Генерация на нескольких моделях параллельно
+// ============================================================================
+
+interface MultiModelRequest {
+  model: string
+  aspect_ratio: string
+  resolution?: '2K' | '4K'
+  gpt_image_quality?: 'medium' | 'high'
+}
+
+// Цены моделей для мульти-генерации
+function getMultiModelPrice(model: string, gptQuality?: string, resolution?: string): number {
+  if (model === 'gpt-image-1.5') {
+    return GPT_IMAGE_PRICES[gptQuality || 'medium'] || 5
+  }
+  if (model === 'nanobanana-pro' && resolution === '2K') {
+    return 10
+  }
+  return MODEL_PRICES[model] || 0
+}
+
+// Возврат токенов пользователю
+async function refundTokens(userId: number, amount: number): Promise<void> {
+  if (!userId || amount <= 0) return
+
+  try {
+    const userResult = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
+    if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
+      const currentBalance = userResult.data[0].balance || 0
+      const newBalance = currentBalance + amount
+      await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: newBalance })
+      console.log(`[Refund] Returned ${amount} tokens to user ${userId}: ${currentBalance} -> ${newBalance}`)
+    }
+  } catch (e) {
+    console.error('[Refund] Failed to refund tokens:', e)
+  }
+}
+
+// Генерация одной модели (обёртка для параллельного вызова)
+async function generateSingleModel(
+  apiKey: string,
+  modelRequest: MultiModelRequest,
+  prompt: string,
+  images: string[],
+  userId: number,
+  generationId: number
+): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
+  try {
+    const { model, aspect_ratio, resolution, gpt_image_quality } = modelRequest
+
+    // Подготовить input images
+    let imageUrls: string[] = []
+    if (images && images.length > 0) {
+      imageUrls = images.map(img => {
+        if (typeof img === 'string') {
+          if (img.startsWith('http')) return img
+          const saved = saveBase64Image(img)
+          return saved.publicUrl
+        }
+        return ''
+      }).filter(Boolean)
+    }
+
+    // Prepare metadata
+    const cost = getMultiModelPrice(model, gpt_image_quality, resolution)
+    const metaPayload = prepareKieMeta({
+      generationId,
+      tokens: cost,
+      userId
+    })
+
+    // Вызов API в зависимости от модели
+    const result = await generateImageWithKieAI(apiKey, {
+      model,
+      prompt,
+      aspect_ratio,
+      images: imageUrls,
+      resolution,
+      gpt_image_quality,
+      meta: { generationId, tokens: cost, userId }
+    }, async (taskId) => {
+      if (generationId) {
+        await supaPatch('generations', `?id=eq.${generationId}`, { task_id: taskId })
+      }
+    })
+
+    if (result.timeout) {
+      // Оставляем pending — webhook обработает
+      console.log(`[MultiGen] Model ${model} timed out, staying pending`)
+      return { success: false, error: 'Generation pending - will complete later' }
+    }
+
+    if (result.error) {
+      console.error(`[MultiGen] Model ${model} failed:`, result.error)
+      return { success: false, error: result.error }
+    }
+
+    if (result.images && result.images.length > 0) {
+      return { success: true, imageUrl: result.images[0] }
+    }
+
+    return { success: false, error: 'No image returned' }
+
+  } catch (e) {
+    console.error(`[MultiGen] Exception for model:`, e)
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
+  }
+}
+
+/**
+ * /api/generation/generate/multi
+ * Мульти-генерация на 1-3 моделях параллельно
+ */
+export async function handleMultiGenerate(req: Request, res: Response) {
+  console.log('[MultiGen] Request received:', {
+    modelsCount: req.body.models?.length,
+    userId: req.body.user_id,
+    hasImages: req.body.images?.length > 0
+  })
+
+  try {
+    const { prompt, models, images, user_id } = req.body as {
+      prompt: string
+      models: MultiModelRequest[]
+      images?: string[]
+      user_id?: number
+    }
+
+    // 1. Валидация
+    if (!models || !Array.isArray(models) || models.length < 1 || models.length > 3) {
+      return res.status(400).json({ error: 'Select 1-3 models' })
+    }
+
+    if (!prompt?.trim()) {
+      return res.status(400).json({ error: 'Prompt is required' })
+    }
+
+    // Исключить видео-модели
+    const hasVideoModel = models.some(m => m.model === 'seedance-1.5-pro')
+    if (hasVideoModel) {
+      return res.status(400).json({ error: 'Video models not supported in multi-generation' })
+    }
+
+    // Проверить что все модели валидны
+    for (const m of models) {
+      if (!MODEL_CONFIGS[m.model as keyof typeof MODEL_CONFIGS]) {
+        return res.status(400).json({ error: `Invalid model: ${m.model}` })
+      }
+    }
+
+    // 2. Подсчёт общей стоимости
+    const totalCost = models.reduce((acc, m) => {
+      return acc + getMultiModelPrice(m.model, m.gpt_image_quality, m.resolution)
+    }, 0)
+
+    console.log(`[MultiGen] Total cost: ${totalCost} tokens for ${models.length} models`)
+
+    // 3. Проверка баланса
+    if (!user_id) {
+      return res.status(400).json({ error: 'User ID is required' })
+    }
+
+    const userResult = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
+    if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const currentBalance = userResult.data[0].balance || 0
+    if (currentBalance < totalCost) {
+      console.warn(`[MultiGen] Insufficient balance. Required: ${totalCost}, Available: ${currentBalance}`)
+      return res.status(403).json({
+        error: `Insufficient balance. Required: ${totalCost}, Available: ${currentBalance}`
+      })
+    }
+
+    // 4. Списать токены сразу
+    await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, {
+      balance: currentBalance - totalCost
+    })
+    console.log(`[MultiGen] Balance debited: ${currentBalance} -> ${currentBalance - totalCost}`)
+
+    // 5. Создать записи generations для каждой модели (status: pending)
+    const generationIds: number[] = []
+    const modelCosts: number[] = []
+
+    for (const m of models) {
+      const cost = getMultiModelPrice(m.model, m.gpt_image_quality, m.resolution)
+      modelCosts.push(cost)
+
+      // Для GPT Image 1.5 используем gptimage1.5 в БД
+      const dbModel = m.model === 'gpt-image-1.5' ? 'gptimage1.5' : m.model
+
+      const genBody: any = {
+        user_id: Number(user_id),
+        prompt: prompt + ` [multi-gen; model=${m.model}; ratio=${m.aspect_ratio}]`,
+        model: dbModel,
+        status: 'pending',
+        cost: cost,
+        resolution: m.resolution
+      }
+
+      const genRes = await supaPost('generations', genBody)
+      if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
+        generationIds.push(genRes.data[0].id)
+        console.log(`[MultiGen] Created pending generation ${genRes.data[0].id} for model ${m.model}`)
+      } else {
+        console.error(`[MultiGen] Failed to create generation for model ${m.model}`)
+        generationIds.push(0)
+      }
+    }
+
+    // 6. API Key
+    const apiKey = process.env.KIE_API_KEY
+    if (!apiKey) {
+      // Вернуть токены
+      await refundTokens(user_id, totalCost)
+      return res.status(500).json({ error: 'API key not configured' })
+    }
+
+    // 7. Ответить сразу с generation_ids (не ждём завершения)
+    res.json({
+      status: 'started',
+      generation_ids: generationIds,
+      total_cost: totalCost
+    })
+
+    // 8. Запустить генерации параллельно в фоне
+    Promise.allSettled(
+      models.map((m, i) =>
+        generateSingleModel(apiKey, m, prompt, images || [], user_id, generationIds[i])
+      )
+    ).then(async (results) => {
+      console.log(`[MultiGen] All generations completed`)
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const genId = generationIds[i]
+        const modelCost = modelCosts[i]
+        const model = models[i].model
+
+        if (result.status === 'fulfilled' && result.value.success && result.value.imageUrl) {
+          // Успех — обновить generation
+          const mediaType = 'image'
+          await supaPatch('generations', `?id=eq.${genId}`, {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            image_url: result.value.imageUrl,
+            media_type: mediaType
+          })
+          console.log(`[MultiGen] Model ${model} completed successfully, genId: ${genId}`)
+
+          // Уведомление
+          try {
+            await createNotification(
+              user_id,
+              'generation_completed',
+              'Генерация готова ✨',
+              `${model} завершена`,
+              { generation_id: genId, deep_link: `/profile?gen=${genId}` }
+            )
+          } catch (e) {
+            console.error('[MultiGen] Notification error:', e)
+          }
+
+          // Telegram уведомление
+          try {
+            const settings = await getUserNotificationSettings(user_id)
+            if (settings.telegram_generation) {
+              await tg('sendDocument', {
+                chat_id: user_id,
+                document: result.value.imageUrl,
+                caption: `✨ Multi-Gen: ${model}`
+              })
+            }
+          } catch (e) {
+            console.error('[MultiGen] Telegram notification error:', e)
+          }
+
+        } else {
+          // Ошибка — вернуть токены за эту модель
+          const errorMsg = result.status === 'rejected'
+            ? (result.reason?.message || 'Generation failed')
+            : (result.value?.error || 'Unknown error')
+
+          // Обновить статус на failed
+          await supaPatch('generations', `?id=eq.${genId}`, {
+            status: 'failed',
+            error_message: errorMsg
+          })
+          console.log(`[MultiGen] Model ${model} failed: ${errorMsg}, genId: ${genId}`)
+
+          // Вернуть токены за эту модель
+          await refundTokens(user_id, modelCost)
+
+          // Уведомление об ошибке
+          try {
+            await createNotification(
+              user_id,
+              'generation_failed',
+              'Ошибка генерации ⚠️',
+              `${model}: токены возвращены (+${modelCost})`,
+              { generation_id: genId, refunded: modelCost }
+            )
+          } catch (e) {
+            console.error('[MultiGen] Error notification failed:', e)
+          }
+        }
+      }
+    }).catch(err => {
+      console.error('[MultiGen] Background processing error:', err)
+    })
+
+  } catch (error) {
+    console.error('[MultiGen] Handler error:', error)
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Multi-generation failed'
     })
   }
 }

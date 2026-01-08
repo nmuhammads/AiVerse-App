@@ -35,6 +35,9 @@ i18n
         detection: {
             order: ['localStorage', 'telegram', 'navigator'],
             caches: ['localStorage'],
+        },
+        react: {
+            useSuspense: false
         }
     })
 

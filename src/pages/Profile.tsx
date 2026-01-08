@@ -138,6 +138,22 @@ export default function Profile() {
   // Channel subscription reward state
   const [channelReward, setChannelReward] = useState<{ show: boolean; loading: boolean; claiming: boolean }>({ show: false, loading: true, claiming: false })
   const [showRewardModal, setShowRewardModal] = useState(false)
+  const [showSpinButton, setShowSpinButton] = useState(false) // State based on event settings
+
+  useEffect(() => {
+    // Check if spin event is enabled
+    fetch('/api/events/status/spin')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.enabled) {
+          setShowSpinButton(true)
+        } else {
+          setShowSpinButton(false)
+        }
+      })
+      .catch((e) => console.error('Failed to fetch spin status', e))
+  }, [])
+
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name} `
     : (user?.first_name || user?.username || t('profile.guest'))
@@ -767,31 +783,34 @@ export default function Profile() {
                 <span>{balance ?? 0}</span>
                 <span className="opacity-70 font-normal text-[10px] ml-0.5">{t('profile.balance.tokens')}</span>
               </button>
-              <button
-                onClick={() => { impact('light'); navigate('/spin') }}
-                className="relative w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all group overflow-visible"
-              >
-                <div className="relative w-6 h-6" style={{ animation: 'spin-slow 10s linear infinite' }}>
-                  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
-                    <circle cx="50" cy="50" r="48" fill="#18181b" stroke="#3f3f46" strokeWidth="4" />
-                    <path d="M50 50 L50 4 A46 46 0 0 1 78.5 14 Z" fill="#8b5cf6" />
-                    <path d="M50 50 L78.5 14 A46 46 0 0 1 96 50 Z" fill="#3f3f46" />
-                    <path d="M50 50 L96 50 A46 46 0 0 1 78.5 86 Z" fill="#7c3aed" />
-                    <path d="M50 50 L78.5 86 A46 46 0 0 1 50 96 Z" fill="#27272a" />
-                    <path d="M50 50 L50 96 A46 46 0 0 1 21.5 86 Z" fill="#8b5cf6" />
-                    <path d="M50 50 L21.5 86 A46 46 0 0 1 4 50 Z" fill="#3f3f46" />
-                    <path d="M50 50 L4 50 A46 46 0 0 1 21.5 14 Z" fill="#7c3aed" />
-                    <path d="M50 50 L21.5 14 A46 46 0 0 1 50 4 Z" fill="#27272a" />
-                    <circle cx="50" cy="50" r="12" fill="#18181b" stroke="#52525b" strokeWidth="2" />
-                    <circle cx="50" cy="50" r="6" fill="#fbbf24" />
-                  </svg>
-                </div>
 
-                {/* Badge */}
-                <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[16px] h-4 rounded-full flex items-center justify-center border border-zinc-900 shadow-sm z-10 pointer-events-none">
-                  {spins}
-                </div>
-              </button>
+              {showSpinButton && (
+                <button
+                  onClick={() => { impact('light'); navigate('/spin') }}
+                  className="relative w-11 h-11 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl flex items-center justify-center border border-white/5 active:scale-[0.98] transition-all group overflow-visible"
+                >
+                  <div className="relative w-6 h-6" style={{ animation: 'spin-slow 10s linear infinite' }}>
+                    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                      <circle cx="50" cy="50" r="48" fill="#18181b" stroke="#3f3f46" strokeWidth="4" />
+                      <path d="M50 50 L50 4 A46 46 0 0 1 78.5 14 Z" fill="#8b5cf6" />
+                      <path d="M50 50 L78.5 14 A46 46 0 0 1 96 50 Z" fill="#3f3f46" />
+                      <path d="M50 50 L96 50 A46 46 0 0 1 78.5 86 Z" fill="#7c3aed" />
+                      <path d="M50 50 L78.5 86 A46 46 0 0 1 50 96 Z" fill="#27272a" />
+                      <path d="M50 50 L50 96 A46 46 0 0 1 21.5 86 Z" fill="#8b5cf6" />
+                      <path d="M50 50 L21.5 86 A46 46 0 0 1 4 50 Z" fill="#3f3f46" />
+                      <path d="M50 50 L4 50 A46 46 0 0 1 21.5 14 Z" fill="#7c3aed" />
+                      <path d="M50 50 L21.5 14 A46 46 0 0 1 50 4 Z" fill="#27272a" />
+                      <circle cx="50" cy="50" r="12" fill="#18181b" stroke="#52525b" strokeWidth="2" />
+                      <circle cx="50" cy="50" r="6" fill="#fbbf24" />
+                    </svg>
+                  </div>
+
+                  {/* Badge */}
+                  <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[16px] h-4 rounded-full flex items-center justify-center border border-zinc-900 shadow-sm z-10 pointer-events-none">
+                    {spins}
+                  </div>
+                </button>
+              )}
               {/* Channel Reward Button - Only show if not claimed */}
               {!channelReward.loading && channelReward.show && (
                 <button

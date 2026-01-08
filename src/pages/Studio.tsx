@@ -3,24 +3,31 @@ import { useTranslation, Trans } from 'react-i18next'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality, type ImageCount } from '@/store/generationStore'
+import { useActiveGenerationsStore, MAX_ACTIVE_IMAGES } from '@/store/activeGenerationsStore'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
 import { DevModeBanner } from '@/components/DevModeBanner'
+import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
 import { compressImage } from '@/utils/imageCompression'
 
 
 // Модели для генерации изображений
-const IMAGE_MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
+const ALL_IMAGE_MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string; devOnly?: boolean }[] = [
   { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/optimized/nanobanana.png' },
   { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
   { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/optimized/seedream.png' },
   { id: 'seedream4-5', name: 'Seedream 4.5', desc: '7 токенов', color: 'from-blue-400 to-indigo-500', icon: '/models/optimized/seedream-4-5.png' },
   { id: 'gpt-image-1.5', name: 'GPT image 1.5', desc: 'от 5 токенов', color: 'from-cyan-400 to-blue-500', icon: '/models/optimized/gpt-image.png' },
+  { id: 'test-model', name: '🧪 Test Model', desc: '0 токенов', color: 'from-green-400 to-emerald-500', icon: '/models/optimized/nanobanana.png', devOnly: true },
 ]
+
+// Фильтруем модели по DEV режиму
+const IS_DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'
+const IMAGE_MODELS = ALL_IMAGE_MODELS.filter(m => !m.devOnly || IS_DEV_MODE)
 
 // Модели для генерации видео
 const VIDEO_MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
@@ -38,6 +45,7 @@ const MODEL_PRICES: Record<ModelType, number> = {
   'p-image-edit': 2,
   'seedance-1.5-pro': 42, // Default: 720p, 8s, без аудио
   'gpt-image-1.5': 5, // Default: medium quality
+  'test-model': 0, // Тестовая модель - бесплатно
 }
 
 // Цены для GPT Image 1.5 по качеству
@@ -54,6 +62,7 @@ const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
   'p-image-edit': ['Auto', '1:1', '16:9', '9:16', '4:3', '3:4'],
   'seedance-1.5-pro': ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'],
   'gpt-image-1.5': ['1:1', '2:3', '3:2'],
+  'test-model': ['1:1', '16:9', '9:16'],
 }
 
 // Цены для видео Seedance 1.5 Pro
@@ -174,6 +183,13 @@ export default function Studio() {
   const [showTimeoutModal, setShowTimeoutModal] = useState(false)
   const [showCountSelector, setShowCountSelector] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  // Реактивно отслеживаем доступные слоты для генерации
+  const availableSlots = useActiveGenerationsStore(
+    (state) => MAX_ACTIVE_IMAGES - state.generations
+      .filter((g) => g.status === 'processing')
+      .reduce((sum, g) => sum + g.imageCount, 0)
+  )
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -386,6 +402,20 @@ export default function Studio() {
   }
 
   const handleGenerate = async () => {
+    // Получить store
+    const { addGeneration, updateGeneration, getAvailableSlots } = useActiveGenerationsStore.getState()
+
+    // Определить количество изображений для этого запроса
+    const requestImageCount = mediaType === 'video' ? 1 : imageCount
+
+    // Проверить лимит активных изображений
+    const availableSlots = getAvailableSlots()
+    if (availableSlots < requestImageCount) {
+      setError(t('activeGenerations.maxReached'))
+      notify('error')
+      return
+    }
+
     // Пропустить проверку промпта для слепого ремикса с приватным промптом
     if (!prompt.trim() && !(isPromptPrivate && parentGenerationId)) {
       setError(t('studio.errors.promptRequired'))
@@ -397,117 +427,173 @@ export default function Studio() {
       notify('error')
       return
     }
-    setIsGenerating(true)
-    setError(null)
 
+    setError(null)
     impact('heavy')
 
-    // Create AbortController for client-side timeout (300s for images, 360s for video)
-    const controller = new AbortController()
-    const timeoutMs = mediaType === 'video' ? 360000 : 300000
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    // Добавить генерацию в очередь с количеством изображений
+    const generationId = addGeneration({
+      prompt: prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''),
+      model: selectedModel,
+      status: 'processing',
+      mediaType,
+      imageCount: requestImageCount
+    })
 
-    try {
-      const requestBody: Record<string, unknown> = {
-        prompt,
-        model: selectedModel,
-        aspect_ratio: aspectRatio,
-        images: generationMode === 'image' ? uploadedImages : [],
-        user_id: user?.id || null,
-        parent_id: parentGenerationId || undefined,
-        resolution: selectedModel === 'nanobanana-pro' ? resolution : undefined,
-        contest_entry_id: contestEntryId || undefined,
-        image_count: mediaType === 'image' ? imageCount : 1
-      }
-
-      // Добавить параметры видео для Seedance 1.5 Pro
-      if (mediaType === 'video') {
-        requestBody.video_duration = videoDuration
-        requestBody.video_resolution = videoResolution
-        requestBody.fixed_lens = fixedLens
-        requestBody.generate_audio = generateAudio
-      }
-
-      // Добавить параметр качества для GPT Image 1.5
-      if (selectedModel === 'gpt-image-1.5') {
-        requestBody.gpt_image_quality = gptImageQuality
-      }
-
-      const res = await fetch('/api/generation/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      if (res.status === 403) {
-        setShowBalancePopup(true)
-        notify('error')
-        setIsGenerating(false)
-        return
-      }
-
-      const data = await res.json()
-
-      if (data.status === 'pending') {
-        setShowTimeoutModal(true)
-        notify('warning')
-        setIsGenerating(false)
-        return
-      }
-
-      if (!res.ok) throw new Error(data.error || t('studio.errors.generationError'))
-
-      // Обработать результат: для видео и изображений
-      if (mediaType === 'video') {
-        setGeneratedVideo(data.image) // API возвращает URL в поле image
-        setGeneratedImage(null)
-        setGeneratedImages([])
-      } else {
-        // Поддержка множественной генерации: API может вернуть images[] или image
-        const images = data.images || (data.image ? [data.image] : [])
-        if (images.length > 1) {
-          setGeneratedImages(images)
-          setGeneratedImage(images[0]) // Первое изображение для совместимости
-        } else {
-          setGeneratedImage(images[0] || data.image)
-          setGeneratedImages([])
-        }
-        setGeneratedVideo(null)
-      }
-
-      setParentGeneration(null, null) // Reset parent after success
-      // Баланс уже был списан на сервере при создании генерации
-      // Не обновляем локально чтобы избежать двойного списания
-
-      try {
-        const modelName = mediaType === 'video' ? 'Seedance Pro' : MODELS.find(m => m.id === selectedModel)?.name
-        const item = { id: Date.now(), url: data.image, prompt, model: modelName, ratio: aspectRatio, date: new Date().toLocaleDateString(), mediaType }
-        const prev = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
-        const next = [item, ...prev]
-        localStorage.setItem('img_gen_history_v2', JSON.stringify(next))
-      } catch { void 0 }
-      setCurrentScreen('result')
-      notify('success')
-    } catch (e) {
-      let msg = t('studio.errors.generationError')
-      if (e instanceof Error) {
-        if (e.name === 'AbortError') {
-          msg = mediaType === 'video' ? t('studio.errors.videoTimeout') : t('studio.errors.timeout')
-        } else if (e.message === 'Failed to fetch' || e.message.includes('Load failed')) {
-          msg = t('studio.errors.network')
-        } else {
-          msg = e.message
-        }
-      }
-      setError(msg)
-      notify('error')
-    } finally {
-      clearTimeout(timeoutId)
-      setIsGenerating(false)
+    // Сохранить текущие параметры для асинхронного запроса
+    const currentParams = {
+      prompt,
+      selectedModel,
+      aspectRatio,
+      uploadedImages: generationMode === 'image' ? [...uploadedImages] : [],
+      userId: user?.id || null,
+      parentGenerationId,
+      resolution,
+      contestEntryId,
+      imageCount: mediaType === 'image' ? imageCount : 1,
+      mediaType,
+      videoDuration,
+      videoResolution,
+      fixedLens,
+      generateAudio,
+      gptImageQuality
     }
+
+      // Запустить генерацию асинхронно (не блокируя UI)
+      ; (async () => {
+        const controller = new AbortController()
+        const timeoutMs = currentParams.mediaType === 'video' ? 360000 : 300000
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+        try {
+          const requestBody: Record<string, unknown> = {
+            prompt: currentParams.prompt,
+            model: currentParams.selectedModel,
+            aspect_ratio: currentParams.aspectRatio,
+            images: currentParams.uploadedImages,
+            user_id: currentParams.userId,
+            parent_id: currentParams.parentGenerationId || undefined,
+            resolution: currentParams.selectedModel === 'nanobanana-pro' ? currentParams.resolution : undefined,
+            contest_entry_id: currentParams.contestEntryId || undefined,
+            image_count: currentParams.imageCount
+          }
+
+          // Добавить параметры видео для Seedance 1.5 Pro
+          if (currentParams.mediaType === 'video') {
+            requestBody.video_duration = currentParams.videoDuration
+            requestBody.video_resolution = currentParams.videoResolution
+            requestBody.fixed_lens = currentParams.fixedLens
+            requestBody.generate_audio = currentParams.generateAudio
+          }
+
+          // Добавить параметр качества для GPT Image 1.5
+          if (currentParams.selectedModel === 'gpt-image-1.5') {
+            requestBody.gpt_image_quality = currentParams.gptImageQuality
+          }
+
+          const res = await fetch('/api/generation/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (res.status === 403) {
+            updateGeneration(generationId, { status: 'error', error: 'Недостаточно токенов' })
+            setShowBalancePopup(true)
+            notify('error')
+            return
+          }
+
+          const data = await res.json()
+
+          if (data.status === 'pending') {
+            // Генерация ушла в фон — обновляем статус
+            updateGeneration(generationId, { status: 'completed' })
+            notify('warning')
+            return
+          }
+
+          if (!res.ok) {
+            throw new Error(data.error || t('studio.errors.generationError'))
+          }
+
+          // Обработать результат
+          if (currentParams.mediaType === 'video') {
+            updateGeneration(generationId, {
+              status: 'completed',
+              videoUrl: data.image
+            })
+          } else {
+            const images = data.images || (data.image ? [data.image] : [])
+            updateGeneration(generationId, {
+              status: 'completed',
+              imageUrl: images[0] || data.image,
+              imageUrls: images.length > 1 ? images : undefined
+            })
+          }
+
+          // Сохранить в историю
+          try {
+            const modelName = currentParams.mediaType === 'video' ? 'Seedance Pro' : MODELS.find(m => m.id === currentParams.selectedModel)?.name
+            const item = { id: Date.now(), url: data.image, prompt: currentParams.prompt, model: modelName, ratio: currentParams.aspectRatio, date: new Date().toLocaleDateString(), mediaType: currentParams.mediaType }
+            const prev = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
+            const next = [item, ...prev]
+            localStorage.setItem('img_gen_history_v2', JSON.stringify(next))
+          } catch { void 0 }
+
+          notify('success')
+
+          // Обновить баланс
+          if (user?.id) {
+            fetch(`/api/user/info/${user.id}`).then(async r => {
+              const j = await r.json().catch(() => null)
+              if (r.ok && j && typeof j.balance === 'number') setBalance(j.balance)
+            })
+          }
+
+        } catch (e) {
+          let msg = t('studio.errors.generationError')
+          if (e instanceof Error) {
+            if (e.name === 'AbortError') {
+              msg = currentParams.mediaType === 'video' ? t('studio.errors.videoTimeout') : t('studio.errors.timeout')
+            } else if (e.message === 'Failed to fetch' || e.message.includes('Load failed')) {
+              msg = t('studio.errors.network')
+            } else {
+              msg = e.message
+            }
+          }
+          updateGeneration(generationId, { status: 'error', error: msg })
+          notify('error')
+        } finally {
+          clearTimeout(timeoutId)
+        }
+      })()
+
+    // Сброс parent после запуска генерации
+    setParentGeneration(null, null)
+  }
+
+  // Обработчик для просмотра результата из панели активных генераций
+  const handleViewGenerationResult = (gen: { imageUrl?: string; imageUrls?: string[]; videoUrl?: string; mediaType: 'image' | 'video' }) => {
+    if (gen.mediaType === 'video' && gen.videoUrl) {
+      setGeneratedVideo(gen.videoUrl)
+      setGeneratedImage(null)
+      setGeneratedImages([])
+    } else if (gen.imageUrls && gen.imageUrls.length > 1) {
+      // Множественные изображения (2x, 3x, 4x)
+      setGeneratedImages(gen.imageUrls)
+      setGeneratedImage(gen.imageUrls[0])
+      setGeneratedVideo(null)
+      setCurrentImageIndex(0)
+    } else if (gen.imageUrl) {
+      setGeneratedImage(gen.imageUrl)
+      setGeneratedVideo(null)
+      setGeneratedImages([])
+    }
+    setCurrentScreen('result')
   }
 
   // Показать результат для изображения ИЛИ видео
@@ -525,178 +611,183 @@ export default function Studio() {
   console.log('[Studio Result]', { generatedImage, generatedImages, generatedVideo, isVideoResult, hasMultipleImages, currentImageIndex, resultUrl })
 
   if (hasResult) {
+    const paddingTopResult = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 10px)' : 'calc(env(safe-area-inset-top) + 50px)'
+
+    const paddingBottomResult = platform === 'ios' ? 'calc(env(safe-area-inset-bottom) + 96px)' : '120px'
+
     return (
-      <div className="min-h-dvh bg-black safe-bottom-tabbar flex flex-col justify-end pb-24">
-        <div className="mx-auto max-w-3xl w-full px-4">
-          <Card className="bg-zinc-900/90 border-white/10 backdrop-blur-xl relative">
-            <button
-              onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setGeneratedVideo(null); setGeneratedImages([]); setCurrentImageIndex(0); setError(null) }}
-              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white transition-colors z-10"
-            >
-              <X size={20} />
-            </button>
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                {isVideoResult && <Video size={20} className="text-orange-400" />}
-                {isVideoResult ? t('studio.result.videoTitle') : t('studio.result.title')}
-                {hasMultipleImages && (
-                  <span className="text-sm font-normal text-zinc-400 ml-1">
-                    ({currentImageIndex + 1}/{generatedImages.length})
-                  </span>
-                )}
-              </CardTitle>
-              <CardDescription className="text-white/60">
-                {isVideoResult ? 'Seedance Pro' : MODELS.find(m => m.id === selectedModel)?.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative rounded-lg overflow-hidden group bg-black/20 flex items-center justify-center py-2">
-                {isVideoResult ? (
-                  <>
-                    {console.log('[Studio Video]', { resultUrl })}
-                    <video
-                      src={resultUrl}
-                      controls
-                      loop
-                      muted={isMuted}
-                      playsInline
-                      className="max-h-[45vh] w-auto object-contain shadow-lg rounded-md"
-                      onLoadStart={() => console.log('[Studio Video] Load started, url:', resultUrl)}
-                      onLoadedData={() => console.log('[Studio Video] Data loaded successfully')}
-                      onCanPlay={() => console.log('[Studio Video] Can play now')}
-                      onError={(e) => {
-                        const video = e.currentTarget
-                        console.error('[Studio Video] Error:', {
-                          url: resultUrl,
-                          errorCode: video.error?.code,
-                          errorMsg: video.error?.message,
-                          networkState: video.networkState,
-                          readyState: video.readyState
-                        })
-                      }}
-                    />
-                  </>
-                ) : (
-                  <img src={resultUrl} alt="result" className="max-h-[45vh] w-auto object-contain shadow-lg rounded-md" />
-                )}
-
-                {/* Навигация для множественных изображений */}
-                {hasMultipleImages && !isVideoResult && (
-                  <>
-                    {/* Кнопка влево */}
-                    <button
-                      onClick={() => {
-                        impact('light')
-                        setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : generatedImages.length - 1))
-                      }}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                    {/* Кнопка вправо */}
-                    <button
-                      onClick={() => {
-                        impact('light')
-                        setCurrentImageIndex((prev) => (prev < generatedImages.length - 1 ? prev + 1 : 0))
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                    {/* Индикаторы */}
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                      {generatedImages.map((_, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => { impact('light'); setCurrentImageIndex(idx) }}
-                          className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white w-4' : 'bg-white/50'
-                            }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {!isVideoResult && !hasMultipleImages && (
+      <div className="min-h-dvh bg-black flex flex-col justify-end px-4" style={{ paddingTop: paddingTopResult, paddingBottom: paddingBottomResult }}>
+        {/* Image/Video Preview */}
+        <div className="flex-1 flex items-center justify-center mb-4 relative">
+          {isVideoResult ? (
+            <>
+              {console.log('[Studio Video]', { resultUrl })}
+              <video
+                src={resultUrl}
+                controls
+                loop
+                muted={isMuted}
+                playsInline
+                className="max-w-full max-h-[60vh] object-contain rounded-xl"
+                onLoadStart={() => console.log('[Studio Video] Load started, url:', resultUrl)}
+                onLoadedData={() => console.log('[Studio Video] Data loaded successfully')}
+                onCanPlay={() => console.log('[Studio Video] Can play now')}
+                onError={(e) => {
+                  const video = e.currentTarget
+                  console.error('[Studio Video] Error:', {
+                    url: resultUrl,
+                    errorCode: video.error?.code,
+                    errorMsg: video.error?.message,
+                    networkState: video.networkState,
+                    readyState: video.readyState
+                  })
+                }}
+              />
+              {/* Mute toggle for video */}
+              <button
+                onClick={() => { setIsMuted(!isMuted); impact('light') }}
+                className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
+              >
+                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+            </>
+          ) : (
+            <>
+              <img
+                src={resultUrl}
+                alt="result"
+                className="max-w-full max-h-[60vh] object-contain rounded-xl"
+                onClick={() => { impact('light'); setIsFullScreen(true) }}
+              />
+              {/* Navigation for multiple images */}
+              {hasMultipleImages && (
+                <>
                   <button
                     onClick={() => {
                       impact('light')
-                      setIsFullScreen(true)
+                      setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : generatedImages.length - 1))
                     }}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
                   >
-                    <Maximize2 size={16} />
+                    <ChevronLeft size={20} />
                   </button>
-                )}
-                {hasMultipleImages && !isVideoResult && (
                   <button
                     onClick={() => {
                       impact('light')
-                      setIsFullScreen(true)
+                      setCurrentImageIndex((prev) => (prev < generatedImages.length - 1 ? prev + 1 : 0))
                     }}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
                   >
-                    <Maximize2 size={16} />
+                    <ChevronRight size={20} />
                   </button>
-                )}
-              </div>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button
-                    onClick={() => {
-                      const ext = isVideoResult ? 'mp4' : 'jpg'
-                      saveToGallery(resultUrl, `ai-${Date.now()}.${ext}`)
-                    }}
-                    className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold"
-                  >
-                    <DownloadIcon size={16} className="mr-2" />
-                    {t('studio.result.save')}
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      if (!user?.id) return
-                      impact('light')
-                      try {
-                        const r = await fetch('/api/telegram/sendDocument', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: user.id, file_url: resultUrl, caption: prompt }) })
-                        const j = await r.json().catch(() => null)
-                        if (r.ok && j?.ok) { notify('success') }
-                        else {
-                          notify('error')
-                          if (!isVideoResult) shareImage(resultUrl, prompt)
-                        }
-                      } catch {
-                        notify('error')
-                      }
-                    }}
-                    className="flex-1 bg-violet-600 text-white hover:bg-violet-700 font-bold"
-                  >
-                    <Send size={16} className="mr-2" />
-                    {t('studio.result.sendToChat')}
-                  </Button>
-                </div>
-                {/* Кнопка редактирования только для изображений */}
-                {!isVideoResult && (
-                  <Button
-                    onClick={() => navigate(`/editor?image=${encodeURIComponent(resultUrl)}`)}
-                    className="w-full bg-cyan-600 text-white hover:bg-cyan-500 font-bold"
-                  >
-                    <Pencil size={16} className="mr-2" />
-                    {t('editor.edit')}
-                  </Button>
-                )}
-                <Button
-                  onClick={() => { setCurrentScreen('form'); setGeneratedImage(null); setGeneratedVideo(null); setError(null) }}
-                  className="w-full bg-zinc-800 text-white hover:bg-zinc-700 font-bold border border-white/10"
+                  {/* Dot indicators */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {generatedImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { impact('light'); setCurrentImageIndex(idx) }}
+                        className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white w-4' : 'bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {/* Fullscreen button for single image */}
+              {!hasMultipleImages && (
+                <button
+                  onClick={() => { impact('light'); setIsFullScreen(true) }}
+                  className="absolute right-4 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
+                  style={{ top: 'calc(env(safe-area-inset-top) + 60px)' }}
                 >
-                  {t('studio.result.close')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  <Maximize2 size={18} />
+                </button>
+              )}
+            </>
+          )}
         </div>
+
+        {/* Compact Bottom Panel */}
+        <div className="bg-zinc-900/95 backdrop-blur-lg border border-white/10 rounded-2xl p-4 space-y-3">
+          {/* Model & count info */}
+          {hasMultipleImages && (
+            <div className="text-center text-xs text-zinc-400 mb-1">
+              {currentImageIndex + 1} / {generatedImages.length}
+            </div>
+          )}
+
+          {/* Primary Action Buttons Row */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const ext = isVideoResult ? 'mp4' : 'jpg'
+                saveToGallery(resultUrl, `ai-${Date.now()}.${ext}`)
+              }}
+              className="flex-1 py-3 rounded-xl bg-white text-black font-medium flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors"
+            >
+              <DownloadIcon size={18} />
+              <span className="text-sm">{t('studio.result.save')}</span>
+            </button>
+            <button
+              onClick={async () => {
+                if (!user?.id) return
+                impact('light')
+                try {
+                  const r = await fetch('/api/telegram/sendDocument', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: user.id, file_url: resultUrl, caption: prompt })
+                  })
+                  const j = await r.json().catch(() => null)
+                  if (r.ok && j?.ok) {
+                    notify('success')
+                  } else {
+                    notify('error')
+                    if (!isVideoResult) shareImage(resultUrl, prompt)
+                  }
+                } catch {
+                  notify('error')
+                }
+              }}
+              className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-violet-500 transition-colors"
+            >
+              <Send size={18} />
+              <span className="text-sm">{t('studio.result.sendToChat')}</span>
+            </button>
+          </div>
+
+          {/* Secondary Actions */}
+          <div className="flex gap-2">
+            {/* Edit button - only for images */}
+            {!isVideoResult && (
+              <button
+                onClick={() => navigate(`/editor?image=${encodeURIComponent(resultUrl)}`)}
+                className="flex-1 py-2.5 rounded-xl bg-cyan-600/20 text-cyan-400 text-sm font-medium flex items-center justify-center gap-2 border border-cyan-500/30 hover:bg-cyan-600/30 transition-colors"
+              >
+                <Pencil size={16} />
+                {t('editor.edit')}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setCurrentScreen('form')
+                setGeneratedImage(null)
+                setGeneratedVideo(null)
+                setGeneratedImages([])
+                setCurrentImageIndex(0)
+                setError(null)
+              }}
+              className={`${!isVideoResult ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-zinc-800 text-zinc-400 text-sm font-medium flex items-center justify-center gap-2 border border-white/10 hover:bg-zinc-700 hover:text-white transition-colors`}
+            >
+              <X size={16} />
+              {t('studio.result.close')}
+            </button>
+          </div>
+        </div>
+
+        {/* Fullscreen Modal */}
         {isFullScreen && (
           <div className="fixed inset-0 z-[200] bg-black flex flex-col">
-            <div className={`absolute top-0 right-0 z-50 p-4 pt-[calc(3rem+env(safe-area-inset-top))]`}>
+            <div className="absolute top-0 right-0 z-50 p-4 pt-[calc(3rem+env(safe-area-inset-top))]">
               <button
                 onClick={() => setIsFullScreen(false)}
                 className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
@@ -715,7 +806,7 @@ export default function Studio() {
               >
                 <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <img
-                    src={generatedImage}
+                    src={resultUrl}
                     alt="Fullscreen"
                     className="max-w-full max-h-full object-contain"
                   />
@@ -822,6 +913,29 @@ export default function Studio() {
             })}
 
           </div>
+        )}
+
+        {/* Multi Generation Button */}
+        {mediaType === 'image' && (
+          <button
+            onClick={() => { impact('light'); navigate('/multi-generation') }}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 flex items-center justify-between group active:scale-[0.99] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                <Layers size={20} />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-white group-hover:text-pink-200 transition-colors">
+                  {t('multiGeneration.title')}
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  {t('multiGeneration.desc')}
+                </div>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-zinc-500 group-hover:text-white transition-colors" />
+          </button>
         )}
 
         {/* 1.5 Video Model Info (показываем когда выбрано видео) */}
@@ -1399,71 +1513,78 @@ export default function Studio() {
         )}
 
 
+        {/* Active Generations Panel */}
+        <ActiveGenerationsPanel onViewResult={handleViewGenerationResult} />
+
         {/* 6. Generate Button with Image Count Selector */}
         <div className="">
-          {isGenerating && (
-            <p className="text-xs text-zinc-500 text-center mb-3 animate-in fade-in slide-in-from-bottom-1 px-4 leading-relaxed">
-              <Trans i18nKey="studio.generate.waitMessage" components={[<br />, <span className="text-zinc-400 font-medium" />, <br />, <span className="text-zinc-400 font-medium" />]} />
-            </p>
-          )}
           <div className="flex gap-2">
             {/* Image Count Selector - only for images, not video */}
-            {mediaType === 'image' && (
-              <div className="relative">
-                <button
-                  onClick={() => { setShowCountSelector(!showCountSelector); impact('light') }}
-                  className="h-full px-4 rounded-xl bg-zinc-800 border border-white/10 text-white font-bold flex items-center gap-1.5 hover:bg-zinc-700 transition-colors min-w-[56px] justify-center"
-                >
-                  <span className="text-lg">{imageCount}</span>
-                  <span className="text-[10px] text-zinc-400">×</span>
-                </button>
+            {mediaType === 'image' && (() => {
+              const maxAvailable = Math.min(4, Math.max(1, availableSlots)) as ImageCount
 
-                {/* Dropdown menu - opens upward */}
-                {showCountSelector && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowCountSelector(false)}
-                    />
-                    <div className="absolute bottom-full left-0 mb-2 bg-zinc-800 border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                      {([1, 2, 3, 4] as ImageCount[]).map((count) => (
-                        <button
-                          key={count}
-                          onClick={() => {
-                            setImageCount(count)
-                            setShowCountSelector(false)
-                            impact('light')
-                          }}
-                          className={`w-full px-5 py-2.5 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${imageCount === count
-                            ? 'bg-violet-600 text-white'
-                            : 'text-zinc-300 hover:bg-zinc-700'
-                            }`}
-                        >
-                          <span className="text-lg">{count}</span>
-                          <span className="text-[10px] text-zinc-400">×</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+              return (
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowCountSelector(!showCountSelector); impact('light') }}
+                    className="h-full px-4 rounded-xl bg-zinc-800 border border-white/10 text-white font-bold flex items-center gap-1.5 hover:bg-zinc-700 transition-colors min-w-[56px] justify-center"
+                  >
+                    <span className="text-lg">{Math.min(imageCount, maxAvailable)}</span>
+                    <span className="text-[10px] text-zinc-400">×</span>
+                  </button>
+
+                  {/* Dropdown menu - opens upward */}
+                  {showCountSelector && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowCountSelector(false)}
+                      />
+                      <div className="absolute bottom-full left-0 mb-2 bg-zinc-800 border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        {([1, 2, 3, 4] as ImageCount[]).map((count) => {
+                          const isDisabled = count > availableSlots
+                          return (
+                            <button
+                              key={count}
+                              disabled={isDisabled}
+                              onClick={() => {
+                                if (!isDisabled) {
+                                  setImageCount(count)
+                                  setShowCountSelector(false)
+                                  impact('light')
+                                }
+                              }}
+                              className={`w-full px-5 py-2.5 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${isDisabled
+                                ? 'text-zinc-600 cursor-not-allowed'
+                                : imageCount === count
+                                  ? 'bg-violet-600 text-white'
+                                  : 'text-zinc-300 hover:bg-zinc-700'
+                                }`}
+                            >
+                              <span className="text-lg">{count}</span>
+                              <span className="text-[10px] text-zinc-400">×</span>
+                              {isDisabled && <span className="text-[9px] ml-1">🔒</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Generate Button */}
             <Button
               onClick={handleGenerate}
-              disabled={isGenerating || (!prompt.trim() && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0)}
-              className={`flex-1 py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group ${isGenerating ? 'bg-zinc-900/80 text-violet-200 cursor-wait border border-violet-500/20' : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10'}`}
+              disabled={(!prompt.trim() && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0)}
+              className="flex-1 py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10"
             >
-              {isGenerating ? (
-                <div className="absolute inset-0 bg-violet-500/10 animate-pulse" />
-              ) : (
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              )}
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               <div className="relative flex items-center gap-2">
-                {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
-                <span>{isGenerating ? t('studio.generate.generating') : t('studio.generate.button')}</span>
-                {!isGenerating && <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
+                <Sparkles size={20} />
+                <span>{t('studio.generate.button')}</span>
+                <span className="bg-black/20 px-2 py-0.5 rounded text-xs font-normal ml-1">
                   {(() => {
                     const basePrice = mediaType === 'video'
                       ? calculateVideoCost(videoResolution, videoDuration, generateAudio)
@@ -1473,7 +1594,7 @@ export default function Studio() {
                     const totalPrice = mediaType === 'video' ? basePrice : basePrice * imageCount
                     return `${totalPrice} ${t('studio.tokens')}`
                   })()}
-                </span>}
+                </span>
               </div>
             </Button>
           </div>
