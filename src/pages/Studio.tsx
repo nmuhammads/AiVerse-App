@@ -253,7 +253,7 @@ export default function Studio() {
     if (selectedModel === 'kling-mc' && uploadedVideoUrl && videoDurationSeconds > 0) {
       const maxDuration = characterOrientation === 'image' ? 10 : 30
       if (videoDurationSeconds > maxDuration) {
-        setError(t('studio.kling.mc.durationError', `Видео слишком длинное. Максимум: ${maxDuration} сек`))
+        setError(t('studio.kling.mc.durationError', { max: maxDuration, defaultValue: `Видео слишком длинное. Максимум: ${maxDuration} сек` }))
       } else {
         // Clear specific duration error if valid
         if (error?.includes('Видео слишком длинное')) {
@@ -1351,7 +1351,7 @@ export default function Studio() {
         )}
 
         {/* 4.1 Reference Frames for VIDEO mode (Start/End frames for I2V) */}
-        {generationMode === 'image' && mediaType === 'video' && (
+        {generationMode === 'image' && mediaType === 'video' && selectedModel !== 'kling-mc' && (
           <div className="animate-in fade-in slide-in-from-top-4 duration-300">
             <div className={`grid gap-3 ${['kling-t2v', 'kling-i2v', 'kling-mc'].includes(selectedModel) ? 'grid-cols-1' : 'grid-cols-2'}`}>
               {/* Start Frame / Reference Image */}
@@ -1736,6 +1736,84 @@ export default function Studio() {
                 {t('studio.kling.mc.uploadImage', 'Загрузите фото персонажа')}
               </label>
               <p className="text-[10px] text-zinc-500 pl-7">{t('studio.kling.mc.imageHint', 'Лицо должно быть видно (голова + плечи + торс)')}</p>
+
+              {/* Image Upload Area */}
+              {uploadedImages[0] ? (
+                <div className="border-2 border-dashed border-white/10 rounded-xl aspect-[4/3] bg-zinc-900/20 relative overflow-hidden">
+                  <img src={uploadedImages[0]} alt="character-ref" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => {
+                      const newImages = [...uploadedImages]
+                      newImages[0] = ''
+                      setUploadedImages(newImages.filter(Boolean))
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0]
+                        if (file) {
+                          const base64 = await new Promise<string>((resolve) => {
+                            const reader = new FileReader()
+                            reader.onloadend = () => resolve(reader.result as string)
+                            reader.readAsDataURL(file)
+                          })
+                          const newImages = [...uploadedImages]
+                          newImages[0] = base64
+                          setUploadedImages(newImages)
+                        }
+                      }
+                      input.click()
+                    }}
+                    className="w-full py-4 rounded-xl border-2 border-dashed border-white/10 bg-zinc-900/50 text-zinc-400 hover:border-cyan-500/50 hover:text-cyan-400 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ImageIcon size={20} />
+                    <span>{t('studio.upload.selectPhoto')}</span>
+                  </button>
+
+                  {/* Paste zone */}
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onPaste={async (e) => {
+                      e.preventDefault()
+                      const items = e.clipboardData?.items
+                      if (!items) return
+                      for (const item of Array.from(items)) {
+                        if (item.type.startsWith('image/')) {
+                          const file = item.getAsFile()
+                          if (file) {
+                            const base64 = await new Promise<string>((resolve) => {
+                              const reader = new FileReader()
+                              reader.onloadend = () => resolve(reader.result as string)
+                              reader.readAsDataURL(file)
+                            })
+                            const newImages = [...uploadedImages]
+                            newImages[0] = base64
+                            setUploadedImages(newImages)
+                            break
+                          }
+                        }
+                      }
+                      e.currentTarget.innerHTML = ''
+                    }}
+                    onInput={(e) => { e.currentTarget.innerHTML = '' }}
+                    className="w-full py-2.5 px-3 rounded-xl border-2 border-dashed border-violet-500/30 bg-violet-500/5 flex items-center justify-center gap-2 text-violet-300 text-[10px] font-medium cursor-text select-none focus:outline-none focus:border-violet-500/50"
+                  >
+                    <Clipboard size={14} />
+                    <span>{t('studio.upload.paste')}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Step 2: Character Orientation */}

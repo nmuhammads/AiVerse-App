@@ -1245,7 +1245,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
         model,
         prompt,
         aspect_ratio,
-        images,
+        images: (r2Images && r2Images.length > 0) ? r2Images : images,
         negative_prompt,
         meta: generationId && index === 0 ? {
           generationId,
