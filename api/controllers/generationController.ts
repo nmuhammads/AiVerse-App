@@ -27,6 +27,12 @@ interface KieAIRequest {
   generate_audio?: boolean
   // Параметры для GPT Image 1.5
   gpt_image_quality?: 'medium' | 'high'
+  // Параметры для Kling AI
+  kling_duration?: '5' | '10'
+  kling_sound?: boolean
+  kling_mc_quality?: '720p' | '1080p'
+  character_orientation?: 'image' | 'video'
+  video_url?: string
 }
 
 interface KieAIResponse {
@@ -47,6 +53,33 @@ const MODEL_CONFIGS = {
   'seedance-1.5-pro': { kind: 'jobs' as const, model: 'bytedance/seedance-1.5-pro', mediaType: 'video' as const },
   'gpt-image-1.5': { kind: 'jobs' as const, model: 'gpt-image/1.5-text-to-image', dbModel: 'gptimage1.5' },
   'test-model': { kind: 'test' as const, model: 'test-model' }, // Тестовая модель (не вызывает API)
+  // Kling AI v2.6 модели
+  'kling-t2v': { kind: 'jobs' as const, model: 'kling-2.6/text-to-video', mediaType: 'video' as const },
+  'kling-i2v': { kind: 'jobs' as const, model: 'kling-2.6/image-to-video', mediaType: 'video' as const },
+  'kling-mc': { kind: 'jobs' as const, model: 'kling-2.6/motion-control', mediaType: 'video' as const },
+}
+
+// Маппинг внешних API имён моделей (от Kie.ai) к внутренним именам
+// Используется для генераций созданных другими ботами
+const EXTERNAL_MODEL_MAP: Record<string, string> = {
+  'kling-2.6/motion-control': 'kling-mc',
+  'kling-2.6/text-to-video': 'kling-t2v',
+  'kling-2.6/image-to-video': 'kling-i2v',
+  'bytedance/seedance-1.5-pro': 'seedance-1.5-pro',
+  'nano-banana-pro': 'nanobanana-pro',
+  'google/nano-banana-edit': 'nanobanana',
+  'gpt-image/1.5-text-to-image': 'gpt-image-1.5',
+}
+
+// Список video моделей — включает оба формата (внутренний и внешний API)
+const VIDEO_MODELS = [
+  'seedance-1.5-pro', 'kling-t2v', 'kling-i2v', 'kling-mc',
+  'bytedance/seedance-1.5-pro', 'kling-2.6/motion-control', 'kling-2.6/text-to-video', 'kling-2.6/image-to-video'
+]
+
+// Определить media type по имени модели (поддерживает оба формата имён)
+function getMediaType(model: string): 'video' | 'image' {
+  return VIDEO_MODELS.includes(model) ? 'video' : 'image'
 }
 
 function mapSeedreamImageSize(ratio?: string): string | undefined {
@@ -297,7 +330,7 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
         throw new Error(json.data.failMsg || 'Jobs task failed')
       }
     }
-    await new Promise(r => setTimeout(r, 2000))
+    await new Promise(r => setTimeout(r, 30000))
   }
   console.log(`[Jobs] Task ${taskId} timed out after ${timeoutMs}ms - status stays pending for later check`)
   return 'TIMEOUT'
@@ -375,6 +408,36 @@ function calculateVideoCost(resolution: string, duration: string, withAudio: boo
   return withAudio ? prices.audio : prices.base
 }
 
+// === Цены для Kling AI v2.6 ===
+// T2V & I2V: фиксированная цена по длительности
+const KLING_VIDEO_PRICES: Record<string, { base: number; audio: number }> = {
+  '5': { base: 55, audio: 110 },
+  '10': { base: 110, audio: 220 },
+}
+
+// Motion Control: цена за секунду (минимум 5 сек)
+const KLING_MC_PRICES: Record<string, number> = {
+  '720p': 6,
+  '1080p': 9,
+}
+
+// Рассчитать стоимость Kling в токенах
+function calculateKlingCost(
+  mode: string, // 't2v' | 'i2v' | 'motion-control'
+  duration: string,
+  withSound: boolean,
+  mcQuality: string = '720p',
+  videoDurationSeconds: number = 0
+): number {
+  if (mode === 'motion-control' || mode === 'kling-mc') {
+    const pricePerSec = KLING_MC_PRICES[mcQuality] || 6
+    const effectiveDuration = Math.max(5, videoDurationSeconds)
+    return effectiveDuration * pricePerSec
+  }
+  const prices = KLING_VIDEO_PRICES[duration] || KLING_VIDEO_PRICES['5']
+  return withSound ? prices.audio : prices.base
+}
+
 async function completeGeneration(
   generationId: number,
   userId: number,
@@ -396,10 +459,10 @@ async function completeGeneration(
     return
   }
 
-  console.log(`[DB] Completing generation ${generationId} for user ${userId}`)
+  console.log(`[DB] Completing generation ${generationId} for user ${userId}, model: ${model}`)
   try {
-    // Determine media type from model
-    const mediaType = model === 'seedance-1.5-pro' ? 'video' : 'image'
+    // Determine media type from model (supports both internal and external API model names)
+    const mediaType = getMediaType(model)
 
     // 1. Update generation status - save video to video_url, image to image_url
     const updatePayload: Record<string, unknown> = {
@@ -772,6 +835,86 @@ async function generateImageWithKieAI(
       return { images: [url], inputImages: imageUrls }
     }
 
+    // Kling T2V — Text to Video
+    if (model === 'kling-t2v') {
+      const { kling_duration, kling_sound } = requestData as any
+
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspect_ratio || '16:9',
+        duration: kling_duration || '5',
+        sound: kling_sound ?? false,
+      }
+
+      console.log('[Kling T2V] Creating task:', JSON.stringify(input))
+      const taskId = await createJobsTask(apiKey, 'kling-2.6/text-to-video', input, onTaskCreated, metaPayload)
+
+      const KLING_TIMEOUT_MS = 360000 // 6 min for T2V
+      const url = await pollJobsTask(apiKey, taskId, KLING_TIMEOUT_MS)
+
+      if (url === 'TIMEOUT') {
+        console.log('[Kling T2V] Generation timed out, status stays pending')
+        return { timeout: true, inputImages: [] }
+      }
+
+      console.log('[Kling T2V] Video generated:', url)
+      return { images: [url], inputImages: [] }
+    }
+
+    // Kling I2V — Image to Video
+    if (model === 'kling-i2v') {
+      const { kling_duration, kling_sound } = requestData as any
+
+      const input: Record<string, unknown> = {
+        prompt,
+        image_urls: imageUrls,
+        duration: kling_duration || '5',
+        sound: kling_sound ?? false,
+      }
+
+      console.log('[Kling I2V] Creating task:', JSON.stringify(input))
+      const taskId = await createJobsTask(apiKey, 'kling-2.6/image-to-video', input, onTaskCreated, metaPayload)
+
+      const KLING_TIMEOUT_MS = 360000 // 6 min for I2V
+      const url = await pollJobsTask(apiKey, taskId, KLING_TIMEOUT_MS)
+
+      if (url === 'TIMEOUT') {
+        console.log('[Kling I2V] Generation timed out, status stays pending')
+        return { timeout: true, inputImages: imageUrls }
+      }
+
+      console.log('[Kling I2V] Video generated:', url)
+      return { images: [url], inputImages: imageUrls }
+    }
+
+    // Kling Motion Control
+    if (model === 'kling-mc') {
+      const { character_orientation, kling_mc_quality, video_url } = requestData as any
+
+      const input: Record<string, unknown> = {
+        prompt,
+        input_urls: imageUrls,
+        video_urls: [video_url],
+        character_orientation: character_orientation || 'video',
+        mode: kling_mc_quality || '720p',
+      }
+
+      console.log('[Kling MC] Creating task:', JSON.stringify(input))
+      const taskId = await createJobsTask(apiKey, 'kling-2.6/motion-control', input, onTaskCreated, metaPayload)
+
+      // Motion Control может занимать до 30 минут
+      const KLING_MC_TIMEOUT_MS = 1800000 // 30 min
+      const url = await pollJobsTask(apiKey, taskId, KLING_MC_TIMEOUT_MS)
+
+      if (url === 'TIMEOUT') {
+        console.log('[Kling MC] Generation timed out after 15 minutes')
+        return { timeout: true, inputImages: imageUrls }
+      }
+
+      console.log('[Kling MC] Video generated:', url)
+      return { images: [url], inputImages: imageUrls }
+    }
+
 
     throw new Error('Unsupported model')
   } catch (error) {
@@ -793,12 +936,15 @@ export async function handleGenerateImage(req: Request, res: Response) {
       prompt, model, aspect_ratio, images, negative_prompt, user_id, resolution, contest_entry_id,
       // Параметры для видео (Seedance 1.5 Pro)
       video_duration, video_resolution, fixed_lens, generate_audio,
+      // Параметры для Kling AI
+      kling_duration, kling_sound, kling_mc_quality, character_orientation, video_url, video_duration_seconds,
       // Количество изображений для множественной генерации
       image_count = 1
     } = req.body
 
     // Ограничить image_count до 1-4, и только для изображений (не для видео)
-    const imageCount = model === 'seedance-1.5-pro' ? 1 : Math.max(1, Math.min(4, Number(image_count) || 1))
+    // Video models support only 1 image at a time
+    const imageCount = VIDEO_MODELS.includes(model) ? 1 : Math.max(1, Math.min(4, Number(image_count) || 1))
 
     const parent_id = req.body.parent_id
 
@@ -840,11 +986,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
     }
 
     // Валидация входных данных
-    if (!prompt || typeof prompt !== 'string') {
+    // Валидация входных данных
+    if ((!prompt || typeof prompt !== 'string') && model !== 'kling-mc') {
       return res.status(400).json({
         error: 'Prompt is required and must be a string'
       })
     }
+    if (!prompt) prompt = ''
 
     if (!model || !MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]) {
       return res.status(400).json({
@@ -943,6 +1091,18 @@ export async function handleGenerateImage(req: Request, res: Response) {
         const gpt_image_quality = req.body.gpt_image_quality || 'medium'
         cost = calculateGptImageCost(gpt_image_quality)
       }
+      // Dynamic pricing for Kling T2V/I2V
+      if (model === 'kling-t2v' || model === 'kling-i2v') {
+        const kling_duration = req.body.kling_duration || '5'
+        const kling_sound = req.body.kling_sound ?? false
+        cost = calculateKlingCost('t2v', kling_duration, kling_sound)
+      }
+      // Dynamic pricing for Kling Motion Control
+      if (model === 'kling-mc') {
+        const kling_mc_quality = req.body.kling_mc_quality || '720p'
+        const video_duration_seconds = req.body.video_duration_seconds || 5
+        cost = calculateKlingCost('motion-control', '', false, kling_mc_quality, video_duration_seconds)
+      }
       const q = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance,language_code`)
       const balance = Array.isArray(q.data) && q.data[0]?.balance != null ? Number(q.data[0].balance) : 0
       if (Array.isArray(q.data) && q.data[0]?.language_code) {
@@ -1034,6 +1194,34 @@ export async function handleGenerateImage(req: Request, res: Response) {
             console.log(`[DB] Balance debited at start for user ${user_id}: ${currBal} -> ${nextBal}`)
           }
         }
+
+        // === KLING MOTION CONTROL VIDEO UPLOAD LOGIC ===
+        // Now that we have generationId, we upload the video with custom filename
+        if (model === 'kling-mc' && req.body.video_url && req.body.video_url.startsWith('data:video')) {
+          const { uploadVideoFromBase64 } = await import('../services/r2Service.js')
+          console.log(`[API] Uploading reference video for Gen ${generationId}...`)
+          try {
+            const r2VideoUrl = await uploadVideoFromBase64(req.body.video_url, '', {
+              customFileName: `${generationId}.mp4`
+            })
+            console.log(`[API] Reference video uploaded: ${r2VideoUrl}`)
+
+            // 1. Update local variable for API call
+            video_url = r2VideoUrl
+
+            // 2. Update DB record
+            await supaPatch('generations', `?id=eq.${generationId}`, { video_input: r2VideoUrl })
+            console.log(`[DB] Updated generation ${generationId} with video_input`)
+
+          } catch (e) {
+            console.error(`[API] Failed to upload video for Gen ${generationId}`, e)
+            // Determine what to do on failure? 
+            // For now proceed, API might fail or use base64 if logic allows (which we removed from var but body still has it?)
+            // Actually we updated `video_url` var only on success.
+          }
+        }
+        // === END KLING MC UPLOAD ===
+
       } else {
         console.error('Failed to create pending generation record', genRes)
         // We continue, but generationId will be 0, so meta won't be sent
@@ -1043,8 +1231,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     // Вызов Kie.ai API с таймаутом
     // Set a hard timeout for the entire generation process (e.g. 5 min) to avoid platform timeouts
-    // For video, use 6 min timeout
-    const GENERATION_TIMEOUT_MS = model === 'seedance-1.5-pro' ? 360000 : 300000
+    // For video: Seedance 6 min, Kling T2V/I2V 6 min, Kling MC 15 min
+    let GENERATION_TIMEOUT_MS = 300000 // default 5 min for images
+    if (model === 'seedance-1.5-pro' || model === 'kling-t2v' || model === 'kling-i2v') {
+      GENERATION_TIMEOUT_MS = 360000 // 6 min
+    } else if (model === 'kling-mc') {
+      GENERATION_TIMEOUT_MS = 1800000 // 30 min for Motion Control
+    }
 
     console.log(`[API] Starting generation (imageCount: ${imageCount}) with timeout protection...`)
 
@@ -1054,7 +1247,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
         model,
         prompt,
         aspect_ratio,
-        images,
+        images: (r2Images && r2Images.length > 0) ? r2Images : images,
         negative_prompt,
         meta: generationId && index === 0 ? {
           generationId,
@@ -1067,6 +1260,12 @@ export async function handleGenerateImage(req: Request, res: Response) {
         fixed_lens,
         generate_audio,
         gpt_image_quality: req.body.gpt_image_quality,
+        // Kling параметры
+        kling_duration,
+        kling_sound,
+        kling_mc_quality,
+        character_orientation,
+        video_url,
       }, async (taskId) => {
         if (generationId && index === 0) {
           console.log(`[API] Task ID received: ${taskId} for generation ${generationId}`)
@@ -1260,7 +1459,8 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
   }
 
   // Get pending generations (all of them, to handle missing task_id too)
-  const q = await supaSelect('generations', `?user_id=eq.${user_id}&status=eq.pending&select=*,input_images`)
+  // Note: use 'ilike' pattern to catch statuses with leading/trailing spaces from other bots' data
+  const q = await supaSelect('generations', `?user_id=eq.${user_id}&status=ilike.*pending*&select=*,input_images`)
   if (!q.ok || !Array.isArray(q.data)) {
     return res.json({ checked: 0, updated: 0 })
   }
@@ -1268,6 +1468,12 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
   const pending = q.data
   let updated = 0
   const apiKey = process.env.KIE_API_KEY || ''
+
+  // Расширенное логирование
+  console.log(`[CheckStatus] Found ${pending.length} pending generation(s):`)
+  for (const gen of pending) {
+    console.log(`  - ID: ${gen.id}, model: ${gen.model}, task_id: ${gen.task_id || 'MISSING'}, cost: ${gen.cost || 0}`)
+  }
 
   for (const gen of pending) {
     // Handle missing model AND task_id - mark as failed
@@ -1317,12 +1523,10 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
     let result = { status: 'pending', imageUrl: '', error: '' }
 
     try {
-      // Check API status (use checkJobsTask as default if no model)
-      if (gen.model === 'flux') {
-        result = await checkFluxTask(apiKey, gen.task_id)
-      } else {
-        result = await checkJobsTask(apiKey, gen.task_id)
-      }
+      // Check API status via Kie.ai Jobs API (universal for all models)
+      console.log(`[CheckStatus] Checking gen ${gen.id} with task_id ${gen.task_id}...`)
+      result = await checkJobsTask(apiKey, gen.task_id)
+      console.log(`[CheckStatus] Gen ${gen.id} API result: status=${result.status}, hasUrl=${!!result.imageUrl}, error=${result.error || 'none'}`)
 
       if (result.status === 'success' && result.imageUrl) {
         let cost = gen.cost

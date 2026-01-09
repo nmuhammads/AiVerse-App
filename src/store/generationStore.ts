@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro' | 'gpt-image-1.5' | 'test-model'
+export type ModelType = 'nanobanana-pro' | 'seedream4' | 'nanobanana' | 'seedream4-5' | 'p-image-edit' | 'seedance-1.5-pro' | 'gpt-image-1.5' | 'test-model' | 'kling-t2v' | 'kling-i2v' | 'kling-mc'
 
 export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '16:21' | 'Auto' | 'square_hd' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | '2:3' | '3:2'
 
@@ -13,6 +13,12 @@ export type VideoResolution = '480p' | '720p'
 export type GptImageQuality = 'medium' | 'high'
 
 export type ImageCount = 1 | 2 | 3 | 4
+
+// === Типы для Kling AI ===
+export type KlingVideoMode = 't2v' | 'i2v' | 'motion-control'
+export type KlingDuration = '5' | '10'
+export type KlingMCQuality = '720p' | '1080p'
+export type CharacterOrientation = 'image' | 'video'
 
 export interface GenerationState {
   // Текущая выбранная модель
@@ -63,6 +69,22 @@ export interface GenerationState {
   // === Параметры для GPT Image 1.5 ===
   // Качество генерации (medium=5 токенов, high=15 токенов)
   gptImageQuality: GptImageQuality
+
+  // === Параметры для Kling AI ===
+  // Режим генерации Kling (T2V, I2V, Motion Control)
+  klingVideoMode: KlingVideoMode
+  // Длительность видео Kling (5 или 10 секунд)
+  klingDuration: KlingDuration
+  // Генерация звука для Kling
+  klingSound: boolean
+  // Качество Motion Control (720p или 1080p)
+  klingMCQuality: KlingMCQuality
+  // Ориентация персонажа (как на фото или как в видео)
+  characterOrientation: CharacterOrientation
+  // URL загруженного референсного видео (для Motion Control)
+  uploadedVideoUrl: string | null
+  // Длительность загруженного видео в секундах
+  videoDurationSeconds: number
 }
 
 export interface GenerationActions {
@@ -115,6 +137,22 @@ export interface GenerationActions {
   // Установить качество генерации
   setGptImageQuality: (quality: GptImageQuality) => void
 
+  // === Actions для Kling AI ===
+  // Установить режим Kling
+  setKlingVideoMode: (mode: KlingVideoMode) => void
+  // Установить длительность Kling
+  setKlingDuration: (duration: KlingDuration) => void
+  // Установить звук Kling
+  setKlingSound: (sound: boolean) => void
+  // Установить качество Motion Control
+  setKlingMCQuality: (quality: KlingMCQuality) => void
+  // Установить ориентацию персонажа
+  setCharacterOrientation: (orientation: CharacterOrientation) => void
+  // Установить URL загруженного видео
+  setUploadedVideoUrl: (url: string | null) => void
+  // Установить длительность загруженного видео
+  setVideoDurationSeconds: (seconds: number) => void
+
   // Сбросить состояние
   reset: () => void
 }
@@ -143,7 +181,15 @@ const initialState: GenerationState = {
   fixedLens: true,
   generateAudio: false,
   // GPT Image 1.5 параметры
-  gptImageQuality: 'medium'
+  gptImageQuality: 'medium',
+  // Kling AI параметры
+  klingVideoMode: 't2v',
+  klingDuration: '5',
+  klingSound: false,
+  klingMCQuality: '720p',
+  characterOrientation: 'video',
+  uploadedVideoUrl: null,
+  videoDurationSeconds: 0
 }
 
 export const useGenerationStore = create<GenerationState & GenerationActions>()(
@@ -177,6 +223,15 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
     // GPT Image 1.5 actions
     setGptImageQuality: (quality) => set({ gptImageQuality: quality }),
 
+    // Kling AI actions
+    setKlingVideoMode: (mode) => set({ klingVideoMode: mode }),
+    setKlingDuration: (duration) => set({ klingDuration: duration }),
+    setKlingSound: (sound) => set({ klingSound: sound }),
+    setKlingMCQuality: (quality) => set({ klingMCQuality: quality }),
+    setCharacterOrientation: (orientation) => set({ characterOrientation: orientation }),
+    setUploadedVideoUrl: (url) => set({ uploadedVideoUrl: url }),
+    setVideoDurationSeconds: (seconds) => set({ videoDurationSeconds: seconds }),
+
     reset: () => set({
       prompt: '',
       negativePrompt: '',
@@ -196,7 +251,15 @@ export const useGenerationStore = create<GenerationState & GenerationActions>()(
       videoResolution: '720p',
       fixedLens: false,
       generateAudio: false,
-      gptImageQuality: 'medium'
+      gptImageQuality: 'medium',
+      // Kling reset
+      klingVideoMode: 't2v',
+      klingDuration: '5',
+      klingSound: false,
+      klingMCQuality: '720p',
+      characterOrientation: 'video',
+      uploadedVideoUrl: null,
+      videoDurationSeconds: 0
     })
   })
 )

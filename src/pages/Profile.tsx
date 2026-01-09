@@ -83,6 +83,12 @@ function getModelDisplayName(model: string | null): string {
     case 'p-image-edit': return 'Editor'
     case 'seedance-1.5-pro': return 'Seedance Pro'
     case 'gptimage1.5': return 'GPT image 1.5'
+    case 'kling-mc':
+    case 'kling-2.6/motion-control': return 'Kling Motion-Control'
+    case 'kling-t2v':
+    case 'kling-2.6/text-to-video': return 'Kling 2.6'
+    case 'kling-i2v':
+    case 'kling-2.6/image-to-video': return 'Kling 2.6'
     default: return model
   }
 }
@@ -115,8 +121,8 @@ export default function Profile() {
   const [remixCount, setRemixCount] = useState<number>(0)
   const [followingCount, setFollowingCount] = useState<number>(0)
   const [followersCount, setFollowersCount] = useState<number>(0)
-  const [items, setItems] = useState<{ id: number; image_url: string | null; video_url?: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null }[]>([])
-  const [preview, setPreview] = useState<{ id: number; image_url: string; video_url?: string | null; prompt: string; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null } | null>(null)
+  const [items, setItems] = useState<{ id: number; image_url: string | null; video_url?: string | null; compressed_url?: string | null; prompt: string; created_at: string | null; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null; input_images?: string[] | null }[]>([])
+  const [preview, setPreview] = useState<{ id: number; image_url: string; video_url?: string | null; prompt: string; is_published: boolean; is_prompt_private?: boolean; model?: string | null; edit_variants?: string[] | null; media_type?: 'image' | 'video' | null; input_images?: string[] | null } | null>(null)
   const [previewIndex, setPreviewIndex] = useState(0) // 0 = original, 1+ = edit variants
   const [currentGenerationIndex, setCurrentGenerationIndex] = useState<number | null>(null) // index in items array
   const [isVideoMuted, setIsVideoMuted] = useState(true)
@@ -469,7 +475,8 @@ export default function Profile() {
   const goToNextGeneration = async () => {
     if (currentGenerationIndex === null) return
 
-    const filteredItems = items.filter(h => !!(h.image_url || h.video_url))
+    // Filter logic updated to include items with video_url even if image_url is missing (use input_images for thumbnail)
+    const filteredItems = items.filter(h => !!(h.image_url || h.video_url || (h.media_type === 'video' && h.input_images && h.input_images.length > 0)))
 
     // If at the last item and there are more to load, fetch next batch
     if (currentGenerationIndex >= filteredItems.length - 1) {
@@ -488,7 +495,8 @@ export default function Profile() {
             setTotal(j.total)
 
             // Now navigate to the next item
-            const newFilteredItems = newItems.filter(h => !!(h.image_url || h.video_url))
+            // Filter logic updated
+            const newFilteredItems = newItems.filter(h => !!(h.image_url || h.video_url || (h.media_type === 'video' && h.input_images && h.input_images.length > 0)))
             const newIndex = currentGenerationIndex + 1
             if (newIndex < newFilteredItems.length) {
               const newItem = newFilteredItems[newIndex]
@@ -1099,12 +1107,12 @@ export default function Profile() {
             <>
               <div>
                 <div className="grid grid-cols-2 gap-3">
-                  {items.filter(h => !!(h.image_url || h.video_url)).map((h, idx) => (
+                  {items.filter(h => !!(h.image_url || h.video_url || (h.media_type === 'video' && h.input_images && h.input_images.length > 0))).map((h, idx) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                      <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, is_prompt_private: h.is_prompt_private, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type }) }} className="block w-full">
+                      <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, is_prompt_private: h.is_prompt_private, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type, input_images: h.input_images }) }} className="block w-full">
                         <GridImage
-                          src={h.compressed_url || h.image_url || ''}
-                          originalUrl={h.image_url || ''}
+                          src={h.compressed_url || h.image_url || ((h.media_type === 'video' && h.input_images && h.input_images.length > 0) ? h.input_images[0] : '')}
+                          originalUrl={h.image_url || ((h.media_type === 'video' && h.input_images && h.input_images.length > 0) ? h.input_images[0] : '')}
                           alt="History"
                           className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105"
                         />
@@ -1256,7 +1264,7 @@ export default function Profile() {
                           e.stopPropagation()
                           goToNextGeneration()
                         }}
-                        disabled={currentGenerationIndex === null || (currentGenerationIndex >= items.filter(h => !!(h.image_url || h.video_url)).length - 1 && (total === undefined || items.length >= total))}
+                        disabled={currentGenerationIndex === null || (currentGenerationIndex >= items.filter(h => !!(h.image_url || h.video_url || (h.media_type === 'video' && h.input_images && h.input_images.length > 0))).length - 1 && (total === undefined || items.length >= total))}
                         className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white backdrop-blur-md shadow-lg border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <ChevronRight size={24} />

@@ -47,6 +47,12 @@ function getModelDisplayName(model: string | null): string {
         case 'p-image-edit': return 'Editor'
         case 'seedance-1.5-pro': return 'Seedance Pro'
         case 'gptimage1.5': return 'GPT image 1.5'
+        case 'kling-mc':
+        case 'kling-2.6/motion-control': return 'Kling Motion-Control'
+        case 'kling-t2v':
+        case 'kling-2.6/text-to-video': return 'Kling 2.6'
+        case 'kling-i2v':
+        case 'kling-2.6/image-to-video': return 'Kling 2.6'
         default: return model
     }
 }
@@ -72,12 +78,19 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
         setLikesCount(item.likes_count)
     }, [item.is_liked, item.likes_count])
 
+    // Для Kling Motion Control используем input_images вместо thumbnail
+    const isKlingMC = item.model === 'kling-mc' || item.model === 'kling-2.6/motion-control'
+
     useEffect(() => {
-        setImgSrc(getImageUrl(item.compressed_url || item.image_url || ''))
+        // Для Kling MC используем первое input_image как превью
+        const imageToShow = isKlingMC && item.input_images?.[0]
+            ? item.input_images[0]
+            : (item.compressed_url || item.image_url || '')
+        setImgSrc(getImageUrl(imageToShow))
         setHasError(false)
         setLoaded(false)
         setTriedProxy(false)
-    }, [item.compressed_url, item.image_url, getImageUrl])
+    }, [item.compressed_url, item.image_url, item.input_images, isKlingMC, getImageUrl])
 
     // Check for cached images
     useEffect(() => {
@@ -213,7 +226,8 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                             </div>
                         </div>
                         <div className={`flex items-center ${isCompact ? 'gap-1' : 'gap-2'}`}>
-                            {showRemix && (
+                            {/* Скрываем Ремикс для Kling Motion Control */}
+                            {showRemix && !isKlingMC && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()

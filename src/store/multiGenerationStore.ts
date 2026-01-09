@@ -23,6 +23,9 @@ const MODEL_PRICES: Record<ModelType, number> = {
     'seedance-1.5-pro': 42,
     'gpt-image-1.5': 5,
     'test-model': 0,
+    'kling-t2v': 55,
+    'kling-i2v': 55,
+    'kling-mc': 30,
 }
 
 // Цены GPT Image по качеству
@@ -41,6 +44,9 @@ export const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
     'seedance-1.5-pro': ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'],
     'gpt-image-1.5': ['1:1', '2:3', '3:2'],
     'test-model': ['1:1', '16:9', '9:16'],
+    'kling-t2v': ['1:1', '16:9', '9:16'],
+    'kling-i2v': ['1:1', '16:9', '9:16'],
+    'kling-mc': ['1:1', '16:9', '9:16'],
 }
 
 // Дефолтные соотношения для моделей
@@ -53,6 +59,9 @@ const DEFAULT_RATIOS: Record<ModelType, AspectRatio> = {
     'seedance-1.5-pro': '16:9',
     'gpt-image-1.5': '2:3',
     'test-model': '1:1',
+    'kling-t2v': '16:9',
+    'kling-i2v': '16:9',
+    'kling-mc': '16:9',
 }
 
 export interface MultiGenerationState {

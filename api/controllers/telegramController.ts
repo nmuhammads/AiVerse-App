@@ -46,6 +46,20 @@ export async function webhook(req: Request, res: Response) {
 
     const msg = update?.message
 
+    // Special Logger for User 817308975 to capture file_ids
+    if (msg?.from?.id === 817308975) {
+      if (msg.video) {
+        console.log(`[AdminLog] Video from 817308975: file_id=${msg.video.file_id}, unique_id=${msg.video.file_unique_id}`)
+      }
+      if (msg.photo && Array.isArray(msg.photo) && msg.photo.length > 0) {
+        const largest = msg.photo[msg.photo.length - 1]
+        console.log(`[AdminLog] Photo from 817308975: file_id=${largest.file_id}, unique_id=${largest.file_unique_id}`)
+      }
+      if (msg.document) {
+        console.log(`[AdminLog] Document from 817308975: file_id=${msg.document.file_id}, name=${msg.document.file_name}`)
+      }
+    }
+
     // Handle Successful Payment
     if (msg?.successful_payment) {
       const payment = msg.successful_payment

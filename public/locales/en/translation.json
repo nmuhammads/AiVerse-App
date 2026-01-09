@@ -136,6 +136,33 @@
             "addEndFrame": "Optional",
             "framesHint": "Start frame is required. End frame is optional to control the final look of the video."
         },
+        "kling": {
+            "motionControl": "Motion Control",
+            "duration": "Duration",
+            "sound": "Sound",
+            "referenceImage": "Reference Image",
+            "mc": {
+                "uploadImage": "Upload character photo",
+                "imageHint": "Face must be visible (head + shoulders + torso)",
+                "orientation": "Character orientation",
+                "orientationHint": "Choose where to take gaze direction and body position from",
+                "asImage": "As in photo",
+                "asImageDesc1": "Pose & gaze from photo",
+                "max10s": "max 10s",
+                "asVideo": "As in video",
+                "asVideoDesc1": "Pose & gaze from video",
+                "max30s": "max 30s",
+                "uploadVideo": "Upload motion video",
+                "videoHint": "MP4/MOV, 3-30s, min 720p",
+                "uploadVideoBtn": "Upload video",
+                "changeVideo": "Change video",
+                "selectVideo": "Select video",
+                "validDuration": "✓ Valid",
+                "invalidDuration": "✕ Too long",
+                "durationError": "Video too long. Max: {{max}}s",
+                "quality": "Quality"
+            }
+        },
         "prompt": {
             "from": "Prompt from {{username}}",
             "placeholder": "Describe your idea..."
@@ -168,7 +195,7 @@
             "pasteInstruction": "Copy photo and long press here → Paste",
             "generationError": "Generation error",
             "timeout": "Timeout. Generation may finish in background, check history later.",
-            "videoTimeout": "Video generation takes 1-3 minutes. Check generation history later.",
+            "videoTimeout": "Video generation takes up to 30 minutes. Check generation history later.",
             "network": "Network error. Check internet or try again later."
         },
         "result": {
@@ -324,7 +351,8 @@
         },
         "button": {
             "pay": "Pay {{amount}} {{symbol}} via {{method}}",
-            "processing": "Processing..."
+            "processing": "Processing...",
+            "bonus": "Buy with +15% bonus tokens"
         },
         "messages": {
             "description": "Purchase {{count}} AiVerse tokens",
@@ -332,7 +360,8 @@
             "status": "Payment status: {{status}}",
             "errorInvoice": "Error creating invoice: {{error}}",
             "errorNetwork": "Network error",
-            "sbpCommission": "Service commission charged for SBP payments"
+            "sbpCommission": "Service commission charged for SBP payments",
+            "minPurchase": "Minimum purchase via administrator with bonus — 200 tokens"
         }
     },
     "generationSelector": {

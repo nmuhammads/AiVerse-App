@@ -57,6 +57,12 @@ function getModelDisplayName(model: string | null): string {
         case 'p-image-edit': return 'Editor'
         case 'seedance-1.5-pro': return 'Seedance Pro'
         case 'gptimage1.5': return 'GPT image 1.5'
+        case 'kling-mc':
+        case 'kling-2.6/motion-control': return 'Kling Motion-Control'
+        case 'kling-t2v':
+        case 'kling-2.6/text-to-video': return 'Kling 2.6'
+        case 'kling-i2v':
+        case 'kling-2.6/image-to-video': return 'Kling 2.6'
         default: return model
     }
 }
@@ -342,13 +348,16 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
                             <span>{item.likes_count}</span>
                         </button>
 
-                        <button
-                            onClick={() => { impact('medium'); onRemix(item) }}
-                            className="flex-1 h-12 rounded-xl bg-violet-600 text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-violet-700 border border-violet-500"
-                        >
-                            <Repeat size={20} />
-                            <span>{t('feed.remix')}</span>
-                        </button>
+                        {/* Скрываем Ремикс для Kling Motion Control */}
+                        {!(item.model === 'kling-mc' || item.model === 'kling-2.6/motion-control') && (
+                            <button
+                                onClick={() => { impact('medium'); onRemix(item) }}
+                                className="flex-1 h-12 rounded-xl bg-violet-600 text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-violet-700 border border-violet-500"
+                            >
+                                <Repeat size={20} />
+                                <span>{t('feed.remix')}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div >

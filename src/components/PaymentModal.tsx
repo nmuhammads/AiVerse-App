@@ -302,6 +302,28 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             method: activeMethod === 'stars' ? t('payment.methods.stars') : activeMethod === 'card' ? t('payment.methods.card') : t('payment.methods.sbp')
                         })}
                     </button>
+
+                    {/* Bonus Purchase Button */}
+                    <button
+                        onClick={() => {
+                            impact('medium')
+                            const wa = (window as any).Telegram?.WebApp
+                            const link = 'https://t.me/aiversebots?direct'
+                            if (wa) {
+                                wa.openTelegramLink(link)
+                                onClose()
+                            } else {
+                                window.open(link, '_blank')
+                            }
+                        }}
+                        className="w-full h-11 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-900/20"
+                    >
+                        <Gift size={16} />
+                        {t('payment.button.bonus')}
+                    </button>
+                    <div className="text-[10px] text-red-400 font-bold text-center -mt-1 shadow-black/50 drop-shadow-sm">
+                        {t('payment.messages.minPurchase')}
+                    </div>
                 </div>
             </div>
         </div>

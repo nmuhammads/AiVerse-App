@@ -286,8 +286,9 @@ export async function listGenerations(req: Request, res: Response) {
     let select = `select=id,image_url,video_url,prompt,created_at,is_published,is_prompt_private,model,likes_count,remix_count,input_images,user_id,edit_variants,media_type,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
     // Filter: show items that have either image_url OR video_url (both must start with https:// and not be empty)
     // Using stricter filter to exclude empty generations from other bots
-    // Exclude specific models that come from other bots
-    let query = `?user_id=eq.${encodeURIComponent(userId)}&status=neq.deleted&model=neq.seedream4.5&model=neq.wavespeed-ai/wan-2.2-spicy/image-to-video&model=neq.bytedance/seedance-v1-pro-fast/image-to-video&or=(image_url.ilike.https://%25,video_url.ilike.https://%25)&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
+    // Exclude specific models that come from other bots (use not.in.() syntax for multiple values)
+    const excludedModels = ['seedream4.5', 'wavespeed-ai/wan-2.2-spicy/image-to-video', 'bytedance/seedance-v1-pro-fast/image-to-video']
+    let query = `?user_id=eq.${encodeURIComponent(userId)}&status=neq.deleted&model=not.in.(${excludedModels.join(',')})&or=(image_url.ilike.https://%25,video_url.ilike.https://%25)&${select}&order=created_at.desc&limit=${limit}&offset=${offset}`
 
     // Legacy: published_only support
     if (publishedOnly) {

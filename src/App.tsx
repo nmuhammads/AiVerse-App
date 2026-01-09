@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 import WebApp from "@twa-dev/sdk";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 import { CloudflareProxyProvider } from "@/contexts/CloudflareProxyContext";
+import { DebugOverlay } from "@/components/DebugOverlay";
 
 function StartParamRouter() {
   const navigate = useNavigate();
@@ -183,6 +184,7 @@ export default function App() {
           <TabBar />
           <PendingIndicator />
           <AnnouncementModal />
+          <DebugOverlay />
         </div>
       </Router>
       <Toaster />

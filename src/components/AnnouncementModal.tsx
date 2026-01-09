@@ -8,10 +8,10 @@ import { useNavigate } from 'react-router-dom'
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
     enabled: true, // Set to true to enable the announcement
-    id: 'announcement_update_3_1_2',
-    title: 'Обновление AiVerse 3.1.2 ⚡️',
-    description: 'Запускайте генерации одну за другой в Студии (до 4-х процессов одновременно).\n\nНовый режим Мульти-генерации: создавайте варианты сразу в нескольких нейросетях!\n\nУлучшенный интерфейс модальных окон и исправления багов.',
-    image: '/announcements/update_3_1_2.png',
+    id: 'announcement_kling_motion_control',
+    title: 'Kling 2.6 Motion Control 🎬',
+    description: 'Новая модель для создания видео!\n\nЗагрузите фото персонажа и референс-видео с движением — AI перенесёт движения на вашего персонажа.\n\nПоддержка видео до 30 секунд в качестве 720p/1080p.',
+    image: '/announcements/kling_motion_control.png',
     buttonText: 'Попробовать',
     link: '/studio', // Redirect to studio
     secondaryButtonText: 'Закрыть',
