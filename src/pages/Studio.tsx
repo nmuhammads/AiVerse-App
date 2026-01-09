@@ -703,6 +703,16 @@ export default function Studio() {
   console.log('[Studio Result]', { generatedImage, generatedImages, generatedVideo, isVideoResult, hasMultipleImages, currentImageIndex, resultUrl })
 
   if (hasResult) {
+    // Safety: если hasResult=true но resultUrl пустой, вернуть на форму
+    if (!resultUrl) {
+      console.warn('[Studio] hasResult=true but resultUrl is empty, resetting to form')
+      setCurrentScreen('form')
+      setGeneratedImage(null)
+      setGeneratedVideo(null)
+      setGeneratedImages([])
+      return null
+    }
+
     const paddingTopResult = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 10px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
     const paddingBottomResult = platform === 'ios' ? 'calc(env(safe-area-inset-bottom) + 96px)' : '120px'
