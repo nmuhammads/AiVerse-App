@@ -57,6 +57,12 @@ function getModelDisplayName(model: string | null): string {
         case 'p-image-edit': return 'Editor'
         case 'seedance-1.5-pro': return 'Seedance Pro'
         case 'gptimage1.5': return 'GPT image 1.5'
+        case 'kling-mc':
+        case 'kling-2.6/motion-control': return 'Kling Motion-Control'
+        case 'kling-t2v':
+        case 'kling-2.6/text-to-video': return 'Kling 2.6'
+        case 'kling-i2v':
+        case 'kling-2.6/image-to-video': return 'Kling 2.6'
         default: return model
     }
 }
