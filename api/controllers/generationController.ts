@@ -986,11 +986,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
     }
 
     // Валидация входных данных
-    if (!prompt || typeof prompt !== 'string') {
+    // Валидация входных данных
+    if ((!prompt || typeof prompt !== 'string') && model !== 'kling-mc') {
       return res.status(400).json({
         error: 'Prompt is required and must be a string'
       })
     }
+    if (!prompt) prompt = ''
 
     if (!model || !MODEL_CONFIGS[model as keyof typeof MODEL_CONFIGS]) {
       return res.status(400).json({

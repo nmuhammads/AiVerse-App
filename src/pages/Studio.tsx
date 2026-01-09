@@ -2015,7 +2015,7 @@ export default function Studio() {
             {/* Generate Button */}
             <Button
               onClick={handleGenerate}
-              disabled={(!prompt.trim() && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0) || (selectedModel === 'kling-mc' && (!uploadedVideoUrl || (characterOrientation === 'image' && videoDurationSeconds > 10) || (characterOrientation === 'video' && videoDurationSeconds > 30)))}
+              disabled={(!prompt.trim() && selectedModel !== 'kling-mc' && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0) || (selectedModel === 'kling-mc' && (!uploadedVideoUrl || (characterOrientation === 'image' && videoDurationSeconds > 10) || (characterOrientation === 'video' && videoDurationSeconds > 30)))}
               className="flex-1 py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10"
             >
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
