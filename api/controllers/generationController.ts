@@ -330,7 +330,7 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
         throw new Error(json.data.failMsg || 'Jobs task failed')
       }
     }
-    await new Promise(r => setTimeout(r, 2000))
+    await new Promise(r => setTimeout(r, 30000))
   }
   console.log(`[Jobs] Task ${taskId} timed out after ${timeoutMs}ms - status stays pending for later check`)
   return 'TIMEOUT'
@@ -902,8 +902,8 @@ async function generateImageWithKieAI(
       console.log('[Kling MC] Creating task:', JSON.stringify(input))
       const taskId = await createJobsTask(apiKey, 'kling-2.6/motion-control', input, onTaskCreated, metaPayload)
 
-      // Motion Control может занимать до 15 минут
-      const KLING_MC_TIMEOUT_MS = 900000 // 15 min
+      // Motion Control может занимать до 30 минут
+      const KLING_MC_TIMEOUT_MS = 1800000 // 30 min
       const url = await pollJobsTask(apiKey, taskId, KLING_MC_TIMEOUT_MS)
 
       if (url === 'TIMEOUT') {
@@ -1234,7 +1234,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
     if (model === 'seedance-1.5-pro' || model === 'kling-t2v' || model === 'kling-i2v') {
       GENERATION_TIMEOUT_MS = 360000 // 6 min
     } else if (model === 'kling-mc') {
-      GENERATION_TIMEOUT_MS = 900000 // 15 min for Motion Control
+      GENERATION_TIMEOUT_MS = 1800000 // 30 min for Motion Control
     }
 
     console.log(`[API] Starting generation (imageCount: ${imageCount}) with timeout protection...`)

@@ -498,7 +498,7 @@ export default function Studio() {
     }
 
     setError(null)
-    impact('heavy')
+    impact('medium')
 
     // Добавить генерацию в очередь с количеством изображений
     const generationId = addGeneration({
@@ -600,9 +600,9 @@ export default function Studio() {
           const data = await res.json()
 
           if (data.status === 'pending') {
-            // Генерация ушла в фон — обновляем статус
-            updateGeneration(generationId, { status: 'completed' })
-            notify('warning')
+            // Генерация ушла в фон — оставляем статус processing
+            // updateGeneration(generationId, { status: 'processing' }) // Already processing
+            notify('success', t('studio.generation.backgroundStarted', 'Запущено в фоне'))
             return
           }
 
@@ -1147,7 +1147,8 @@ export default function Studio() {
                 setGenerationMode('image')
                 impact('light')
               }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${klingVideoMode === 'motion-control' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${klingVideoMode === 'motion-control' ? 'bg-zinc-800 text-white shadow-sm' : 'text-purple-400 hover:text-purple-300'}`}
+              style={klingVideoMode !== 'motion-control' ? { textShadow: '0 0 10px rgba(168, 85, 247, 0.5)' } : undefined}
             >
               <Zap size={14} />
               <span>{t('studio.kling.motionControl', 'Motion Control')}</span>
