@@ -551,7 +551,8 @@ export default function Studio() {
       // Запустить генерацию асинхронно (не блокируя UI)
       ; (async () => {
         const controller = new AbortController()
-        const timeoutMs = currentParams.mediaType === 'video' ? 360000 : 300000
+        // Таймаут: видео до 30 мин (Kling Motion Control), изображения 5 мин
+        const timeoutMs = currentParams.mediaType === 'video' ? 1800000 : 300000
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
         try {

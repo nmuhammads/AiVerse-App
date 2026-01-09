@@ -78,12 +78,19 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
         setLikesCount(item.likes_count)
     }, [item.is_liked, item.likes_count])
 
+    // Для Kling Motion Control используем input_images вместо thumbnail
+    const isKlingMC = item.model === 'kling-mc' || item.model === 'kling-2.6/motion-control'
+
     useEffect(() => {
-        setImgSrc(getImageUrl(item.compressed_url || item.image_url || ''))
+        // Для Kling MC используем первое input_image как превью
+        const imageToShow = isKlingMC && item.input_images?.[0]
+            ? item.input_images[0]
+            : (item.compressed_url || item.image_url || '')
+        setImgSrc(getImageUrl(imageToShow))
         setHasError(false)
         setLoaded(false)
         setTriedProxy(false)
-    }, [item.compressed_url, item.image_url, getImageUrl])
+    }, [item.compressed_url, item.image_url, item.input_images, isKlingMC, getImageUrl])
 
     // Check for cached images
     useEffect(() => {
@@ -219,7 +226,8 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                             </div>
                         </div>
                         <div className={`flex items-center ${isCompact ? 'gap-1' : 'gap-2'}`}>
-                            {showRemix && (
+                            {/* Скрываем Ремикс для Kling Motion Control */}
+                            {showRemix && !isKlingMC && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()

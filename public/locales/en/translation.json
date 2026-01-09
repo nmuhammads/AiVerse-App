@@ -195,7 +195,7 @@
             "pasteInstruction": "Copy photo and long press here → Paste",
             "generationError": "Generation error",
             "timeout": "Timeout. Generation may finish in background, check history later.",
-            "videoTimeout": "Video generation takes 1-3 minutes. Check generation history later.",
+            "videoTimeout": "Video generation takes up to 30 minutes. Check generation history later.",
             "network": "Network error. Check internet or try again later."
         },
         "result": {
