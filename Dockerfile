@@ -2,7 +2,7 @@
 FROM node:22-alpine
 
 # Устанавливаем fontconfig и шрифты для поддержки кириллицы в водяных знаках
-RUN apk add --no-cache fontconfig font-noto font-noto-cjk ttf-dejavu \
+RUN apk add --no-cache fontconfig font-noto font-noto-cjk ttf-dejavu ffmpeg \
     && fc-cache -fv
 
 # Устанавливаем рабочую директорию

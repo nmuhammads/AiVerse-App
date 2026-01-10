@@ -5,6 +5,7 @@ import { Request, Response } from 'express'
 
 // Типы для запросов к Kie.ai
 import { uploadImageFromBase64, uploadImageFromUrl, createThumbnail } from '../services/r2Service.js'
+import { processVideoForKling, deleteFromR2, isBase64Video } from '../services/videoProcessingService.js'
 import { tg } from './telegramController.js'
 import { createNotification, getUserNotificationSettings } from './notificationController.js'
 
@@ -891,10 +892,27 @@ async function generateImageWithKieAI(
     if (model === 'kling-mc') {
       const { character_orientation, kling_mc_quality, video_url } = requestData as any
 
+      // Process video: check resolution and upscale if needed
+      let processedVideoUrl = video_url
+      let r2VideoKey: string | null = null
+
+      if (isBase64Video(video_url)) {
+        console.log('[Kling MC] Processing video for resolution check...')
+        try {
+          const processed = await processVideoForKling(video_url)
+          processedVideoUrl = processed.url
+          r2VideoKey = processed.storageKey
+          console.log(`[Kling MC] Video processed: ${processed.originalResolution} -> ${processed.newResolution}, upscaled: ${processed.upscaled}`)
+        } catch (processError) {
+          console.error('[Kling MC] Video processing failed:', processError)
+          throw new Error(`Video processing failed: ${processError instanceof Error ? processError.message : 'Unknown error'}`)
+        }
+      }
+
       const input: Record<string, unknown> = {
         prompt,
         input_urls: imageUrls,
-        video_urls: [video_url],
+        video_urls: [processedVideoUrl],
         character_orientation: character_orientation || 'video',
         mode: kling_mc_quality || '720p',
       }
@@ -906,8 +924,15 @@ async function generateImageWithKieAI(
       const KLING_MC_TIMEOUT_MS = 1800000 // 30 min
       const url = await pollJobsTask(apiKey, taskId, KLING_MC_TIMEOUT_MS)
 
+      // Cleanup: delete processed video from R2
+      if (r2VideoKey) {
+        deleteFromR2(r2VideoKey).catch(err => {
+          console.warn('[Kling MC] R2 cleanup failed:', err)
+        })
+      }
+
       if (url === 'TIMEOUT') {
-        console.log('[Kling MC] Generation timed out after 15 minutes')
+        console.log('[Kling MC] Generation timed out after 30 minutes')
         return { timeout: true, inputImages: imageUrls }
       }
 
