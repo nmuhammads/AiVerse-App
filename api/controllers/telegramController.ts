@@ -159,27 +159,36 @@ export async function webhook(req: Request, res: Response) {
     }
 
     if (text.startsWith('/mycontest')) {
+      console.log('[MyContest] Command received from chat:', chatId, 'text:', text)
       const parts = text.split(/\s+/)
       let organizerName = parts.length > 1 ? parts.slice(1).join(' ') : ''
+
+      console.log('[MyContest] Parsed organizerName from command:', organizerName, 'username from msg:', msg.from?.username)
 
       if (!organizerName && msg.from?.username) {
         organizerName = msg.from.username
       }
 
       if (!organizerName) {
+        console.log('[MyContest] No organizer name provided')
         await tg('sendMessage', { chat_id: chatId, text: 'Пожалуйста, укажите имя организатора: /mycontest <name> или установите username в Telegram.' })
         return res.json({ ok: true })
       }
 
       // Remove @ if present
       organizerName = organizerName.replace('@', '')
+      console.log('[MyContest] Final organizerName:', organizerName)
 
       // Find active contest
-      const q = await supaSelect('contests', `?status=eq.active&organizer_name=ilike.${organizerName}&select=*`)
+      const query = `?status=eq.active&organizer_name=ilike.${encodeURIComponent(organizerName)}&select=*`
+      console.log('[MyContest] Supabase query:', query)
+      const q = await supaSelect('contests', query)
+      console.log('[MyContest] Supabase result:', { ok: q.ok, dataLength: q.data?.length, data: q.data })
 
       if (q.ok && q.data && q.data.length > 0) {
         const contest = q.data[0]
-        const caption = `🏆 <b>${contest.title}</b>\n\n${contest.description}\n\nЧтобы поставить лайк перейдите на гелерею\n\n👇 Жми кнопку ниже, чтобы участвовать или поставить лайк!`
+        console.log('[MyContest] Found contest:', { id: contest.id, title: contest.title, has_image: !!contest.image_url })
+        const caption = `🏆 <b>${contest.title}</b>\n\n${contest.description}\n\nЧтобы поставить лайк перейдите на галерею\n\n👇 Жми кнопку ниже, чтобы участвовать или поставить лайк!`
         const deepLink = `contest-${contest.id}`
 
         // Get bot username dynamically
@@ -194,6 +203,7 @@ export async function webhook(req: Request, res: Response) {
         }
 
         const url = `https://t.me/${botUsername}?startapp=${deepLink}`
+        console.log('[MyContest] Deep link URL:', url)
 
         const kb = {
           inline_keyboard: [[
@@ -201,24 +211,43 @@ export async function webhook(req: Request, res: Response) {
           ]]
         }
 
+        let sendResult
         if (contest.image_url) {
-          await tg('sendPhoto', {
+          console.log('[MyContest] Sending photo with image_url:', contest.image_url)
+          sendResult = await tg('sendPhoto', {
             chat_id: chatId,
             photo: contest.image_url,
             caption: caption,
             parse_mode: 'HTML',
             reply_markup: kb
           })
+          console.log('[MyContest] sendPhoto result:', sendResult)
+
+          // Fallback: если sendPhoto не удался, отправляем текст
+          if (!sendResult?.ok) {
+            console.log('[MyContest] sendPhoto failed, falling back to sendMessage')
+            sendResult = await tg('sendMessage', {
+              chat_id: chatId,
+              text: caption,
+              parse_mode: 'HTML',
+              reply_markup: kb
+            })
+            console.log('[MyContest] fallback sendMessage result:', sendResult)
+          }
         } else {
-          await tg('sendMessage', {
+          console.log('[MyContest] Sending message (no image)')
+          sendResult = await tg('sendMessage', {
             chat_id: chatId,
             text: caption,
             parse_mode: 'HTML',
             reply_markup: kb
           })
+          console.log('[MyContest] Send result:', sendResult)
         }
       } else {
-        await tg('sendMessage', { chat_id: chatId, text: `Активный конкурс от организатора "${organizerName}" не найден.` })
+        console.log('[MyContest] No contest found for organizer:', organizerName)
+        const sendResult = await tg('sendMessage', { chat_id: chatId, text: `Активный конкурс от организатора "${organizerName}" не найден.` })
+        console.log('[MyContest] Send error message result:', sendResult)
       }
       return res.json({ ok: true })
     }
