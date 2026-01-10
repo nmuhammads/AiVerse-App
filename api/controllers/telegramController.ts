@@ -221,6 +221,19 @@ export async function webhook(req: Request, res: Response) {
             parse_mode: 'HTML',
             reply_markup: kb
           })
+          console.log('[MyContest] sendPhoto result:', sendResult)
+
+          // Fallback: если sendPhoto не удался, отправляем текст
+          if (!sendResult?.ok) {
+            console.log('[MyContest] sendPhoto failed, falling back to sendMessage')
+            sendResult = await tg('sendMessage', {
+              chat_id: chatId,
+              text: caption,
+              parse_mode: 'HTML',
+              reply_markup: kb
+            })
+            console.log('[MyContest] fallback sendMessage result:', sendResult)
+          }
         } else {
           console.log('[MyContest] Sending message (no image)')
           sendResult = await tg('sendMessage', {
@@ -229,8 +242,8 @@ export async function webhook(req: Request, res: Response) {
             parse_mode: 'HTML',
             reply_markup: kb
           })
+          console.log('[MyContest] Send result:', sendResult)
         }
-        console.log('[MyContest] Send result:', sendResult)
       } else {
         console.log('[MyContest] No contest found for organizer:', organizerName)
         const sendResult = await tg('sendMessage', { chat_id: chatId, text: `Активный конкурс от организатора "${organizerName}" не найден.` })
