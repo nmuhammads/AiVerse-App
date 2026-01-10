@@ -892,27 +892,10 @@ async function generateImageWithKieAI(
     if (model === 'kling-mc') {
       const { character_orientation, kling_mc_quality, video_url } = requestData as any
 
-      // Process video: check resolution and upscale if needed
-      let processedVideoUrl = video_url
-      let r2VideoKey: string | null = null
-
-      if (isBase64Video(video_url)) {
-        console.log('[Kling MC] Processing video for resolution check...')
-        try {
-          const processed = await processVideoForKling(video_url)
-          processedVideoUrl = processed.url
-          r2VideoKey = processed.storageKey
-          console.log(`[Kling MC] Video processed: ${processed.originalResolution} -> ${processed.newResolution}, upscaled: ${processed.upscaled}`)
-        } catch (processError) {
-          console.error('[Kling MC] Video processing failed:', processError)
-          throw new Error(`Video processing failed: ${processError instanceof Error ? processError.message : 'Unknown error'}`)
-        }
-      }
-
       const input: Record<string, unknown> = {
         prompt,
         input_urls: imageUrls,
-        video_urls: [processedVideoUrl],
+        video_urls: [video_url],  // video_url is already processed and uploaded to R2
         character_orientation: character_orientation || 'video',
         mode: kling_mc_quality || '720p',
       }
@@ -923,13 +906,6 @@ async function generateImageWithKieAI(
       // Motion Control может занимать до 30 минут
       const KLING_MC_TIMEOUT_MS = 1800000 // 30 min
       const url = await pollJobsTask(apiKey, taskId, KLING_MC_TIMEOUT_MS)
-
-      // Cleanup: delete processed video from R2
-      if (r2VideoKey) {
-        deleteFromR2(r2VideoKey).catch(err => {
-          console.warn('[Kling MC] R2 cleanup failed:', err)
-        })
-      }
 
       if (url === 'TIMEOUT') {
         console.log('[Kling MC] Generation timed out after 30 minutes')
@@ -1220,29 +1196,24 @@ export async function handleGenerateImage(req: Request, res: Response) {
           }
         }
 
-        // === KLING MOTION CONTROL VIDEO UPLOAD LOGIC ===
-        // Now that we have generationId, we upload the video with custom filename
+        // === KLING MOTION CONTROL VIDEO UPLOAD LOGIC (with upscaling) ===
+        // Process video: check resolution, upscale if needed, then upload to R2
         if (model === 'kling-mc' && req.body.video_url && req.body.video_url.startsWith('data:video')) {
-          const { uploadVideoFromBase64 } = await import('../services/r2Service.js')
-          console.log(`[API] Uploading reference video for Gen ${generationId}...`)
+          const { processVideoForKling } = await import('../services/videoProcessingService.js')
+          console.log(`[API] Processing reference video for Gen ${generationId}...`)
           try {
-            const r2VideoUrl = await uploadVideoFromBase64(req.body.video_url, '', {
-              customFileName: `${generationId}.mp4`
-            })
-            console.log(`[API] Reference video uploaded: ${r2VideoUrl}`)
+            const processed = await processVideoForKling(req.body.video_url)
+            video_url = processed.url
+            console.log(`[API] Reference video processed: ${processed.originalResolution} -> ${processed.newResolution}, upscaled: ${processed.upscaled}`)
+            console.log(`[API] Reference video uploaded: ${video_url}`)
 
-            // 1. Update local variable for API call
-            video_url = r2VideoUrl
-
-            // 2. Update DB record
-            await supaPatch('generations', `?id=eq.${generationId}`, { video_input: r2VideoUrl })
+            // Update DB record with video input
+            await supaPatch('generations', `?id=eq.${generationId}`, { video_input: video_url })
             console.log(`[DB] Updated generation ${generationId} with video_input`)
 
           } catch (e) {
-            console.error(`[API] Failed to upload video for Gen ${generationId}`, e)
-            // Determine what to do on failure? 
-            // For now proceed, API might fail or use base64 if logic allows (which we removed from var but body still has it?)
-            // Actually we updated `video_url` var only on success.
+            console.error(`[API] Failed to process/upload video for Gen ${generationId}`, e)
+            throw new Error(`Video processing failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
           }
         }
         // === END KLING MC UPLOAD ===
