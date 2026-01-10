@@ -1182,8 +1182,8 @@ export default function Studio() {
           </div>
         )}
 
-        {/* 3. Prompt Input (New Animation) */}
-        <div className="relative mt-1">
+        {/* 3. Prompt Input (New Animation) — скрыть для Kling Motion Control */}
+        {selectedModel !== 'kling-mc' && <div className="relative mt-1">
           {parentAuthorUsername && (
             <div className="flex items-center gap-1.5 text-xs font-medium text-violet-400 animate-in fade-in slide-in-from-bottom-2 mb-1 px-1">
               <Sparkles size={12} />
@@ -1229,15 +1229,7 @@ export default function Studio() {
               </>
             )}
           </div>
-
-          {/* Hint for Motion Control - prompt is optional */}
-          {selectedModel === 'kling-mc' && (
-            <div className="flex items-start gap-2 mt-2 p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-300 text-[10px]">
-              <Info size={12} className="mt-0.5 shrink-0" />
-              <span>{t('studio.kling.mc.promptHint', 'Промпт опционален. Используйте для изменения деталей: одежды, фона, стиля и т.д.')}</span>
-            </div>
-          )}
-        </div>
+        </div>}
 
 
 
@@ -1565,8 +1557,8 @@ export default function Studio() {
           </div>
         )}
 
-        {/* 5. Aspect Ratio Selector (Emojis) */}
-        {(true || generationMode === 'text') && (
+        {/* 5. Aspect Ratio Selector (Emojis) — скрыть для Kling Motion Control */}
+        {selectedModel !== 'kling-mc' && (true || generationMode === 'text') && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.aspectRatio')}</label>
             <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar -mx-2 px-2">
@@ -1772,7 +1764,10 @@ export default function Studio() {
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">1</span>
                 {t('studio.kling.mc.uploadImage', 'Загрузите фото персонажа')}
               </label>
-              <p className="text-[10px] text-zinc-500 pl-7">{t('studio.kling.mc.imageHint', 'Лицо должно быть видно (голова + плечи + торс)')}</p>
+              <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-xs">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                <span>{t('studio.kling.mc.imageHint', 'Лицо должно быть видно (голова + плечи + торс)')}</span>
+              </div>
 
               {/* Image Upload Area */}
               {uploadedImages[0] ? (
@@ -1813,7 +1808,7 @@ export default function Studio() {
                     className="w-full py-4 rounded-xl border-2 border-dashed border-white/10 bg-zinc-900/50 text-zinc-400 hover:border-cyan-500/50 hover:text-cyan-400 transition-all flex items-center justify-center gap-2"
                   >
                     <ImageIcon size={20} />
-                    <span>{t('studio.upload.selectPhoto')}</span>
+                    <span>{t('studio.upload.selectPhoto')} 👇</span>
                   </button>
 
                   {/* Paste zone */}
@@ -1857,7 +1852,10 @@ export default function Studio() {
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">2</span>
                 {t('studio.kling.mc.orientation', 'Ориентация персонажа')}
               </label>
-              <p className="text-[10px] text-zinc-500 pl-7">{t('studio.kling.mc.orientationHint', 'Выберите, откуда взять направление взгляда и положение тела персонажа')}</p>
+              <div className="flex items-start gap-2 p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-300 text-xs">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                <span>{t('studio.kling.mc.orientationHint', 'Выберите, откуда взять направление взгляда и положение тела персонажа')}</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => { setCharacterOrientation('image'); impact('light') }}
@@ -1886,7 +1884,10 @@ export default function Studio() {
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">3</span>
                 {t('studio.kling.mc.uploadVideo', 'Загрузите видео с движением')}
               </label>
-              <p className="text-[10px] text-zinc-500 pl-7">{t('studio.kling.mc.videoHint', 'MP4/MOV, 3-30 сек, мин. 720p')}</p>
+              <div className="flex items-start gap-2 p-2 bg-violet-500/10 border border-violet-500/20 rounded-lg text-violet-300 text-xs">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                <span>{t('studio.kling.mc.videoHint', 'MP4/MOV, 3-30 сек, мин. 720p')}</span>
+              </div>
 
               <input
                 type="file"
@@ -1933,7 +1934,7 @@ export default function Studio() {
                 ) : (
                   <>
                     <Video size={20} />
-                    {uploadedVideoUrl ? t('studio.kling.mc.changeVideo', 'Изменить видео') : t('studio.kling.mc.selectVideo', 'Выбрать видео')}
+                    {uploadedVideoUrl ? t('studio.kling.mc.changeVideo', 'Изменить видео') : <>{t('studio.kling.mc.selectVideo', 'Выбрать видео')} 👇</>}
                   </>
                 )}
               </button>
@@ -1983,6 +1984,25 @@ export default function Studio() {
                 >
                   1080p · 9⚡/сек
                 </button>
+              </div>
+            </div>
+
+            {/* Step 5: Prompt (Optional) */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/50 text-white flex items-center justify-center text-[10px]">5</span>
+                {t('studio.kling.mc.optionalPrompt', 'Промпт')}
+                <span className="text-[10px] text-zinc-500 font-normal">({t('studio.kling.mc.optional', 'Опционально')})</span>
+              </label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={t('studio.kling.mc.promptPlaceholder', 'Опишите детали: одежду, фон, стиль...')}
+                className="w-full min-h-[80px] bg-zinc-900/50 backdrop-blur-sm rounded-xl border border-white/10 p-3 text-white placeholder-zinc-500 text-sm resize-none focus:border-cyan-500/30 focus:outline-none transition-colors"
+              />
+              <div className="flex items-start gap-2 p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-300 text-[10px]">
+                <Info size={12} className="mt-0.5 shrink-0" />
+                <span>{t('studio.kling.mc.promptHint', 'Промпт опционален. Используйте для изменения деталей: одежды, фона, стиля и т.д.')}</span>
               </div>
             </div>
           </div>
@@ -2061,7 +2081,7 @@ export default function Studio() {
             {/* Generate Button */}
             <Button
               onClick={handleGenerate}
-              disabled={(!prompt.trim() && selectedModel !== 'kling-mc' && !(isPromptPrivate && parentGenerationId)) || aspectRatio === 'Auto' || (generationMode === 'image' && uploadedImages.length === 0) || (selectedModel === 'kling-mc' && (!uploadedVideoUrl || (characterOrientation === 'image' && videoDurationSeconds > 10) || (characterOrientation === 'video' && videoDurationSeconds > 30)))}
+              disabled={(!prompt.trim() && selectedModel !== 'kling-mc' && !(isPromptPrivate && parentGenerationId)) || (aspectRatio === 'Auto' && selectedModel !== 'kling-mc') || (generationMode === 'image' && uploadedImages.length === 0) || (selectedModel === 'kling-mc' && (!uploadedVideoUrl || (characterOrientation === 'image' && videoDurationSeconds > 10) || (characterOrientation === 'video' && videoDurationSeconds > 30)))}
               className="flex-1 py-6 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-[0.98] relative overflow-hidden group bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:shadow-violet-500/25 border border-white/10"
             >
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
