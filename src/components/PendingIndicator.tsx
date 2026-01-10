@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTranslation } from 'react-i18next'
 import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
+
+// Throttle интервал для запросов check-status (защита от дублей)
+const CHECK_STATUS_THROTTLE_MS = 3000
 
 export function PendingIndicator() {
     const { t } = useTranslation()
@@ -14,6 +17,9 @@ export function PendingIndicator() {
     const { impact, notify } = useHaptics()
     const navigate = useNavigate()
     const location = useLocation()
+
+    // Ref для throttle - время последнего запроса
+    const lastCheckRef = useRef(0)
 
     // Локальные активные генерации из store (считаем количество изображений)
     const localActiveCount = useActiveGenerationsStore(
@@ -27,6 +33,13 @@ export function PendingIndicator() {
 
     const fetchPendingCount = useCallback(async () => {
         if (!user?.id) return
+
+        // Throttle: не чаще раза в CHECK_STATUS_THROTTLE_MS
+        const now = Date.now()
+        if (now - lastCheckRef.current < CHECK_STATUS_THROTTLE_MS) {
+            return // Пропустить - недавно уже проверяли
+        }
+        lastCheckRef.current = now
 
         try {
             // First, trigger status check to update any completed generations

@@ -366,6 +366,23 @@ async function supaPatch(table: string, filter: string, body: unknown) {
   return { ok: r.ok, data }
 }
 
+// Атомарное обновление с возвратом данных - для защиты от race condition
+// Возвращает массив обновлённых записей. Если пустой - условие не выполнилось.
+async function supaPatchAtomic(table: string, filter: string, body: unknown) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      ...supaHeaders(),
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'  // Возвращает обновлённые записи
+    },
+    body: JSON.stringify(body)
+  })
+  const data = await r.json().catch(() => [])
+  return { ok: r.ok, data: Array.isArray(data) ? data : [] }
+}
+
 const MODEL_PRICES: Record<string, number> = {
   nanobanana: 3,
   'nanobanana-pro': 15,
@@ -1476,7 +1493,19 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
     if (!gen.model && !gen.task_id) {
       console.log(`[CheckStatus] Gen ${gen.id} missing both model and task_id, marking failed`)
 
-      // Возврат токенов
+      // Атомарно обновить статус ТОЛЬКО если ещё pending (защита от race condition)
+      const updateRes = await supaPatchAtomic('generations',
+        `?id=eq.${gen.id}&status=eq.pending`,
+        { status: 'failed', error_message: 'Missing model and task ID' }
+      )
+
+      // Если ничего не обновлено - другой запрос уже обработал
+      if (updateRes.data.length === 0) {
+        console.log(`[CheckStatus] Gen ${gen.id} already processed, skipping refund`)
+        continue
+      }
+
+      // Возврат токенов ТОЛЬКО после успешного атомарного обновления
       const cost = gen.cost || 0
       if (cost > 0) {
         const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
@@ -1486,10 +1515,6 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
       }
 
-      await supaPatch('generations', `?id=eq.${gen.id}`, {
-        status: 'failed',
-        error_message: 'Missing model and task ID'
-      })
       updated++
       continue
     }
@@ -1498,7 +1523,19 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
     if (!gen.task_id) {
       console.log(`[CheckStatus] Gen ${gen.id} missing task_id, marking failed`)
 
-      // Возврат токенов при missing task_id
+      // Атомарно обновить статус ТОЛЬКО если ещё pending (защита от race condition)
+      const updateRes = await supaPatchAtomic('generations',
+        `?id=eq.${gen.id}&status=eq.pending`,
+        { status: 'failed', error_message: 'Missing task ID' }
+      )
+
+      // Если ничего не обновлено - другой запрос уже обработал
+      if (updateRes.data.length === 0) {
+        console.log(`[CheckStatus] Gen ${gen.id} already processed, skipping refund`)
+        continue
+      }
+
+      // Возврат токенов ТОЛЬКО после успешного атомарного обновления
       const cost = gen.cost || (gen.model ? MODEL_PRICES[gen.model] : 0) || 0
       if (cost > 0) {
         const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
@@ -1508,10 +1545,6 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
       }
 
-      await supaPatch('generations', `?id=eq.${gen.id}`, {
-        status: 'failed',
-        error_message: 'Missing task ID'
-      })
       updated++
       continue
     }
@@ -1539,7 +1572,19 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         await completeGeneration(gen.id, gen.user_id, result.imageUrl, gen.model, cost, gen.parent_id, undefined, gen.input_images, gen.resolution, languageCode)
         updated++
       } else if (result.status === 'failed') {
-        // Возврат токенов при fail от провайдера
+        // Атомарно обновить статус ТОЛЬКО если ещё pending (защита от race condition)
+        const updateRes = await supaPatchAtomic('generations',
+          `?id=eq.${gen.id}&status=eq.pending`,
+          { status: 'failed', error_message: result.error }
+        )
+
+        // Если ничего не обновлено - другой запрос уже обработал
+        if (updateRes.data.length === 0) {
+          console.log(`[CheckStatus] Gen ${gen.id} already processed, skipping refund`)
+          continue
+        }
+
+        // Возврат токенов ТОЛЬКО после успешного атомарного обновления
         const cost = gen.cost || MODEL_PRICES[gen.model] || 0
         if (cost > 0) {
           const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
@@ -1549,10 +1594,6 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
           console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
         }
 
-        await supaPatch('generations', `?id=eq.${gen.id}`, {
-          status: 'failed',
-          error_message: result.error
-        })
         updated++
       }
     } catch (e) {
