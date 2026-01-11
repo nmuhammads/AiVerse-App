@@ -231,7 +231,7 @@ export default function ProposeContest() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <div>
                             <label className="text-xs uppercase text-zinc-500 font-bold tracking-wider mb-1 block">{t('events.proposeContest.form.startDate')}</label>
                             <input
