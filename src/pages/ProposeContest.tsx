@@ -35,7 +35,7 @@ export default function ProposeContest() {
     };
 
     const headerStyle = {
-        paddingTop: platform === 'ios' ? 'calc(env(safe-area-inset-top) + 12px)' : platform === 'android' ? '25px' : '10px'
+        paddingTop: platform === 'ios' ? 'calc(env(safe-area-inset-top) + 24px)' : platform === 'android' ? '40px' : '10px'
     };
 
     const [form, setForm] = useState({
@@ -237,7 +237,7 @@ export default function ProposeContest() {
                             <input
                                 type="date"
                                 required
-                                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
+                                className="w-full max-w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition"
                                 value={form.start_date}
                                 onChange={e => setForm({ ...form, start_date: e.target.value })}
                             />
@@ -247,7 +247,7 @@ export default function ProposeContest() {
                             <input
                                 type="date"
                                 required
-                                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
+                                className="w-full max-w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition"
                                 value={form.end_date}
                                 onChange={e => setForm({ ...form, end_date: e.target.value })}
                             />
