@@ -373,6 +373,33 @@
     },
     "events": {
         "pageTitle": "События",
+        "proposeButton": "Предложить конкурс",
+        "proposeContest": {
+            "title": "Предложить конкурс",
+            "form": {
+                "title": "Название конкурса",
+                "description": "Описание",
+                "rules": "Правила",
+                "prizes": "Призы",
+                "prize1": "1 место",
+                "prize2": "2 место",
+                "prize3": "3 место",
+                "organizer": "Имя организатора (или название канала)",
+                "banner": "Баннер конкурса",
+                "bannerHint": "Рекомендуемый формат: 16:9 или 4:3 (альбомная ориентация)",
+                "dates": "Даты проведения",
+                "startDate": "Начало",
+                "endDate": "Конец",
+                "contentType": "Тип контента",
+                "submit": "Отправить на проверку",
+                "submitting": "Отправка..."
+            },
+            "success": {
+                "title": "Предложение отправлено!",
+                "message": "Ваш конкурс отправлен на модерацию. Мы уведомим вас, когда он будет опубликован."
+            },
+            "error": "Ошибка при отправке. Проверьте данные."
+        },
         "tabs": {
             "contests": "Конкурсы",
             "events": "События"
@@ -449,6 +476,12 @@
             "upcoming": "Скоро",
             "until": "До {{date}}"
         },
+        "allowedContent": {
+            "title": "Допускается",
+            "image": "Только фото",
+            "video": "Только видео",
+            "both": "Фото и Видео"
+        },
         "organizer": "Организатор: {{name}}",
         "tabs": {
             "info": "Инфо",
@@ -467,13 +500,20 @@
             "top": "Топ"
         },
         "filter": {
-            "allModels": "Все модели"
+            "allModels": "Все модели",
+            "nanobanana": "NanoBanana",
+            "nanobanana_pro": "NanoBanana Pro",
+            "seedream4": "SeeDream 4",
+            "seedream4_5": "SeeDream 4.5",
+            "gptimage1_5": "GPT Image 1.5"
         },
         "loadingMore": "Загрузка...",
         "join": "Участвовать",
         "messages": {
             "successJoin": "Работа добавлена в конкурс!",
             "errorJoin": "Ошибка при добавлении",
+            "errorContentTypeImage": "В этом конкурсе можно участвовать только с фото",
+            "errorContentTypeVideo": "В этом конкурсе можно участвовать только с видео",
             "errorNetwork": "Ошибка сети",
             "errorLike": "Ошибка при лайке",
             "notFound": "Конкурс не найден"

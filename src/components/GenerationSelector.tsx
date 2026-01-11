@@ -10,15 +10,17 @@ interface Generation {
     prompt: string;
     created_at: string;
     model: string;
+    media_type?: 'image' | 'video';
 }
 
 interface GenerationSelectorProps {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (generationId: number) => void;
+    allowedContentType?: 'image' | 'video' | 'both';
 }
 
-export function GenerationSelector({ isOpen, onClose, onSelect }: GenerationSelectorProps) {
+export function GenerationSelector({ isOpen, onClose, onSelect, allowedContentType = 'both' }: GenerationSelectorProps) {
     const { t } = useTranslation();
     const { user } = useTelegram();
     const [generations, setGenerations] = useState<Generation[]>([]);
@@ -83,37 +85,44 @@ export function GenerationSelector({ isOpen, onClose, onSelect }: GenerationSele
                         </div>
                     ) : (
                         <div className="grid grid-cols-3 gap-2">
-                            {generations.filter(gen => !failedImages.has(gen.id)).map((gen) => (
-                                <div
-                                    key={gen.id}
-                                    onClick={() => setSelectedId(gen.id)}
-                                    className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${selectedId === gen.id ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-transparent hover:border-white/20'}`}
-                                >
-                                    <img
-                                        src={gen.compressed_url || gen.image_url}
-                                        alt=""
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            // Try fallback to original
-                                            if (target.src !== gen.image_url) {
-                                                target.src = gen.image_url;
-                                            } else {
-                                                // Both failed, hide this generation
-                                                setFailedImages(prev => new Set([...prev, gen.id]));
-                                            }
-                                        }}
-                                    />
-                                    {selectedId === gen.id && (
-                                        <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">
-                                            <div className="bg-indigo-500 rounded-full p-1">
-                                                <Check size={16} className="text-white" />
+                            {generations
+                                .filter(gen => !failedImages.has(gen.id))
+                                .filter(gen => {
+                                    if (allowedContentType === 'both') return true;
+                                    const genType = gen.media_type || 'image';
+                                    return genType === allowedContentType;
+                                })
+                                .map((gen) => (
+                                    <div
+                                        key={gen.id}
+                                        onClick={() => setSelectedId(gen.id)}
+                                        className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${selectedId === gen.id ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-transparent hover:border-white/20'}`}
+                                    >
+                                        <img
+                                            src={gen.compressed_url || gen.image_url}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                // Try fallback to original
+                                                if (target.src !== gen.image_url) {
+                                                    target.src = gen.image_url;
+                                                } else {
+                                                    // Both failed, hide this generation
+                                                    setFailedImages(prev => new Set([...prev, gen.id]));
+                                                }
+                                            }}
+                                        />
+                                        {selectedId === gen.id && (
+                                            <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">
+                                                <div className="bg-indigo-500 rounded-full p-1">
+                                                    <Check size={16} className="text-white" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                        )}
+                                    </div>
+                                ))}
                         </div>
                     )}
                 </div>

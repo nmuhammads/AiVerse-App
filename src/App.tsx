@@ -8,6 +8,7 @@ import PublicProfile from '@/pages/PublicProfile';
 import Settings from "@/pages/Settings";
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
 // Contests page is now integrated into EventsPage
+import ProposeContest from "@/pages/ProposeContest";
 import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
 import EventsPage from "@/pages/EventsPage";
@@ -170,6 +171,7 @@ export default function App() {
               <Route path="/profile/:userId" element={<PublicProfile />} />
               <Route path="/settings" element={<Settings />} />
               {/* Contests are now part of EventsPage */}
+              <Route path="/contests/propose" element={<ProposeContest />} />
               <Route path="/contests/:id" element={<ContestDetail />} />
               <Route path="/accumulations" element={<Accumulations />} />
               <Route path="/events" element={<EventsPage />} />

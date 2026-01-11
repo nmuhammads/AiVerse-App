@@ -356,3 +356,62 @@ export async function uploadVideoFromBase64(
         return base64Data // Fallback
     }
 }
+
+export async function uploadImageToVideoBucket(
+    base64Data: string,
+    folder: string = '',
+    options: { customFileName?: string } = {}
+): Promise<string> {
+    const { customFileName } = options
+    const R2_BUCKET_NAME = process.env.R2_BUCKET_VIDEO_REFS
+    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL_VIDEO_REFS
+    const client = getVideoS3Client()
+
+    console.log('Starting Image upload to Video Bucket', customFileName ? `(custom name: ${customFileName})` : '...')
+
+    if (!client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
+        console.warn('R2 Video configuration missing for Image Upload:', {
+            hasClient: !!client,
+            hasBucket: !!R2_BUCKET_NAME,
+            hasPublicUrl: !!R2_PUBLIC_URL
+        })
+        return base64Data
+    }
+
+    try {
+        const matches = base64Data.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/)
+
+        if (!matches || matches.length !== 3) {
+            throw new Error('Invalid Base64 string format')
+        }
+
+        const contentType = matches[1] // image/png, image/jpeg etc
+        const data = matches[2]
+        const buffer = Buffer.from(data, 'base64')
+
+        // Generate filename
+        let fileName: string
+        const ext = contentType.split('/')[1] || 'png'
+
+        if (customFileName) {
+            fileName = folder ? `${folder}/${customFileName}` : customFileName
+        } else {
+            const hash = crypto.randomBytes(16).toString('hex')
+            fileName = folder ? `${folder}/${hash}.${ext}` : `${hash}.${ext}`
+        }
+
+        await client.send(new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: fileName,
+            Body: buffer,
+            ContentType: contentType,
+        }))
+
+        const finalUrl = `${R2_PUBLIC_URL}/${fileName}`
+        console.log('R2 Image-to-VideoBucket upload success:', finalUrl)
+        return finalUrl
+    } catch (error) {
+        console.error('R2 Image-to-VideoBucket upload failed:', error)
+        return base64Data
+    }
+}

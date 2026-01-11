@@ -20,6 +20,7 @@ interface ContestDetail {
     end_date: string;
     organizer_name: string;
     organizer_link: string;
+    allowed_content_types?: 'image' | 'video' | 'both';
 }
 
 interface ContestEntry {
@@ -421,6 +422,17 @@ export default function ContestDetail() {
                             <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{contest.description.replace(/\\n/g, '\n')}</p>
                         </div>
 
+                        {contest.allowed_content_types && (
+                            <div className="bg-indigo-500/10 rounded-xl p-4 border border-indigo-500/20">
+                                <h3 className="text-sm font-bold text-indigo-300 mb-2 uppercase tracking-wider">{t('contestDetail.allowedContent.title')}</h3>
+                                <div className="text-white text-lg font-medium">
+                                    {contest.allowed_content_types === 'both' && t('contestDetail.allowedContent.both')}
+                                    {contest.allowed_content_types === 'image' && t('contestDetail.allowedContent.image')}
+                                    {contest.allowed_content_types === 'video' && t('contestDetail.allowedContent.video')}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-[#1c1c1e] rounded-xl p-4 border border-white/5">
                             <h3 className="text-lg font-bold text-white mb-2">{t('contestDetail.sections.rules')}</h3>
                             <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{contest.rules.replace(/\\n/g, '\n')}</p>
@@ -441,102 +453,105 @@ export default function ContestDetail() {
                 )}
 
                 {activeTab === 'gallery' && (
-                    entries.length === 0 ? (
-                        <div className="text-center py-12 text-zinc-500 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            {t('contestDetail.emptyGallery')}
+                    <>
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => { setSort('new'); impact('light'); }}
+                                    className={`text-sm font-bold tracking-tight transition-colors ${sort === 'new' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    {t('contestDetail.sorting.new')}
+                                </button>
+                                <div className="w-[1px] h-3 bg-zinc-800"></div>
+                                <button
+                                    onClick={() => { setSort('popular'); impact('light'); }}
+                                    className={`text-sm font-bold tracking-tight transition-colors ${sort === 'popular' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    {t('contestDetail.sorting.top')}
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="relative">
+                                    <select
+                                        value={selectedModelFilter}
+                                        onChange={(e) => { setSelectedModelFilter(e.target.value); impact('light'); }}
+                                        className="appearance-none bg-[#1c1c1e] border border-white/5 text-xs font-medium text-zinc-300 rounded-lg py-0 pl-3 pr-8 focus:outline-none focus:border-violet-500/50 transition-colors h-[30px]"
+                                    >
+                                        <option value="all">{t('contestDetail.filter.allModels')}</option>
+                                        <option value="nanobanana">{t('contestDetail.filter.nanobanana')}</option>
+                                        <option value="nanobanana-pro">{t('contestDetail.filter.nanobanana_pro')}</option>
+                                        <option value="seedream4">{t('contestDetail.filter.seedream4')}</option>
+                                        <option value="seedream4-5">{t('contestDetail.filter.seedream4_5')}</option>
+                                        <option value="gptimage1.5">{t('contestDetail.filter.gptimage1_5')}</option>
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                                </div>
+
+                                <div className="bg-[#1c1c1e] p-0.5 rounded-lg flex gap-0.5 border border-white/5 h-[30px] items-center">
+                                    <button
+                                        onClick={() => setViewMode('standard')}
+                                        className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    >
+                                        <LayoutGrid size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('compact')}
+                                        className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'compact' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    >
+                                        <Grid3x3 size={14} />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    ) : (
-                        <>
-                            <div className="flex items-center justify-between mb-4 px-2">
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => { setSort('new'); impact('light'); }}
-                                        className={`text-sm font-bold tracking-tight transition-colors ${sort === 'new' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                    >
-                                        {t('contestDetail.sorting.new')}
-                                    </button>
-                                    <div className="w-[1px] h-3 bg-zinc-800"></div>
-                                    <button
-                                        onClick={() => { setSort('popular'); impact('light'); }}
-                                        className={`text-sm font-bold tracking-tight transition-colors ${sort === 'popular' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                    >
-                                        {t('contestDetail.sorting.top')}
-                                    </button>
-                                </div>
 
-                                <div className="flex items-center gap-2">
-                                    <div className="relative">
-                                        <select
-                                            value={selectedModelFilter}
-                                            onChange={(e) => { setSelectedModelFilter(e.target.value); impact('light'); }}
-                                            className="appearance-none bg-[#1c1c1e] border border-white/5 text-xs font-medium text-zinc-300 rounded-lg py-0 pl-3 pr-8 focus:outline-none focus:border-violet-500/50 transition-colors h-[30px]"
-                                        >
-                                            <option value="all">{t('contestDetail.filter.allModels')}</option>
-                                            <option value="nanobanana">NanoBanana</option>
-                                            <option value="nanobanana-pro">NanoBanana Pro</option>
-                                            <option value="seedream4">SeeDream 4</option>
-                                            <option value="seedream4-5">SeeDream 4.5</option>
-                                        </select>
-                                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                                    </div>
-
-                                    <div className="bg-[#1c1c1e] p-0.5 rounded-lg flex gap-0.5 border border-white/5 h-[30px] items-center">
-                                        <button
-                                            onClick={() => setViewMode('standard')}
-                                            className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'standard' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                        >
-                                            <LayoutGrid size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => setViewMode('compact')}
-                                            className={`p-1 rounded-md transition-all h-full aspect-square flex items-center justify-center ${viewMode === 'compact' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                        >
-                                            <Grid3x3 size={14} />
-                                        </button>
-                                    </div>
+                        {entries.length === 0 ? (
+                            <div className="text-center py-12 text-zinc-500 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                {t('contestDetail.emptyGallery')}
+                            </div>
+                        ) : (
+                            <>
+                                <div className={`flex items-start ${viewMode === 'standard' ? 'gap-4' : 'gap-2'} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+                                    {Array.from({ length: viewMode === 'standard' ? 2 : 3 }).map((_, colIndex) => (
+                                        <div key={colIndex} className={`flex-1 min-w-0 ${viewMode === 'standard' ? 'space-y-4' : 'space-y-2'}`}>
+                                            {entries.filter((_, i) => i % (viewMode === 'standard' ? 2 : 3) === colIndex).map((entry) => (
+                                                <FeedImage
+                                                    key={entry.id}
+                                                    item={{
+                                                        id: entry.generation.id,
+                                                        image_url: entry.generation.image_url,
+                                                        compressed_url: entry.generation.compressed_url,
+                                                        prompt: entry.generation.prompt,
+                                                        created_at: entry.created_at,
+                                                        author: {
+                                                            id: entry.author.id,
+                                                            username: entry.author.username,
+                                                            avatar_url: entry.author.avatar_url,
+                                                            first_name: entry.author.first_name
+                                                        },
+                                                        likes_count: entry.generation.likes_count,
+                                                        remix_count: entry.generation.remix_count,
+                                                        is_liked: entry.generation.is_liked,
+                                                        model: entry.generation.model
+                                                    }}
+                                                    handleRemix={(item) => handleRemix(item, entry.id)}
+                                                    onClick={handleImageClick}
+                                                    onLike={handleLike}
+                                                    showRemix={false}
+                                                />
+                                            ))}
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                            <div className={`flex items-start ${viewMode === 'standard' ? 'gap-4' : 'gap-2'} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
-                                {Array.from({ length: viewMode === 'standard' ? 2 : 3 }).map((_, colIndex) => (
-                                    <div key={colIndex} className={`flex-1 min-w-0 ${viewMode === 'standard' ? 'space-y-4' : 'space-y-2'}`}>
-                                        {entries.filter((_, i) => i % (viewMode === 'standard' ? 2 : 3) === colIndex).map((entry) => (
-                                            <FeedImage
-                                                key={entry.id}
-                                                item={{
-                                                    id: entry.generation.id,
-                                                    image_url: entry.generation.image_url,
-                                                    compressed_url: entry.generation.compressed_url,
-                                                    prompt: entry.generation.prompt,
-                                                    created_at: entry.created_at,
-                                                    author: {
-                                                        id: entry.author.id,
-                                                        username: entry.author.username,
-                                                        avatar_url: entry.author.avatar_url,
-                                                        first_name: entry.author.first_name
-                                                    },
-                                                    likes_count: entry.generation.likes_count,
-                                                    remix_count: entry.generation.remix_count,
-                                                    is_liked: entry.generation.is_liked,
-                                                    model: entry.generation.model
-                                                }}
-                                                handleRemix={(item) => handleRemix(item, entry.id)}
-                                                onClick={handleImageClick}
-                                                onLike={handleLike}
-                                                showRemix={false}
-                                            />
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                            {
-                                isFetchingMore && (
-                                    <div className="text-center text-zinc-500 py-4 w-full">{t('contestDetail.loadingMore')}</div>
-                                )
-                            }
-                        </>
-                    )
-                )
-                }
+                                {
+                                    isFetchingMore && (
+                                        <div className="text-center text-zinc-500 py-4 w-full">{t('contestDetail.loadingMore')}</div>
+                                    )
+                                }
+                            </>
+                        )}
+                    </>
+                )}
 
                 {
                     activeTab === 'leaderboard' && (
@@ -622,6 +637,7 @@ export default function ContestDetail() {
                 isOpen={isSelectorOpen}
                 onClose={() => setIsSelectorOpen(false)}
                 onSelect={handleJoin}
+                allowedContentType={contest.allowed_content_types}
             />
 
             {

@@ -161,6 +161,15 @@ export default function EventsPage() {
             {/* Contests Tab Content */}
             {activeTab === 'contests' && (
                 <>
+                    {/* Propose Contest Button */}
+                    <button
+                        onClick={() => navigate('/contests/propose')}
+                        className="w-full mb-4 py-3 bg-gradient-to-r from-indigo-600/20 to-violet-600/20 hover:from-indigo-600/30 hover:to-violet-600/30 border border-indigo-500/30 rounded-xl text-indigo-300 font-bold text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                    >
+                        <Trophy size={16} />
+                        {t('events.proposeButton')}
+                    </button>
+
                     {/* Contest Filter */}
                     <div className="flex p-1 bg-zinc-900/60 backdrop-blur-sm rounded-xl border border-white/5 mb-4">
                         {[

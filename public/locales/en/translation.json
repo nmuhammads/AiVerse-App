@@ -465,7 +465,12 @@
             "top": "Top"
         },
         "filter": {
-            "allModels": "All models"
+            "allModels": "All models",
+            "nanobanana": "NanoBanana",
+            "nanobanana_pro": "NanoBanana Pro",
+            "seedream4": "SeeDream 4",
+            "seedream4_5": "SeeDream 4.5",
+            "gptimage1_5": "GPT Image 1.5"
         },
         "loadingMore": "Loading more...",
         "join": "Join",

@@ -30,7 +30,7 @@ export async function getContests(req: Request, res: Response) {
     try {
         const status = req.query.status ? String(req.query.status) : 'active'
 
-        let query = `?select=*&order=created_at.desc`
+        let query = `?select=*&order=created_at.desc&is_approved=is.true`
         if (status === 'active') {
             query += `&status=eq.active`
         } else if (status === 'completed') {
@@ -142,10 +142,33 @@ export async function joinContest(req: Request, res: Response) {
 
         if (!id || !userId || !generationId) return res.status(400).json({ error: 'Missing required fields' })
 
-        // Check if contest is active
-        const contestCheck = await supaSelect('contests', `?id=eq.${id}&select=status`)
-        if (!contestCheck.ok || !contestCheck.data[0] || contestCheck.data[0].status !== 'active') {
+        // Check if contest is active and what content is allowed
+        const contestCheck = await supaSelect('contests', `?id=eq.${id}&select=status,allowed_content_types`)
+        if (!contestCheck.ok || !contestCheck.data[0]) {
+            return res.status(404).json({ error: 'Contest not found' })
+        }
+
+        const contest = contestCheck.data[0]
+        if (contest.status !== 'active') {
             return res.status(400).json({ error: 'Contest is not active' })
+        }
+
+        const allowedTypes = contest.allowed_content_types || 'both'
+
+        // Get generation media type
+        const genCheck = await supaSelect('generations', `?id=eq.${generationId}&select=media_type`)
+        if (!genCheck.ok || !genCheck.data[0]) {
+            return res.status(404).json({ error: 'Generation not found' })
+        }
+
+        const mediaType = genCheck.data[0].media_type || 'image'
+
+        // Validate content type
+        if (allowedTypes !== 'both' && allowedTypes !== mediaType) {
+            const errorMsg = allowedTypes === 'image'
+                ? 'Only photo submissions are allowed for this contest'
+                : 'Only video submissions are allowed for this contest'
+            return res.status(400).json({ error: errorMsg })
         }
 
         // Check if already joined with this generation
@@ -221,6 +244,84 @@ export async function likeContestEntry(req: Request, res: Response) {
         }
     } catch (e) {
         console.error('likeContestEntry error:', e)
+        return res.status(500).json({ error: 'Internal server error' })
+    }
+    // ... (existing code: likeContestEntry)
+}
+
+
+import { uploadImageToVideoBucket } from '../services/r2Service.js'
+
+export async function createContestProposal(req: Request, res: Response) {
+    try {
+        const { title, description, rules, prizes, start_date, end_date, allowed_content_types, organizer_name, banner_image, user_id } = req.body
+
+        if (!title || !description || !user_id) return res.status(400).json({ error: 'Missing required fields' })
+
+        // 1. Upload banner if provided
+        let image_url = null
+        if (banner_image) {
+            image_url = await uploadImageToVideoBucket(banner_image, 'contest-banners')
+        }
+
+        // 2. Create contest record (is_approved = false)
+        const contestData = {
+            title,
+            description,
+            rules: rules || '',
+            prizes: prizes || '',
+            start_date: start_date || new Date().toISOString(),
+            end_date: end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            status: 'upcoming',
+            allowed_content_types: allowed_content_types || 'both',
+            organizer_name: organizer_name || 'User',
+            image_url,
+            is_approved: false,
+            proposed_by: user_id,
+            proposal_status: 'pending'
+        }
+
+        const insert = await supaPost('contests', contestData)
+        if (!insert.ok) {
+            console.error('createContestProposal DB error:', insert.data)
+            return res.status(500).json({ error: 'Failed to create proposal' })
+        }
+
+        const newContest = insert.data[0]
+
+        // 3. Notify Admin (ID: 817308975)
+        const ADMIN_ID = 817308975
+        const { tg } = await import('./telegramController.js')
+
+        const message = `📋 *Новое предложение конкурса!*\n\n` +
+            `*Название:* ${title}\n` +
+            `*Организатор:* ${organizer_name}\n` +
+            `*Описание:* ${description.slice(0, 100)}...\n` +
+            `*Тип контента:* ${allowed_content_types || 'both'}\n` +
+            `*От пользователя:* [ID: ${user_id}](tg://user?id=${user_id})\n\n` +
+            `_Конкурс создан со статусом "upcoming" и требует одобрения (is_approved = true) в базе данных._`
+
+        try {
+            await tg('sendMessage', {
+                chat_id: ADMIN_ID,
+                text: message,
+                parse_mode: 'Markdown'
+            })
+            if (image_url) {
+                await tg('sendPhoto', {
+                    chat_id: ADMIN_ID,
+                    photo: image_url,
+                    caption: `Баннер для конкурса "${title}"`
+                })
+            }
+        } catch (notifyError) {
+            console.error('Failed to notify admin about contest proposal:', notifyError)
+        }
+
+        return res.json({ success: true, contest: newContest })
+
+    } catch (e) {
+        console.error('createContestProposal error:', e)
         return res.status(500).json({ error: 'Internal server error' })
     }
 }
