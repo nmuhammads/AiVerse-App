@@ -35,7 +35,7 @@ export default function ProposeContest() {
     };
 
     const headerStyle = {
-        paddingTop: platform === 'ios' ? 'env(safe-area-inset-top)' : '10px'
+        paddingTop: platform === 'ios' ? 'calc(env(safe-area-inset-top) + 12px)' : platform === 'android' ? '25px' : '10px'
     };
 
     const [form, setForm] = useState({
