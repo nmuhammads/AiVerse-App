@@ -1,4 +1,5 @@
 import { X, Heart, Repeat, Download, Share2, Sparkles, Maximize2, Trophy, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useState, useEffect } from 'react'
@@ -299,14 +300,11 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-3 cursor-pointer" onClick={handleProfileClick}>
-                                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-white/10 overflow-hidden">
-                                    {item.author.avatar_url ? (
-                                        <img src={item.author.avatar_url} alt={item.author.username} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-zinc-400 font-bold">
-                                            {item.author.username[0].toUpperCase()}
-                                        </div>
-                                    )}
+                                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10">
+                                    <UserAvatar
+                                        user={item.author}
+                                        className="w-full h-full"
+                                    />
                                 </div>
                                 <div>
                                     <div className="text-white font-semibold text-sm">{item.author.username}</div>

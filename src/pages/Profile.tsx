@@ -69,6 +69,7 @@ import { useTelegram } from '@/hooks/useTelegram'
 import { useGenerationStore } from '@/store/generationStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ProfileSkeletonGrid } from '@/components/ui/skeleton'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 
 function getModelDisplayName(model: string | null): string {
   if (!model) return ''
@@ -742,11 +743,12 @@ export default function Profile() {
             <div className="relative mb-3 group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
               <div className="w-20 h-20 rounded-full p-1 bg-gradient-to-br from-violet-500 via-fuchsia-500 to-indigo-500 shadow-xl shadow-violet-500/20">
                 <div className="w-full h-full rounded-full bg-black overflow-hidden relative">
-                  <img
-                    src={avatarSrc || avatarUrl}
-                    alt={displayName}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = avatarUrl }}
+                  <UserAvatar
+                    user={{
+                      username: displayName,
+                      avatar_url: avatarSrc || avatarUrl
+                    }}
+                    className="w-full h-full"
                   />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
                     <Edit className="text-white" size={20} />
