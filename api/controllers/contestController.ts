@@ -293,25 +293,49 @@ export async function createContestProposal(req: Request, res: Response) {
         const ADMIN_ID = 817308975
         const { tg } = await import('./telegramController.js')
 
-        const message = `📋 *Новое предложение конкурса!*\n\n` +
-            `*Название:* ${title}\n` +
-            `*Организатор:* ${organizer_name}\n` +
-            `*Описание:* ${description.slice(0, 100)}...\n` +
-            `*Тип контента:* ${allowed_content_types || 'both'}\n` +
-            `*От пользователя:* [ID: ${user_id}](tg://user?id=${user_id})\n\n` +
-            `_Конкурс создан со статусом "upcoming" и требует одобрения (is_approved = true) в базе данных._`
+        // Format prizes for message
+        let prizesText = ''
+        try {
+            const p = typeof prizes === 'string' ? JSON.parse(prizes) : prizes
+            if (p) {
+                if (p['1']) prizesText += `\n🥇 1 место: ${p['1']}`
+                if (p['2']) prizesText += `\n🥈 2 место: ${p['2']}`
+                if (p['3']) prizesText += `\n🥉 3 место: ${p['3']}`
+            }
+        } catch (e) {
+            console.error('Error parsing prizes for message', e)
+        }
+
+        // Helper to escape HTML special chars
+        const escapeHtml = (unsafe: string) => unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+        const msgText = `📋 <b>Новое предложение конкурса!</b>\n\n` +
+            `<b>Название:</b> ${escapeHtml(title)}\n` +
+            `<b>Организатор:</b> ${escapeHtml(organizer_name)}\n` +
+            (prizesText ? `<b>Призы:</b>${escapeHtml(prizesText)}\n` : '') +
+            `<b>Описание:</b> ${escapeHtml(description.slice(0, 100))}...\n` +
+            `<b>Тип контента:</b> ${escapeHtml(allowed_content_types || 'both')}\n` +
+            `<b>От пользователя:</b> <a href="tg://user?id=${user_id}">ID: ${user_id}</a>\n\n` +
+            `<i>Конкурс создан со статусом "upcoming" и требует одобрения (is_approved = true) в базе данных.</i>`
 
         try {
-            await tg('sendMessage', {
-                chat_id: ADMIN_ID,
-                text: message,
-                parse_mode: 'Markdown'
-            })
             if (image_url) {
                 await tg('sendPhoto', {
                     chat_id: ADMIN_ID,
                     photo: image_url,
-                    caption: `Баннер для конкурса "${title}"`
+                    caption: msgText,
+                    parse_mode: 'HTML'
+                })
+            } else {
+                await tg('sendMessage', {
+                    chat_id: ADMIN_ID,
+                    text: msgText,
+                    parse_mode: 'HTML'
                 })
             }
         } catch (notifyError) {
