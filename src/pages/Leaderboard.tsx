@@ -1,4 +1,5 @@
 import { Crown, Heart, Repeat } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTelegram } from '@/hooks/useTelegram'
@@ -170,14 +171,15 @@ export default function Leaderboard() {
 
               {/* Avatar */}
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden border border-white/10">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.username || 'User'} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-500 font-bold text-lg">
-                      {(user.first_name?.[0] || user.username?.[0] || '?').toUpperCase()}
-                    </div>
-                  )}
+                <div className="w-12 h-12 rounded-full overflow-hidden border border-white/10">
+                  <UserAvatar
+                    user={{
+                      username: user.username || user.first_name || 'User',
+                      avatar_url: user.avatar_url
+                    }}
+                    className="w-full h-full"
+                    size={24}
+                  />
                 </div>
                 <div className={`absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-zinc-900 border border-white/10 text-[8px] font-bold uppercase ${getBadgeColor(badge)}`}>
                   {badge}

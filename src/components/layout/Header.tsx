@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTelegram } from '@/hooks/useTelegram'
 import { NotificationBell } from '@/components/NotificationBell'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 
 export function Header() {
   const { t } = useTranslation()
@@ -50,7 +51,13 @@ export function Header() {
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
             <span className="text-white font-semibold">{displayName}</span>
             <Link to="/profile" className="h-8 w-8 rounded-full overflow-hidden ring-2 ring-violet-600 bg-white/10">
-              <img src={avatarSrc || avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+              <UserAvatar
+                user={{
+                  username: displayName,
+                  avatar_url: avatarSrc || avatarUrl
+                }}
+                className="w-full h-full"
+              />
             </Link>
             <NotificationBell />
             <Link to="/settings" className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center"><Settings size={16} /></Link>

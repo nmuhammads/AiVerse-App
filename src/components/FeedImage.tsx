@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useNavigate } from 'react-router-dom'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 import { useCloudflareProxy } from '@/contexts/CloudflareProxyContext'
 
 export interface FeedItem {
@@ -218,11 +219,10 @@ export const FeedImage = ({ item, priority = false, handleRemix, onClick, onLike
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2" onClick={handleProfileClick}>
                             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[10px] font-bold text-white overflow-hidden">
-                                {item.author.avatar_url ? (
-                                    <img src={item.author.avatar_url} alt={item.author.username} className="w-full h-full object-cover" />
-                                ) : (
-                                    item.author.username[0].toUpperCase()
-                                )}
+                                <UserAvatar
+                                    user={item.author}
+                                    className="w-full h-full"
+                                />
                             </div>
                         </div>
                         <div className={`flex items-center ${isCompact ? 'gap-1' : 'gap-2'}`}>
