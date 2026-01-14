@@ -263,12 +263,17 @@ export async function registerBotCommands() {
     console.error('registerBotCommands: Missing API');
     return;
   }
-  console.log('registerBotCommands: Deleting bot commands');
-  const resp = await tg('deleteMyCommands', { scope: { type: 'default' } });
-  if (resp?.ok) {
-    console.log('registerBotCommands: Successfully deleted commands');
-  } else {
-    console.error('registerBotCommands: Failed to delete commands', resp);
+  try {
+    console.log('registerBotCommands: Deleting bot commands');
+    const resp = await tg('deleteMyCommands', { scope: { type: 'default' } });
+    if (resp?.ok) {
+      console.log('registerBotCommands: Successfully deleted commands');
+    } else {
+      console.error('registerBotCommands: Failed to delete commands', resp);
+    }
+  } catch (error) {
+    console.error('registerBotCommands: Network error', (error as Error).message);
+    throw error; // Re-throw for retry logic in server.ts
   }
 }
 
