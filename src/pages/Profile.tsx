@@ -1340,7 +1340,7 @@ export default function Profile() {
                         {/* Send to Chat Section */}
                         <div className="border border-white/10 rounded-xl p-3 space-y-2">
                           <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{t('profile.preview.sendToSection')}</h4>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             <button
                               onClick={async () => {
                                 if (!user?.id) return
@@ -1358,9 +1358,10 @@ export default function Profile() {
                                   notify('error')
                                 }
                               }}
-                              className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98]"
+                              className="min-h-[56px] h-auto py-2 px-1.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold flex flex-col items-center justify-center gap-1 shadow-lg active:scale-[0.98]"
                             >
-                              <span className="flex items-center gap-2"><Send size={16} />{t('profile.preview.sendToChat')}</span>
+                              <Send size={18} className="flex-shrink-0" />
+                              <span className="text-[10px] leading-tight text-center">{t('profile.preview.sendToChat')}</span>
                             </button>
                             <button
                               onClick={async () => {
@@ -1393,10 +1394,11 @@ export default function Profile() {
                                 }
                               }}
                               disabled={sendWithPromptLoading || !preview.prompt}
-                              className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                              className="min-h-[56px] h-auto py-2 px-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold flex flex-col items-center justify-center gap-1 shadow-lg active:scale-[0.98] disabled:opacity-50"
                               title={t('profile.preview.sendWithPromptHint')}
                             >
-                              <span className="flex items-center gap-2">{sendWithPromptLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}{t('profile.preview.sendWithPrompt')}</span>
+                              {sendWithPromptLoading ? <Loader2 size={18} className="flex-shrink-0 animate-spin" /> : <MessageSquare size={18} className="flex-shrink-0" />}
+                              <span className="text-[10px] leading-tight text-center">{t('profile.preview.sendWithPrompt')}</span>
                             </button>
                             <button
                               onClick={async () => {
@@ -1431,10 +1433,11 @@ export default function Profile() {
                                 }
                               }}
                               disabled={sendWithWatermarkLoading || preview.media_type === 'video'}
-                              className="flex-1 min-h-[48px] h-auto py-3 px-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 font-bold text-sm flex items-center justify-center shadow-lg active:scale-[0.98] disabled:opacity-50"
+                              className="min-h-[56px] h-auto py-2 px-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 font-bold flex flex-col items-center justify-center gap-1 shadow-lg active:scale-[0.98] disabled:opacity-50"
                               title={t('profile.preview.sendWithWatermarkHint')}
                             >
-                              <span className="flex items-center gap-2">{sendWithWatermarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Droplets size={16} />}{t('profile.preview.sendWithWatermark')}</span>
+                              {sendWithWatermarkLoading ? <Loader2 size={18} className="flex-shrink-0 animate-spin" /> : <Droplets size={18} className="flex-shrink-0" />}
+                              <span className="text-[10px] leading-tight text-center">{t('profile.preview.sendWithWatermark')}</span>
                             </button>
                           </div>
                         </div>
