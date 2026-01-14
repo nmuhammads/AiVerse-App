@@ -28,8 +28,10 @@ export function PendingIndicator() {
             .reduce((sum, g) => sum + g.imageCount, 0)
     )
 
-    // Общий count = серверные + локальные
-    const totalCount = serverCount + localActiveCount
+    // Используем serverCount как основной источник правды
+    // localActiveCount показывается только если serverCount ещё не получен (до первого fetch)
+    // Это предотвращает двойной подсчёт когда генерация есть и локально, и на сервере
+    const totalCount = serverCount > 0 ? serverCount : localActiveCount
 
     const fetchPendingCount = useCallback(async () => {
         if (!user?.id) return
