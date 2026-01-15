@@ -103,6 +103,40 @@
     "studio": {
         "title": "Studio",
         "tokens": "tokens",
+        "models": {
+            "nanobanana": {
+                "name": "NanoBanana",
+                "desc": "3 tokens"
+            },
+            "nanobanana-pro": {
+                "name": "NanoBanana Pro",
+                "desc": "15 tokens"
+            },
+            "seedream4": {
+                "name": "Seedream 4",
+                "desc": "4 tokens"
+            },
+            "seedream4-5": {
+                "name": "Seedream 4.5",
+                "desc": "7 tokens"
+            },
+            "gpt-image-1.5": {
+                "name": "GPT image 1.5",
+                "desc": "from 5 tokens"
+            },
+            "test-model": {
+                "name": "🧪 Test Model",
+                "desc": "0 tokens"
+            },
+            "seedance-1.5-pro": {
+                "name": "Seedance Pro",
+                "desc": "from 24 tokens"
+            },
+            "kling-t2v": {
+                "name": "Kling AI",
+                "desc": "from 30 tokens"
+            }
+        },
         "tokens_1": "{{count}} token",
         "tokens_2": "{{count}} tokens",
         "tokens_5": "{{count}} tokens",

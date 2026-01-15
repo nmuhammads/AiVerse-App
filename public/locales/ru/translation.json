@@ -104,6 +104,40 @@
     "studio": {
         "title": "Studio",
         "tokens": "токенов",
+        "models": {
+            "nanobanana": {
+                "name": "NanoBanana",
+                "desc": "3 токена"
+            },
+            "nanobanana-pro": {
+                "name": "NanoBanana Pro",
+                "desc": "15 токенов"
+            },
+            "seedream4": {
+                "name": "Seedream 4",
+                "desc": "4 токена"
+            },
+            "seedream4-5": {
+                "name": "Seedream 4.5",
+                "desc": "7 токенов"
+            },
+            "gpt-image-1.5": {
+                "name": "GPT image 1.5",
+                "desc": "от 5 токенов"
+            },
+            "test-model": {
+                "name": "🧪 Test Model",
+                "desc": "0 токенов"
+            },
+            "seedance-1.5-pro": {
+                "name": "Seedance Pro",
+                "desc": "от 24 токенов"
+            },
+            "kling-t2v": {
+                "name": "Kling AI",
+                "desc": "от 30 токенов"
+            }
+        },
         "tokens_1": "{{count}} токен",
         "tokens_2": "{{count}} токена",
         "tokens_5": "{{count}} токенов",

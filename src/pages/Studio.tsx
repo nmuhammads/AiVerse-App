@@ -17,13 +17,13 @@ import { compressImage } from '@/utils/imageCompression'
 
 
 // Модели для генерации изображений
-const ALL_IMAGE_MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string; devOnly?: boolean }[] = [
-  { id: 'nanobanana', name: 'NanoBanana', desc: '3 токена', color: 'from-yellow-400 to-orange-500', icon: '/models/optimized/nanobanana.png' },
-  { id: 'nanobanana-pro', name: 'NanoBanana Pro', desc: '15 токенов', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
-  { id: 'seedream4', name: 'Seedream 4', desc: '4 токена', color: 'from-purple-400 to-fuchsia-500', icon: '/models/optimized/seedream.png' },
-  { id: 'seedream4-5', name: 'Seedream 4.5', desc: '7 токенов', color: 'from-blue-400 to-indigo-500', icon: '/models/optimized/seedream-4-5.png' },
-  { id: 'gpt-image-1.5', name: 'GPT image 1.5', desc: 'от 5 токенов', color: 'from-cyan-400 to-blue-500', icon: '/models/optimized/gpt-image.png' },
-  { id: 'test-model', name: '🧪 Test Model', desc: '0 токенов', color: 'from-green-400 to-emerald-500', icon: '/models/optimized/nanobanana.png', devOnly: true },
+const ALL_IMAGE_MODELS: { id: ModelType; color: string; icon: string; devOnly?: boolean }[] = [
+  { id: 'nanobanana', color: 'from-yellow-400 to-orange-500', icon: '/models/optimized/nanobanana.png' },
+  { id: 'nanobanana-pro', color: 'from-pink-500 to-rose-500', icon: '/models/optimized/nanobanana-pro.png' },
+  { id: 'seedream4', color: 'from-purple-400 to-fuchsia-500', icon: '/models/optimized/seedream.png' },
+  { id: 'seedream4-5', color: 'from-blue-400 to-indigo-500', icon: '/models/optimized/seedream-4-5.png' },
+  { id: 'gpt-image-1.5', color: 'from-cyan-400 to-blue-500', icon: '/models/optimized/gpt-image.png' },
+  { id: 'test-model', color: 'from-green-400 to-emerald-500', icon: '/models/optimized/nanobanana.png', devOnly: true },
 ]
 
 // Фильтруем модели по DEV режиму
@@ -31,9 +31,9 @@ const IS_DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'
 const IMAGE_MODELS = ALL_IMAGE_MODELS.filter(m => !m.devOnly || IS_DEV_MODE)
 
 // Модели для генерации видео
-const VIDEO_MODELS: { id: ModelType; name: string; desc: string; color: string; icon: string }[] = [
-  { id: 'seedance-1.5-pro', name: 'Seedance Pro', desc: 'от 24 токенов', color: 'from-red-500 to-orange-500', icon: '/models/optimized/seedream.png' },
-  { id: 'kling-t2v', name: 'Kling AI', desc: 'от 55 токенов', color: 'from-cyan-500 to-blue-500', icon: '/models/optimized/kling.png' },
+const VIDEO_MODELS: { id: ModelType; color: string; icon: string }[] = [
+  { id: 'seedance-1.5-pro', color: 'from-red-500 to-orange-500', icon: '/models/optimized/seedream.png' },
+  { id: 'kling-t2v', color: 'from-cyan-500 to-blue-500', icon: '/models/optimized/kling.png' },
 ]
 
 // Для обратной совместимости
@@ -643,7 +643,7 @@ export default function Studio() {
 
           // Сохранить в историю
           try {
-            const modelName = currentParams.mediaType === 'video' ? 'Seedance Pro' : MODELS.find(m => m.id === currentParams.selectedModel)?.name
+            const modelName = currentParams.mediaType === 'video' ? 'Seedance Pro' : t(`studio.models.${currentParams.selectedModel}.name`)
             const item = { id: Date.now(), url: data.image, prompt: currentParams.prompt, model: modelName, ratio: currentParams.aspectRatio, date: new Date().toLocaleDateString(), mediaType: currentParams.mediaType }
             const prev = JSON.parse(localStorage.getItem('img_gen_history_v2') || '[]')
             const next = [item, ...prev]
@@ -1020,10 +1020,10 @@ export default function Studio() {
                     }`}
                 >
                   <div className={`w-10 h-10 rounded-xl overflow-hidden shadow-md transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
-                    <img src={m.icon} alt={m.name} className="w-full h-full object-cover" />
+                    <img src={m.icon} alt={t(`studio.models.${m.id}.name`)} className="w-full h-full object-cover" />
                   </div>
                   <span className={`text-[10px] font-semibold text-center leading-tight ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
-                    {m.name}
+                    {t(`studio.models.${m.id}.name`)}
                   </span>
                 </button>
               )
@@ -1085,11 +1085,11 @@ export default function Studio() {
                     }`}
                 >
                   <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md">
-                    <img src={m.icon} alt={m.name} className="w-full h-full object-cover" />
+                    <img src={m.icon} alt={t(`studio.models.${m.id}.name`)} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{m.name}</div>
-                    <div className={`text-xs ${isSelected ? 'text-white/70' : 'text-zinc-500'}`}>{m.desc}</div>
+                    <div className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{t(`studio.models.${m.id}.name`)}</div>
+                    <div className={`text-xs ${isSelected ? 'text-white/70' : 'text-zinc-500'}`}>{t(`studio.models.${m.id}.desc`)}</div>
                   </div>
                 </button>
               )
