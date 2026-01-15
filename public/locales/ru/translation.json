@@ -139,8 +139,10 @@
             }
         },
         "kling": {
+            "motionControl": "Motion Control",
             "duration": "Длительность",
             "sound": "Звук",
+            "referenceImage": "Референс фото",
             "mc": {
                 "uploadImage": "Загрузите фото персонажа",
                 "imageHint": "Лицо должно быть видно (голова + плечи + торс)",
@@ -154,10 +156,12 @@
                 "max30s": "макс 30 сек",
                 "uploadVideo": "Загрузите видео с движением",
                 "videoHint": "MP4/MOV, 3-30 сек, мин. 720p",
+                "uploadVideoBtn": "Загрузить видео",
                 "changeVideo": "Изменить видео",
                 "selectVideo": "Выбрать видео",
                 "validDuration": "✓ Подходит",
                 "invalidDuration": "✕ Слишком длинное",
+                "durationError": "Видео слишком длинное. Максимум: {{max}} сек",
                 "quality": "Качество",
                 "optionalPrompt": "Промпт",
                 "optional": "Опционально",
@@ -198,33 +202,6 @@
             "addStartFrame": "Добавить",
             "addEndFrame": "Опционально",
             "framesHint": "Начальный кадр обязателен. Финальный — опционально для контроля финального вида видео."
-        },
-        "kling": {
-            "motionControl": "Motion Control",
-            "duration": "Длительность",
-            "sound": "Звук",
-            "referenceImage": "Референс фото",
-            "mc": {
-                "uploadImage": "Загрузите фото персонажа",
-                "imageHint": "Лицо должно быть видно (голова + плечи + торс)",
-                "orientation": "Ориентация персонажа",
-                "orientationHint": "Выберите, откуда взять направление взгляда и положение тела персонажа",
-                "asImage": "Как на фото",
-                "asImageDesc1": "Поза и направление с фото",
-                "max10s": "макс 10 сек",
-                "asVideo": "Как в видео",
-                "asVideoDesc1": "Поза и направление с видео",
-                "max30s": "макс 30 сек",
-                "uploadVideo": "Загрузите видео с движением",
-                "videoHint": "MP4/MOV, 3-30 сек, мин. 720p",
-                "uploadVideoBtn": "Загрузить видео",
-                "changeVideo": "Изменить видео",
-                "selectVideo": "Выбрать видео",
-                "validDuration": "✓ Подходит",
-                "invalidDuration": "✕ Слишком длинное",
-                "durationError": "Видео слишком длинное. Максимум: {{max}} сек",
-                "quality": "Качество"
-            }
         },
         "prompt": {
             "from": "Промпт от {{username}}",
