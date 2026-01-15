@@ -1718,7 +1718,7 @@ export default function Studio() {
             <div className="grid grid-cols-2 gap-3">
               {/* Duration */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.kling.duration', 'Длительность')}</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.kling.duration')}</label>
                 <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   {(['5', '10'] as KlingDuration[]).map((d) => (
                     <button
@@ -1734,7 +1734,7 @@ export default function Studio() {
 
               {/* Sound */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.kling.sound', 'Звук')}</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-1">{t('studio.kling.sound')}</label>
                 <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                   <button
                     onClick={() => { setKlingSound(false); impact('light') }}
@@ -1763,11 +1763,11 @@ export default function Studio() {
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">1</span>
-                {t('studio.kling.mc.uploadImage', 'Загрузите фото персонажа')}
+                {t('studio.kling.mc.uploadImage')}
               </label>
               <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-xs">
                 <Info size={14} className="mt-0.5 shrink-0" />
-                <span>{t('studio.kling.mc.imageHint', 'Лицо должно быть видно (голова + плечи + торс)')}</span>
+                <span>{t('studio.kling.mc.imageHint')}</span>
               </div>
 
               {/* Image Upload Area */}
@@ -1851,11 +1851,11 @@ export default function Studio() {
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">2</span>
-                {t('studio.kling.mc.orientation', 'Ориентация персонажа')}
+                {t('studio.kling.mc.orientation')}
               </label>
               <div className="flex items-start gap-2 p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-300 text-xs">
                 <Info size={14} className="mt-0.5 shrink-0" />
-                <span>{t('studio.kling.mc.orientationHint', 'Выберите, откуда взять направление взгляда и положение тела персонажа')}</span>
+                <span>{t('studio.kling.mc.orientationHint')}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -1863,18 +1863,18 @@ export default function Studio() {
                   className={`p-3 rounded-xl border transition-all ${characterOrientation === 'image' ? 'border-cyan-500 bg-cyan-500/10' : 'border-white/10 bg-zinc-900/50'}`}
                 >
                   <ImageIcon size={20} className={`mx-auto mb-1 ${characterOrientation === 'image' ? 'text-cyan-400' : 'text-zinc-500'}`} />
-                  <div className={`text-xs font-bold ${characterOrientation === 'image' ? 'text-white' : 'text-zinc-400'}`}>🖼 {t('studio.kling.mc.asImage', 'Как на фото')}</div>
-                  <div className="text-[10px] text-zinc-500">{t('studio.kling.mc.asImageDesc1', 'Поза и направление с фото')}</div>
-                  <div className="text-[10px] text-cyan-400/70">• {t('studio.kling.mc.max10s', 'макс 10 сек')}</div>
+                  <div className={`text-xs font-bold ${characterOrientation === 'image' ? 'text-white' : 'text-zinc-400'}`}>🖼 {t('studio.kling.mc.asImage')}</div>
+                  <div className="text-[10px] text-zinc-500">{t('studio.kling.mc.asImageDesc1')}</div>
+                  <div className="text-[10px] text-cyan-400/70">• {t('studio.kling.mc.max10s')}</div>
                 </button>
                 <button
                   onClick={() => { setCharacterOrientation('video'); impact('light') }}
                   className={`p-3 rounded-xl border transition-all ${characterOrientation === 'video' ? 'border-cyan-500 bg-cyan-500/10' : 'border-white/10 bg-zinc-900/50'}`}
                 >
                   <Video size={20} className={`mx-auto mb-1 ${characterOrientation === 'video' ? 'text-cyan-400' : 'text-zinc-500'}`} />
-                  <div className={`text-xs font-bold ${characterOrientation === 'video' ? 'text-white' : 'text-zinc-400'}`}>🎬 {t('studio.kling.mc.asVideo', 'Как в видео')}</div>
-                  <div className="text-[10px] text-zinc-500">{t('studio.kling.mc.asVideoDesc1', 'Поза и направление с видео')}</div>
-                  <div className="text-[10px] text-cyan-400/70">• {t('studio.kling.mc.max30s', 'макс 30 сек')}</div>
+                  <div className={`text-xs font-bold ${characterOrientation === 'video' ? 'text-white' : 'text-zinc-400'}`}>🎬 {t('studio.kling.mc.asVideo')}</div>
+                  <div className="text-[10px] text-zinc-500">{t('studio.kling.mc.asVideoDesc1')}</div>
+                  <div className="text-[10px] text-cyan-400/70">• {t('studio.kling.mc.max30s')}</div>
                 </button>
               </div>
             </div>
@@ -1883,11 +1883,11 @@ export default function Studio() {
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">3</span>
-                {t('studio.kling.mc.uploadVideo', 'Загрузите видео с движением')}
+                {t('studio.kling.mc.uploadVideo')}
               </label>
               <div className="flex items-start gap-2 p-2 bg-violet-500/10 border border-violet-500/20 rounded-lg text-violet-300 text-xs">
                 <Info size={14} className="mt-0.5 shrink-0" />
-                <span>{t('studio.kling.mc.videoHint', 'MP4/MOV, 3-30 сек, мин. 720p')}</span>
+                <span>{t('studio.kling.mc.videoHint')}</span>
               </div>
 
               <input
@@ -1930,12 +1930,12 @@ export default function Studio() {
                 {isUploadingVideo ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
-                    {t('studio.upload.loading', 'Загрузка...')}
+                    {t('studio.upload.loading')}
                   </>
                 ) : (
                   <>
                     <Video size={20} />
-                    {uploadedVideoUrl ? t('studio.kling.mc.changeVideo', 'Изменить видео') : <>{t('studio.kling.mc.selectVideo', 'Выбрать видео')} 👇</>}
+                    {uploadedVideoUrl ? t('studio.kling.mc.changeVideo') : <>{t('studio.kling.mc.selectVideo')} 👇</>}
                   </>
                 )}
               </button>
@@ -1948,12 +1948,12 @@ export default function Studio() {
                   <Video size={16} className={(characterOrientation === 'image' ? videoDurationSeconds <= 10 : videoDurationSeconds <= 30) ? 'text-green-400' : 'text-rose-400'} />
                   <div className="flex-1 flex flex-col">
                     <span className={`text-xs ${(characterOrientation === 'image' ? videoDurationSeconds <= 10 : videoDurationSeconds <= 30) ? 'text-green-200' : 'text-rose-200'}`}>
-                      {videoDurationSeconds}s видео
+                      {videoDurationSeconds}s {t('studio.media.video', 'video')}
                     </span>
                     <span className="text-[10px] text-white/50">
                       {(characterOrientation === 'image' ? videoDurationSeconds <= 10 : videoDurationSeconds <= 30)
-                        ? t('studio.kling.mc.validDuration', '✓ Подходит')
-                        : t('studio.kling.mc.invalidDuration', '✕ Слишком длинное')}
+                        ? t('studio.kling.mc.validDuration')
+                        : t('studio.kling.mc.invalidDuration')}
                     </span>
                   </div>
                   <button
@@ -1970,20 +1970,20 @@ export default function Studio() {
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px]">4</span>
-                {t('studio.kling.mc.quality', 'Качество')}
+                {t('studio.kling.mc.quality')}
               </label>
               <div className="flex gap-1 p-0.5 bg-zinc-900/50 rounded-xl border border-white/5">
                 <button
                   onClick={() => { setKlingMCQuality('720p'); impact('light') }}
                   className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${klingMCQuality === '720p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
-                  720p · 6⚡/сек
+                  720p · 6⚡/{t('studio.kling.mc.perSec')}
                 </button>
                 <button
                   onClick={() => { setKlingMCQuality('1080p'); impact('light') }}
                   className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${klingMCQuality === '1080p' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
-                  1080p · 9⚡/сек
+                  1080p · 9⚡/{t('studio.kling.mc.perSec')}
                 </button>
               </div>
             </div>
@@ -1992,18 +1992,18 @@ export default function Studio() {
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-cyan-500/50 text-white flex items-center justify-center text-[10px]">5</span>
-                {t('studio.kling.mc.optionalPrompt', 'Промпт')}
-                <span className="text-[10px] text-zinc-500 font-normal">({t('studio.kling.mc.optional', 'Опционально')})</span>
+                {t('studio.kling.mc.optionalPrompt')}
+                <span className="text-[10px] text-zinc-500 font-normal">({t('studio.kling.mc.optional')})</span>
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={t('studio.kling.mc.promptPlaceholder', 'Опишите детали: одежду, фон, стиль...')}
+                placeholder={t('studio.kling.mc.promptPlaceholder')}
                 className="w-full min-h-[80px] bg-zinc-900/50 backdrop-blur-sm rounded-xl border border-white/10 p-3 text-white placeholder-zinc-500 text-sm resize-none focus:border-cyan-500/30 focus:outline-none transition-colors"
               />
               <div className="flex items-start gap-2 p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-300 text-[10px]">
                 <Info size={12} className="mt-0.5 shrink-0" />
-                <span>{t('studio.kling.mc.promptHint', 'Промпт опционален. Используйте для изменения деталей: одежды, фона, стиля и т.д.')}</span>
+                <span>{t('studio.kling.mc.promptHint')}</span>
               </div>
             </div>
           </div>

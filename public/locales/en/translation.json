@@ -137,6 +137,34 @@
                 "desc": "from 30 tokens"
             }
         },
+        "kling": {
+            "duration": "Duration",
+            "sound": "Sound",
+            "mc": {
+                "uploadImage": "Upload Character Photo",
+                "imageHint": "Face must be visible (head + shoulders + torso)",
+                "orientation": "Character Orientation",
+                "orientationHint": "Choose where to take the gaze direction and body position from",
+                "asImage": "As in Photo",
+                "asImageDesc1": "Pose and direction from photo",
+                "max10s": "max 10s",
+                "asVideo": "As in Video",
+                "asVideoDesc1": "Pose and direction from video",
+                "max30s": "max 30s",
+                "uploadVideo": "Upload Motion Video",
+                "videoHint": "MP4/MOV, 3-30s, min 720p",
+                "changeVideo": "Change Video",
+                "selectVideo": "Select Video",
+                "validDuration": "✓ Valid",
+                "invalidDuration": "✕ Too long",
+                "quality": "Quality",
+                "optionalPrompt": "Prompt",
+                "optional": "Optional",
+                "promptPlaceholder": "Describe details: clothes, background, style...",
+                "promptHint": "Prompt is optional. Use to change details: clothes, background, style, etc.",
+                "perSec": "s"
+            }
+        },
         "tokens_1": "{{count}} token",
         "tokens_2": "{{count}} tokens",
         "tokens_5": "{{count}} tokens",
