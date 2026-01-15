@@ -657,3 +657,67 @@ export async function claimChannelReward(req: Request, res: Response) {
   }
 }
 
+
+// Search users by username, first_name, or last_name
+export async function searchUsers(req: Request, res: Response) {
+  try {
+    const query = String(req.query.q || '').trim()
+
+    // Validation: minimum length (защита от парсинга всей базы)
+    if (query.length < 2) {
+      return res.json({ items: [] })
+    }
+
+    // Validation: maximum length (защита от DoS)
+    if (query.length > 50) {
+      return res.status(400).json({ error: 'Search query too long' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Supabase not configured' })
+    }
+
+    // Escape SQL wildcards для безопасности
+    const escapedQuery = query.replace(/%/g, '\\%').replace(/_/g, '\\_')
+
+    // ЖЁСТКИЙ ЛИМИТ - нельзя изменить через параметры
+    // Нет пагинации - только первые 10 результатов
+    const HARD_LIMIT = 10
+
+    // Поиск по username, first_name, last_name
+    // КРИТИЧЕСКИ ВАЖНО: выбираем ТОЛЬКО публичные поля
+    // НЕ включаем: balance, email, password_hash, is_banned, partner_balance_*, spins, notification_settings
+    const select = 'select=user_id,username,first_name,last_name,avatar_url'
+
+    // Используем or для поиска по нескольким полям (case-insensitive)
+    const searchCondition = `or=(username.ilike.*${escapedQuery}*,first_name.ilike.*${escapedQuery}*,last_name.ilike.*${escapedQuery}*)`
+
+    const q = await supaSelect(
+      'users',
+      `?${searchCondition}&${select}&limit=${HARD_LIMIT}&order=username.asc`
+    )
+
+    if (!q.ok) {
+      return res.status(500).json({ error: 'search failed', detail: q.data })
+    }
+
+    const items = Array.isArray(q.data) ? q.data : []
+
+    // Форматируем результаты для фронтенда
+    const formattedItems = items.map((user: any) => ({
+      user_id: user.user_id,
+      username: user.username ? `@${user.username.replace(/^@+/, '')}` : null,
+      first_name: user.first_name || null,
+      last_name: user.last_name || null,
+      avatar_url: user.avatar_url || (user.username
+        ? `https://api.dicebear.com/9.x/avataaars/svg?seed=${user.username}`
+        : `https://api.dicebear.com/9.x/avataaars/svg?seed=${user.user_id}`)
+    }))
+
+    return res.json({ items: formattedItems })
+  } catch (e) {
+    console.error('searchUsers error:', e)
+    return res.status(500).json({ error: 'search failed' })
+  }
+}
+

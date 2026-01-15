@@ -93,6 +93,13 @@
             "following": "Following"
         },
         "searchPlaceholder": "Find prompt...",
+        "search": {
+            "posts": "Posts",
+            "users": "Users",
+            "usersPlaceholder": "Search users...",
+            "noUsersFound": "No users found",
+            "searching": "Searching..."
+        },
         "feedTitle": "Feed for {{date}}",
         "models": {
             "all": "All Models"
@@ -103,6 +110,72 @@
     "studio": {
         "title": "Studio",
         "tokens": "tokens",
+        "models": {
+            "nanobanana": {
+                "name": "NanoBanana",
+                "desc": "3 tokens"
+            },
+            "nanobanana-pro": {
+                "name": "NanoBanana Pro",
+                "desc": "15 tokens"
+            },
+            "seedream4": {
+                "name": "Seedream 4",
+                "desc": "4 tokens"
+            },
+            "seedream4-5": {
+                "name": "Seedream 4.5",
+                "desc": "7 tokens"
+            },
+            "gpt-image-1.5": {
+                "name": "GPT image 1.5",
+                "desc": "from 5 tokens"
+            },
+            "test-model": {
+                "name": "🧪 Test Model",
+                "desc": "0 tokens"
+            },
+            "seedance-1.5-pro": {
+                "name": "Seedance Pro",
+                "desc": "from 24 tokens"
+            },
+            "kling-t2v": {
+                "name": "Kling AI",
+                "desc": "from 30 tokens"
+            }
+        },
+        "kling": {
+            "motionControl": "Motion Control",
+            "duration": "Duration",
+            "sound": "Sound",
+            "referenceImage": "Reference Image",
+            "mc": {
+                "uploadImage": "Upload Character Photo",
+                "imageHint": "Face must be visible (head + shoulders + torso)",
+                "orientation": "Character Orientation",
+                "orientationHint": "Choose where to take the gaze direction and body position from",
+                "asImage": "As in Photo",
+                "asImageDesc1": "Pose and direction from photo",
+                "max10s": "max 10s",
+                "asVideo": "As in Video",
+                "asVideoDesc1": "Pose and direction from video",
+                "max30s": "max 30s",
+                "uploadVideo": "Upload Motion Video",
+                "videoHint": "MP4/MOV, 3-30s, min 720p",
+                "uploadVideoBtn": "Upload video",
+                "changeVideo": "Change Video",
+                "selectVideo": "Select Video",
+                "validDuration": "✓ Valid",
+                "invalidDuration": "✕ Too long",
+                "durationError": "Video too long. Max: {{max}}s",
+                "quality": "Quality",
+                "optionalPrompt": "Prompt",
+                "optional": "Optional",
+                "promptPlaceholder": "Describe details: clothes, background, style...",
+                "promptHint": "Prompt is optional. Use to change details: clothes, background, style, etc.",
+                "perSec": "s"
+            }
+        },
         "tokens_1": "{{count}} token",
         "tokens_2": "{{count}} tokens",
         "tokens_5": "{{count}} tokens",
@@ -135,33 +208,6 @@
             "addStartFrame": "Add",
             "addEndFrame": "Optional",
             "framesHint": "Start frame is required. End frame is optional to control the final look of the video."
-        },
-        "kling": {
-            "motionControl": "Motion Control",
-            "duration": "Duration",
-            "sound": "Sound",
-            "referenceImage": "Reference Image",
-            "mc": {
-                "uploadImage": "Upload character photo",
-                "imageHint": "Face must be visible (head + shoulders + torso)",
-                "orientation": "Character orientation",
-                "orientationHint": "Choose where to take gaze direction and body position from",
-                "asImage": "As in photo",
-                "asImageDesc1": "Pose & gaze from photo",
-                "max10s": "max 10s",
-                "asVideo": "As in video",
-                "asVideoDesc1": "Pose & gaze from video",
-                "max30s": "max 30s",
-                "uploadVideo": "Upload motion video",
-                "videoHint": "MP4/MOV, 3-30s, min 720p",
-                "uploadVideoBtn": "Upload video",
-                "changeVideo": "Change video",
-                "selectVideo": "Select video",
-                "validDuration": "✓ Valid",
-                "invalidDuration": "✕ Too long",
-                "durationError": "Video too long. Max: {{max}}s",
-                "quality": "Quality"
-            }
         },
         "prompt": {
             "from": "Prompt from {{username}}",

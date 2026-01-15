@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward } from '../controllers/userController.js'
+import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward, searchUsers } from '../controllers/userController.js'
 import { updateNotificationSettings } from '../controllers/notificationController.js'
 
 const router = Router()
@@ -21,7 +21,10 @@ router.get('/followers/:userId', getFollowers)
 // Channel subscription reward
 router.get('/channel-subscription/:userId', checkChannelSubscription)
 router.post('/claim-channel-reward', claimChannelReward)
+// User search
+router.get('/search', searchUsers)
 export default router
+
 
 
 

@@ -19,6 +19,7 @@ import WatermarkEditor from "@/pages/WatermarkEditor";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { PendingIndicator } from "@/components/PendingIndicator";
+import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { useEffect, useRef } from "react";
 import WebApp from "@twa-dev/sdk";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
@@ -164,22 +165,22 @@ export default function App() {
           <StartParamRouter />
           <div className="flex-1">
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/studio" element={<Studio />} />
-              <Route path="/top" element={<Leaderboard />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/:userId" element={<PublicProfile />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
+              <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
+              <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
+              <Route path="/profile" element={<PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary>} />
+              <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
+              <Route path="/settings" element={<PageErrorBoundary pageName="Настройки"><Settings /></PageErrorBoundary>} />
               {/* Contests are now part of EventsPage */}
-              <Route path="/contests/propose" element={<ProposeContest />} />
-              <Route path="/contests/:id" element={<ContestDetail />} />
-              <Route path="/accumulations" element={<Accumulations />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/spin" element={<SpinPage />} />
-              <Route path="/editor" element={<ImageEditorPage />} />
-              <Route path="/multi-generation" element={<MultiGeneration />} />
-              <Route path="/subscriptions" element={<SubscriptionsPage />} />
-              <Route path="/watermark" element={<WatermarkEditor />} />
+              <Route path="/contests/propose" element={<PageErrorBoundary pageName="Создание конкурса"><ProposeContest /></PageErrorBoundary>} />
+              <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
+              <Route path="/accumulations" element={<PageErrorBoundary pageName="Накопления"><Accumulations /></PageErrorBoundary>} />
+              <Route path="/events" element={<PageErrorBoundary pageName="События"><EventsPage /></PageErrorBoundary>} />
+              <Route path="/spin" element={<PageErrorBoundary pageName="Рулетка"><SpinPage /></PageErrorBoundary>} />
+              <Route path="/editor" element={<PageErrorBoundary pageName="Редактор"><ImageEditorPage /></PageErrorBoundary>} />
+              <Route path="/multi-generation" element={<PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary>} />
+              <Route path="/subscriptions" element={<PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary>} />
+              <Route path="/watermark" element={<PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
