@@ -250,6 +250,26 @@
             "save": "Save",
             "sendToChat": "Send to Chat",
             "close": "Close Window"
+        },
+        "promptHelper": {
+            "optimize": "✨ Enhance Prompt",
+            "optimizing": "Enhancing...",
+            "describe": "📝 Prompt from Photo",
+            "describing": "Describing...",
+            "describeTitle": "Describe Image",
+            "describeSubtitle": "AI will create a prompt from your photo",
+            "uploadImage": "Upload an image",
+            "uploadHint": "Click or drag to upload",
+            "pasteImage": "Paste from clipboard",
+            "generatePrompt": "Generate Prompt",
+            "noPrompt": "Enter a prompt to enhance",
+            "noImageInClipboard": "No image in clipboard",
+            "pasteError": "Failed to paste image",
+            "optimizeSuccess": "Prompt enhanced!",
+            "describeSuccess": "Prompt generated!",
+            "error": "Processing failed",
+            "v1Description": "Detailed description using AI model for prompt generation.",
+            "v2Description": "Advanced mode with instructions for AI on how to describe the prompt using details from the reference photo."
         }
     },
     "profile": {

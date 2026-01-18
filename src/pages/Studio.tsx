@@ -4,7 +4,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
+import { Sparkles, Loader2, CloudRain, Code2, Zap, Image as ImageIcon, Type, X, Send, Maximize2, Download as DownloadIcon, Info, Camera, Clipboard, FolderOpen, Pencil, Video, Volume2, VolumeX, Lock, Unlock, ChevronLeft, ChevronRight, Layers, Wand2 } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { useGenerationStore, type ModelType, type AspectRatio, type VideoDuration, type VideoResolution, type GptImageQuality, type ImageCount, type KlingVideoMode, type KlingDuration, type KlingMCQuality, type CharacterOrientation } from '@/store/generationStore'
 import { useActiveGenerationsStore, MAX_ACTIVE_IMAGES } from '@/store/activeGenerationsStore'
@@ -13,6 +13,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { PaymentModal } from '@/components/PaymentModal'
 import { DevModeBanner } from '@/components/DevModeBanner'
 import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
+import { DescribeImageModal } from '@/components/DescribeImageModal'
 import { compressImage } from '@/utils/imageCompression'
 
 
@@ -238,6 +239,8 @@ export default function Studio() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const [isOptimizing, setIsOptimizing] = useState(false)
+  const [isDescribeModalOpen, setIsDescribeModalOpen] = useState(false)
 
   // Реактивно отслеживаем доступные слоты для генерации
   const availableSlots = useActiveGenerationsStore(
@@ -477,6 +480,45 @@ export default function Studio() {
     // Show instruction for manual paste
     setError(t('studio.errors.pasteInstruction'))
     notify('warning')
+  }
+
+  // Улучшить промпт с помощью AI
+  const handleOptimizePrompt = async () => {
+    if (!prompt.trim()) {
+      toast.error(t('studio.promptHelper.noPrompt'))
+      return
+    }
+
+    setIsOptimizing(true)
+    impact('medium')
+
+    try {
+      const response = await fetch('/api/prompt/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: prompt })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to optimize prompt')
+      }
+
+      if (data.prompt) {
+        setPrompt(data.prompt)
+        toast.success(t('studio.promptHelper.optimizeSuccess'))
+        notify('success')
+      } else {
+        throw new Error('No prompt returned')
+      }
+    } catch (error) {
+      console.error('Optimize error:', error)
+      notify('error')
+      toast.error(error instanceof Error ? error.message : t('studio.promptHelper.error'))
+    } finally {
+      setIsOptimizing(false)
+    }
   }
 
   const handleGenerate = async () => {
@@ -1230,6 +1272,39 @@ export default function Studio() {
               </>
             )}
           </div>
+
+          {/* Prompt Helper Buttons */}
+          {!isPromptPrivate && (
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={handleOptimizePrompt}
+                disabled={isOptimizing || !prompt.trim()}
+                className={`flex-1 h-9 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${prompt.trim() && !isOptimizing
+                  ? 'bg-gradient-to-r from-violet-600/80 to-purple-600/80 hover:from-violet-600 hover:to-purple-600 text-white'
+                  : 'bg-zinc-800/50 text-zinc-500 cursor-not-allowed'
+                  }`}
+              >
+                {isOptimizing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    {t('studio.promptHelper.optimizing')}
+                  </>
+                ) : (
+                  <>
+                    <Wand2 size={14} />
+                    {t('studio.promptHelper.optimize')}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => { impact('light'); setIsDescribeModalOpen(true) }}
+                className="flex-1 h-9 rounded-xl bg-zinc-800/50 hover:bg-zinc-700/50 text-zinc-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ImageIcon size={14} />
+                {t('studio.promptHelper.describe')}
+              </button>
+            </div>
+          )}
         </div>}
 
 
@@ -2154,6 +2229,13 @@ export default function Studio() {
         )}
 
       <PaymentModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} />
+      <DescribeImageModal
+        isOpen={isDescribeModalOpen}
+        onClose={() => setIsDescribeModalOpen(false)}
+        onPromptGenerated={(generatedPrompt) => {
+          setPrompt(generatedPrompt)
+        }}
+      />
 
       {/* Timeout Modal */}
       {showTimeoutModal && (

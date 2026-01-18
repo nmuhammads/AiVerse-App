@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
+import crypto from 'crypto'
 import { Request, Response } from 'express'
 
 // Типы для запросов к Kie.ai
@@ -81,6 +82,58 @@ const VIDEO_MODELS = [
 // Определить media type по имени модели (поддерживает оба формата имён)
 function getMediaType(model: string): 'video' | 'image' {
   return VIDEO_MODELS.includes(model) ? 'video' : 'image'
+}
+
+/**
+ * Register prompt in registered_prompts table for authorship tracking.
+ * Computes SHA-256 hash of cleaned prompt text.
+ */
+async function registerPromptInDb(
+  authorUserId: number,
+  promptText: string,
+  generationId: number
+): Promise<void> {
+  try {
+    // Remove fingerprint markers if present
+    const MARKER_START = '\u200D'
+    const MARKER_END = '\u2060'
+    let cleanText = promptText
+    const startIdx = promptText.indexOf(MARKER_START)
+    const endIdx = promptText.indexOf(MARKER_END)
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleanText = promptText.slice(0, startIdx) + promptText.slice(endIdx + 1)
+    }
+    // Remove metadata suffix [type=...; ratio=...; photos=...; avatars=...]
+    cleanText = cleanText.replace(/\s*\[type=[^\]]+\]\s*$/i, '').trim()
+
+    // Compute hash
+    const normalized = cleanText.toLowerCase()
+    const promptHash = crypto.createHash('sha256').update(normalized).digest('hex')
+
+    // Check if already registered
+    const existing = await supaSelect('registered_prompts', `?prompt_hash=eq.${promptHash}&select=id`)
+    if (existing.ok && Array.isArray(existing.data) && existing.data.length > 0) {
+      console.log(`[RegisterPrompt] Prompt hash already exists, skipping`)
+      return
+    }
+
+    // Insert new record
+    const result = await supaPost('registered_prompts', {
+      author_user_id: authorUserId,
+      generation_id: generationId,
+      prompt_hash: promptHash,
+      prompt_text: cleanText.slice(0, 1000), // Limit to 1000 chars
+      source: 'generation'
+    })
+
+    if (result.ok) {
+      console.log(`[RegisterPrompt] Registered prompt for gen ${generationId}, hash: ${promptHash.slice(0, 16)}...`)
+    } else {
+      console.error(`[RegisterPrompt] Failed to register prompt:`, result)
+    }
+  } catch (e) {
+    console.error(`[RegisterPrompt] Error:`, e)
+  }
 }
 
 function mapSeedreamImageSize(ratio?: string): string | undefined {
@@ -1201,6 +1254,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
       if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
         generationId = genRes.data[0].id
         console.log('[DB] Pending generation created, ID:', generationId)
+
+        // Register prompt for authorship tracking (async, don't wait)
+        if (!isBlindRemix) {
+          registerPromptInDb(Number(user_id), prompt, generationId).catch(e => {
+            console.error('[RegisterPrompt] Background registration failed:', e)
+          })
+        }
 
         // Списать токены СРАЗУ при создании генерации
         if (cost > 0) {

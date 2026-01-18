@@ -25,6 +25,7 @@ import appNewsRoutes from './routes/app-news.js'
 import proxyRoutes from './routes/proxy.js'
 import editorRoutes from './routes/editor.js'
 import watermarkRoutes from './routes/watermark.js'
+import promptRoutes from './routes/prompt.js'
 
 
 // load env
@@ -56,6 +57,7 @@ app.use('/api/app-news', appNewsRoutes)
 app.use('/api/proxy', proxyRoutes)
 app.use('/api/editor', editorRoutes)
 app.use('/api/watermarks', watermarkRoutes)
+app.use('/api/prompt', promptRoutes)
 
 /**
  * Serve frontend build
