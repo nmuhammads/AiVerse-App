@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Upload, Loader2, ImageIcon, Sparkles, Clipboard } from 'lucide-react'
+import { X, Upload, Loader2, ImageIcon, Sparkles, Clipboard, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { toast } from 'sonner'
@@ -11,11 +11,14 @@ interface DescribeImageModalProps {
     onPromptGenerated: (prompt: string) => void
 }
 
+type ModelVersion = 'v1' | 'v2'
+
 export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: DescribeImageModalProps) {
     const { t } = useTranslation()
     const { impact, notify } = useHaptics()
     const [image, setImage] = useState<string | null>(null)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [modelVersion, setModelVersion] = useState<ModelVersion>('v1')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     if (!isOpen) return null
@@ -75,7 +78,7 @@ export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: Descr
             const response = await fetch('/api/prompt/describe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image })
+                body: JSON.stringify({ image, version: modelVersion })
             })
 
             const data = await response.json()
@@ -116,7 +119,7 @@ export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: Descr
             />
 
             {/* Modal */}
-            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="p-5 pb-3 flex justify-between items-start">
                     <div>
@@ -136,13 +139,50 @@ export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: Descr
 
                 {/* Content */}
                 <div className="px-5 pb-5">
+                    {/* Model Version Selector */}
+                    <div className="mb-4">
+                        <div className="flex p-1 bg-zinc-800/50 rounded-xl border border-white/5">
+                            <button
+                                onClick={() => { impact('light'); setModelVersion('v1') }}
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${modelVersion === 'v1'
+                                    ? 'bg-violet-600 text-white shadow-sm'
+                                    : 'text-zinc-400 hover:text-zinc-300'
+                                    }`}
+                            >
+                                V1
+                            </button>
+                            <button
+                                onClick={() => { impact('light'); setModelVersion('v2') }}
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${modelVersion === 'v2'
+                                    ? 'bg-violet-600 text-white shadow-sm'
+                                    : 'text-zinc-400 hover:text-zinc-300'
+                                    }`}
+                            >
+                                V2
+                            </button>
+                        </div>
+
+                        {/* Model Description */}
+                        <div className="mt-2 p-2.5 bg-zinc-800/30 rounded-lg border border-white/5">
+                            <div className="flex items-start gap-2">
+                                <Info size={14} className="text-zinc-500 mt-0.5 shrink-0" />
+                                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                                    {modelVersion === 'v1'
+                                        ? t('studio.promptHelper.v1Description')
+                                        : t('studio.promptHelper.v2Description')
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Image Preview or Upload Zone */}
                     {image ? (
                         <div className="relative rounded-xl overflow-hidden mb-4">
                             <img
                                 src={image}
                                 alt="Preview"
-                                className="w-full max-h-64 object-contain bg-zinc-800"
+                                className="w-full max-h-48 object-contain bg-zinc-800"
                             />
                             <button
                                 onClick={() => setImage(null)}
@@ -154,10 +194,10 @@ export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: Descr
                     ) : (
                         <div
                             onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-zinc-700 hover:border-violet-500/50 rounded-xl p-8 mb-4 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors"
+                            className="border-2 border-dashed border-zinc-700 hover:border-violet-500/50 rounded-xl p-6 mb-4 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors"
                         >
-                            <div className="w-14 h-14 rounded-full bg-violet-500/20 flex items-center justify-center">
-                                <Upload size={24} className="text-violet-400" />
+                            <div className="w-12 h-12 rounded-full bg-violet-500/20 flex items-center justify-center">
+                                <Upload size={20} className="text-violet-400" />
                             </div>
                             <div className="text-center">
                                 <p className="text-sm text-zinc-300 font-medium">{t('studio.promptHelper.uploadImage')}</p>
@@ -178,21 +218,56 @@ export function DescribeImageModal({ isOpen, onClose, onPromptGenerated }: Descr
                     {/* Actions */}
                     <div className="space-y-2">
                         {!image && (
-                            <button
-                                onClick={handlePaste}
-                                className="w-full h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium flex items-center justify-center gap-2 transition-colors text-sm"
+                            <div
+                                contentEditable
+                                suppressContentEditableWarning
+                                onPaste={async (e) => {
+                                    e.preventDefault()
+                                    const items = e.clipboardData?.items
+                                    if (!items) return
+
+                                    for (const item of Array.from(items)) {
+                                        if (item.type.startsWith('image/')) {
+                                            const file = item.getAsFile()
+                                            if (file) {
+                                                try {
+                                                    impact('light')
+                                                    const compressed = await compressImage(file)
+                                                    setImage(compressed)
+                                                } catch (error) {
+                                                    console.error('Compression failed:', error)
+                                                    const reader = new FileReader()
+                                                    reader.onload = (ev) => {
+                                                        if (ev.target?.result) {
+                                                            setImage(ev.target.result as string)
+                                                        }
+                                                    }
+                                                    reader.readAsDataURL(file)
+                                                }
+                                                break
+                                            }
+                                        }
+                                    }
+
+                                    e.currentTarget.innerHTML = ''
+                                }}
+                                onInput={(e) => {
+                                    e.currentTarget.innerHTML = ''
+                                }}
+                                className="w-full py-3 px-3 rounded-xl border-2 border-dashed border-violet-500/30 bg-violet-500/5 flex items-center justify-center gap-2 text-violet-300 text-xs font-medium cursor-text select-none focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/10"
+                                style={{ minHeight: '44px', WebkitUserSelect: 'none' }}
                             >
                                 <Clipboard size={16} />
-                                {t('studio.promptHelper.pasteImage')}
-                            </button>
+                                <span>{t('studio.upload.pasteHint')}</span>
+                            </div>
                         )}
 
                         <button
                             onClick={handleGeneratePrompt}
                             disabled={!image || isGenerating}
                             className={`w-full h-11 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm ${image && !isGenerating
-                                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-900/30'
-                                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                                ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-900/30'
+                                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                                 }`}
                         >
                             {isGenerating ? (
