@@ -486,13 +486,18 @@ function isServiceUnavailableError(error: any): boolean {
   const msg = String(error?.message || error || '').toLowerCase()
   return (
     msg.includes('503') ||
+    msg.includes('502') ||
+    msg.includes('524') ||
     msg.includes('service unavailable') ||
     msg.includes('429') ||
     msg.includes('too many requests') ||
     msg.includes('timeout') ||
     msg.includes('econnrefused') ||
     msg.includes('rate limit') ||
-    msg.includes('temporarily unavailable')
+    msg.includes('temporarily unavailable') ||
+    msg.includes('internal error') ||
+    msg.includes('please try again later') ||
+    msg.includes('ai studio api http error')
   )
 }
 
