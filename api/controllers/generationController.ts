@@ -382,8 +382,16 @@ async function pollJobsTask(apiKey: string, taskId: string, timeoutMs = DEFAULT_
         } catch { /* ignore */ }
       }
       if (state === 'fail') {
-        console.error(`[Jobs] Task ${taskId} failed:`, json.data.failMsg)
-        throw new Error(json.data.failMsg || 'Jobs task failed')
+        const errorMsg = json.data.failMsg || 'Jobs task failed'
+        console.error(`[Jobs] Task ${taskId} failed:`, errorMsg)
+
+        // Special handling for Gemini content policy error
+        if (errorMsg.toLowerCase().includes('gemini could not generate') ||
+          errorMsg.toLowerCase().includes('could not generate an image')) {
+          throw new Error('Gemini не смог сгенерировать изображение с этим промптом. Попробуйте другой промпт или используйте Seedream.')
+        }
+
+        throw new Error(errorMsg)
       }
     }
     await new Promise(r => setTimeout(r, 30000))

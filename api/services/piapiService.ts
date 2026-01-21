@@ -142,8 +142,16 @@ export async function pollPiapiTask(taskId: string, timeoutMs = 600000): Promise
             }
 
             if (status === 'failed') {
+                const errorMessage = result.data.error?.message || 'PiAPI task failed';
                 console.error(`[PiAPI] Task ${taskId} failed:`, result.data.error);
-                throw new Error(result.data.error?.message || 'PiAPI task failed');
+
+                // Special handling for Gemini content policy error
+                if (errorMessage.toLowerCase().includes('gemini could not generate') ||
+                    errorMessage.toLowerCase().includes('could not generate an image')) {
+                    throw new Error('Gemini не смог сгенерировать изображение с этим промптом. Попробуйте другой промпт или используйте Seedream.');
+                }
+
+                throw new Error(errorMessage);
             }
         }
 
