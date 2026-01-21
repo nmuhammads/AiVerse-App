@@ -456,7 +456,7 @@ type ApiProvider = 'kie' | 'piapi'
  * Get current primary API provider for NanoBanana Pro from database
  */
 async function getNanobananaApiProvider(): Promise<ApiProvider> {
-  const value = await getAppConfig('nanobanana_primary_api')
+  const value = await getAppConfig('image_generation_primary_api')
   return (value === 'piapi' ? 'piapi' : 'kie') as ApiProvider
 }
 
@@ -466,7 +466,7 @@ async function getNanobananaApiProvider(): Promise<ApiProvider> {
 export async function switchNanobananaApiProvider(): Promise<ApiProvider> {
   const current = await getNanobananaApiProvider()
   const next: ApiProvider = current === 'kie' ? 'piapi' : 'kie'
-  await setAppConfig('nanobanana_primary_api', next)
+  await setAppConfig('image_generation_primary_api', next)
   console.log(`[API Switch] NanoBanana Pro API switched: ${current} -> ${next}`)
   return next
 }
@@ -859,7 +859,7 @@ async function generateImageWithKieAI(
       console.log(`[NanoBanana Pro] Using primary provider: ${primaryProvider}`)
 
       // Helper to generate via specific provider
-      const generateWithProvider = async (provider: ApiProvider): Promise<{ url: string; taskId: string }> => {
+      const generateWithProvider = async (provider: ApiProvider): Promise<{ url: string; taskId: string; provider: ApiProvider }> => {
         if (provider === 'piapi') {
           // PiAPI uses image_urls (not image_input)
           const piapiInput = {
@@ -877,7 +877,7 @@ async function generateImageWithKieAI(
           })
           if (onTaskCreated) onTaskCreated(result.taskId)
           const url = await pollPiapiTask(result.taskId)
-          return { url, taskId: result.taskId }
+          return { url, taskId: result.taskId, provider: 'piapi' }
         } else {
           // Kie.ai uses image_input for Pro
           const input: Record<string, unknown> = {
@@ -890,7 +890,16 @@ async function generateImageWithKieAI(
 
           const taskId = await createJobsTask(apiKey, 'nano-banana-pro', input, onTaskCreated, metaPayload)
           const url = await pollJobsTask(apiKey, taskId)
-          return { url, taskId }
+          return { url, taskId, provider: 'kie' }
+        }
+      }
+
+      // Helper to update api_provider in DB
+      const updateApiProvider = async (provider: ApiProvider) => {
+        const genId = metaPayload?.meta?.generationId
+        if (genId) {
+          await supaPatch('generations', `?id=eq.${genId}`, { api_provider: provider })
+          console.log(`[NanoBanana Pro] Updated api_provider to ${provider} for gen ${genId}`)
         }
       }
 
@@ -898,6 +907,7 @@ async function generateImageWithKieAI(
       try {
         const result = await generateWithProvider(primaryProvider)
         if (result.url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
+        await updateApiProvider(result.provider)
         return { images: [result.url], inputImages: imageUrls }
       } catch (error) {
         if (isServiceUnavailableError(error)) {
@@ -907,6 +917,7 @@ async function generateImageWithKieAI(
           try {
             const result = await generateWithProvider(backupProvider)
             if (result.url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
+            await updateApiProvider(result.provider)
             return { images: [result.url], inputImages: imageUrls }
           } catch (backupError) {
             console.error(`[NanoBanana Pro Fallback] Both providers failed:`, backupError)
