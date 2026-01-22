@@ -281,13 +281,21 @@ export function AIChatOverlay() {
         try {
             // Используем выбранную пользователем модель вместо предложенной AI
             const modelToUse = selectedImageModel
+            // В dev режиме WebApp.initDataUnsafe.user может быть undefined
+            const userId = WebApp.initDataUnsafe?.user?.id || (import.meta.env.DEV ? 817308975 : null)
+
+            if (!userId) {
+                throw new Error('User not authenticated')
+            }
+
             const response = await fetch('/api/chat/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: pendingGeneration.prompt,
                     model: modelToUse,
-                    size: pendingGeneration.size
+                    size: pendingGeneration.size,
+                    user_id: userId
                 })
             })
 
@@ -303,8 +311,9 @@ export function AIChatOverlay() {
             }
 
         } catch (error) {
-            console.error('[AIChatOverlay] Generation error:', error)
-            addMessage('assistant', t('aiChat.generationError', '❌ Ошибка генерации. Попробуйте ещё раз.'))
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error('[AIChatOverlay] Generation error:', errorMessage, error)
+            addMessage('assistant', `❌ ${errorMessage || t('aiChat.generationError', 'Ошибка генерации. Попробуйте ещё раз.')}`)
         } finally {
             setGeneratingImage(false)
             setPendingGeneration(null)

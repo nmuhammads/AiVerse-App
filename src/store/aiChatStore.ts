@@ -67,7 +67,7 @@ export const useAIChatStore = create<AIChatState>()(
             isOpen: false,
             isMinimized: false,
             messages: [],
-            selectedModel: 'openai/gpt-oss-120b',
+            selectedModel: 'deepseek/deepseek-v3.2',
             selectedImageModel: 'z-image-turbo' as ImageModel,
             isLoading: false,
             pendingGeneration: null,
