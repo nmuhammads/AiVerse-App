@@ -286,9 +286,12 @@ export function AIChatOverlay() {
                 </div>
             )}
 
+            {/* Full-screen black backdrop to hide content behind chat (below Header z-50) */}
+            <div className="fixed inset-0 z-[45] bg-black" />
+
             {/* Chat Overlay - positioned below Header */}
             <div
-                className="fixed left-0 right-0 bottom-0 z-[60] bg-black/95 backdrop-blur-xl flex flex-col border-t border-white/10 rounded-t-2xl"
+                className="fixed left-0 right-0 bottom-0 z-[60] bg-black flex flex-col border-t border-white/10 rounded-t-2xl"
                 style={{ top: headerOffset }}
             >
                 {/* Chat Header */}

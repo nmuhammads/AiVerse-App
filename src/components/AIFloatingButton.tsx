@@ -15,8 +15,8 @@ export function AIFloatingButton() {
     if (!isMinimized) return null
 
     const platform = WebApp.platform
-    // Позиционирование над TabBar
-    const bottomOffset = platform === 'android' ? 'bottom-24' : 'bottom-28'
+    // Позиционирование над TabBar (Android TabBar выше)
+    const bottomOffset = platform === 'android' ? 'bottom-32' : 'bottom-28'
 
     return (
         <button
