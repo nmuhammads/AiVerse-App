@@ -14,11 +14,24 @@ export type ChatModel =
     | 'openai/gpt-oss-20b'
     | 'openai/gpt-oss-120b'
 
+export type ImageModel = 'z-image-turbo' | 'qwen-image'
+
+export interface PendingImageGeneration {
+    prompt: string
+    model: ImageModel
+    size: string
+    cost: number
+}
+
 export interface ChatMessage {
     id: string
     role: 'user' | 'assistant'
     content: string
     timestamp: number
+    // Для изображений
+    imageUrl?: string
+    imagePrompt?: string
+    isGenerating?: boolean
 }
 
 interface AIChatState {
@@ -27,16 +40,23 @@ interface AIChatState {
     messages: ChatMessage[]
     selectedModel: ChatModel
     isLoading: boolean
+    // Для генерации изображений
+    pendingGeneration: PendingImageGeneration | null
+    isGeneratingImage: boolean
 
     openChat: () => void
     closeChat: () => void
     minimizeChat: () => void
     restoreChat: () => void
     addMessage: (role: 'user' | 'assistant', content: string) => string
+    addImageMessage: (imageUrl: string, prompt: string) => string
     updateMessage: (id: string, content: string) => void
     clearMessages: () => void
     setModel: (model: ChatModel) => void
     setLoading: (loading: boolean) => void
+    // Для генерации изображений
+    setPendingGeneration: (pending: PendingImageGeneration | null) => void
+    setGeneratingImage: (generating: boolean) => void
 }
 
 export const useAIChatStore = create<AIChatState>()(
@@ -47,6 +67,8 @@ export const useAIChatStore = create<AIChatState>()(
             messages: [],
             selectedModel: 'openai/gpt-oss-120b',
             isLoading: false,
+            pendingGeneration: null,
+            isGeneratingImage: false,
 
             openChat: () => set({ isOpen: true, isMinimized: false }),
 
@@ -69,6 +91,21 @@ export const useAIChatStore = create<AIChatState>()(
                 return id
             },
 
+            addImageMessage: (imageUrl, prompt) => {
+                const id = `img_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+                set(state => ({
+                    messages: [...state.messages, {
+                        id,
+                        role: 'assistant',
+                        content: '',
+                        timestamp: Date.now(),
+                        imageUrl,
+                        imagePrompt: prompt
+                    }]
+                }))
+                return id
+            },
+
             updateMessage: (id, content) => {
                 set(state => ({
                     messages: state.messages.map(msg =>
@@ -77,11 +114,15 @@ export const useAIChatStore = create<AIChatState>()(
                 }))
             },
 
-            clearMessages: () => set({ messages: [] }),
+            clearMessages: () => set({ messages: [], pendingGeneration: null }),
 
             setModel: (model) => set({ selectedModel: model }),
 
-            setLoading: (loading) => set({ isLoading: loading })
+            setLoading: (loading) => set({ isLoading: loading }),
+
+            setPendingGeneration: (pending) => set({ pendingGeneration: pending }),
+
+            setGeneratingImage: (generating) => set({ isGeneratingImage: generating })
         }),
         {
             name: 'aiverse-chat',

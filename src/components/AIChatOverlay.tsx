@@ -5,8 +5,8 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2 } from 'lucide-react'
-import { useAIChatStore, type ChatModel } from '@/store/aiChatStore'
+import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2, ImageIcon, Check, XCircle } from 'lucide-react'
+import { useAIChatStore, type ChatModel, type ImageModel, type PendingImageGeneration } from '@/store/aiChatStore'
 import WebApp from '@twa-dev/sdk'
 
 const MODELS: { id: ChatModel; name: string }[] = [
@@ -17,6 +17,49 @@ const MODELS: { id: ChatModel; name: string }[] = [
     { id: 'openai/gpt-oss-20b', name: 'GPT 4 mini' },
     { id: 'openai/gpt-oss-120b', name: 'GPT 4' }
 ]
+
+// Модели для генерации изображений
+const IMAGE_MODELS: { id: ImageModel; name: string; price: number }[] = [
+    { id: 'z-image-turbo', name: 'Z-Image Turbo', price: 1 },
+    { id: 'qwen-image', name: 'Qwen Image', price: 1 }
+]
+
+/**
+ * Парсинг JSON команды генерации из текста ответа AI
+ * Ищет блок ```json:generate_image {...} ```
+ */
+function parseImageCommand(text: string): PendingImageGeneration | null {
+    // Ищем блок json:generate_image
+    const regex = /```json:generate_image\s*\n?([\s\S]*?)```/i
+    const match = text.match(regex)
+
+    if (!match) return null
+
+    try {
+        const json = JSON.parse(match[1].trim())
+        if (!json.prompt || !json.model) return null
+
+        // Валидация модели
+        const validModel = IMAGE_MODELS.find(m => m.id === json.model)
+        if (!validModel) return null
+
+        return {
+            prompt: json.prompt,
+            model: json.model as ImageModel,
+            size: json.size || '1024x1024',
+            cost: validModel.price
+        }
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Удаляет JSON команду из текста для отображения
+ */
+function removeImageCommand(text: string): string {
+    return text.replace(/```json:generate_image\s*\n?[\s\S]*?```/gi, '').trim()
+}
 
 /**
  * Простой парсер Markdown для чата
@@ -109,13 +152,18 @@ export function AIChatOverlay() {
         messages,
         selectedModel,
         isLoading,
+        pendingGeneration,
+        isGeneratingImage,
         closeChat,
         minimizeChat,
         addMessage,
+        addImageMessage,
         updateMessage,
         clearMessages,
         setModel,
-        setLoading
+        setLoading,
+        setPendingGeneration,
+        setGeneratingImage
     } = useAIChatStore()
 
     const [input, setInput] = useState('')
@@ -203,12 +251,65 @@ export function AIChatOverlay() {
                 }
             }
 
+            // Проверяем есть ли команда генерации в ответе
+            const imageCommand = parseImageCommand(fullContent)
+            if (imageCommand) {
+                // Убираем JSON блок из отображаемого текста
+                const cleanContent = removeImageCommand(fullContent)
+                updateMessage(assistantMsgId, cleanContent)
+                // Сохраняем pending generation
+                setPendingGeneration(imageCommand)
+            }
+
         } catch (error) {
             console.error('[AIChatOverlay] Error:', error)
             updateMessage(assistantMsgId, t('aiChat.error', 'Произошла ошибка. Попробуйте ещё раз.'))
         } finally {
             setLoading(false)
         }
+    }
+
+    // Подтверждение генерации изображения
+    const handleConfirmGeneration = async () => {
+        if (!pendingGeneration) return
+
+        setGeneratingImage(true)
+
+        try {
+            const response = await fetch('/api/chat/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: pendingGeneration.prompt,
+                    model: pendingGeneration.model,
+                    size: pendingGeneration.size
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Generation failed')
+            }
+
+            // Добавляем изображение в чат
+            if (data.imageUrl) {
+                addImageMessage(data.imageUrl, pendingGeneration.prompt)
+            }
+
+        } catch (error) {
+            console.error('[AIChatOverlay] Generation error:', error)
+            addMessage('assistant', t('aiChat.generationError', '❌ Ошибка генерации. Попробуйте ещё раз.'))
+        } finally {
+            setGeneratingImage(false)
+            setPendingGeneration(null)
+        }
+    }
+
+    // Отмена генерации
+    const handleCancelGeneration = () => {
+        setPendingGeneration(null)
+        addMessage('assistant', t('aiChat.generationCancelled', 'Генерация отменена.'))
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -396,6 +497,22 @@ export function AIChatOverlay() {
                                         : 'bg-white/10 text-white'
                                         }`}
                                 >
+                                    {/* Изображение если есть */}
+                                    {msg.imageUrl && (
+                                        <div className="mb-2">
+                                            <img
+                                                src={msg.imageUrl}
+                                                alt={msg.imagePrompt || 'Generated image'}
+                                                className="rounded-xl max-w-full"
+                                            />
+                                            {msg.imagePrompt && (
+                                                <p className="text-xs text-white/50 mt-2 italic">
+                                                    {msg.imagePrompt}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {msg.content ? (
                                         msg.role === 'assistant' ? (
                                             <div className="text-sm leading-relaxed">
@@ -406,7 +523,7 @@ export function AIChatOverlay() {
                                                 {msg.content}
                                             </p>
                                         )
-                                    ) : (isLoading && msg.role === 'assistant' ? (
+                                    ) : (isLoading && msg.role === 'assistant' && !msg.imageUrl ? (
                                         <span className="flex items-center gap-2 text-sm">
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                             {t('aiChat.thinking', 'Думаю...')}
@@ -424,6 +541,57 @@ export function AIChatOverlay() {
                     )}
                     <div ref={messagesEndRef} />
                 </div>
+
+                {/* Pending Generation Confirmation */}
+                {pendingGeneration && (
+                    <div className="mx-4 mb-2 p-4 rounded-xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/30">
+                        <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center">
+                                <ImageIcon size={20} className="text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white mb-1">
+                                    {t('aiChat.confirmGeneration', 'Сгенерировать изображение?')}
+                                </p>
+                                <p className="text-xs text-white/60 truncate mb-2">
+                                    {pendingGeneration.prompt.slice(0, 100)}...
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-white/50">
+                                    <span className="px-2 py-0.5 rounded bg-white/10">{IMAGE_MODELS.find(m => m.id === pendingGeneration.model)?.name}</span>
+                                    <span>•</span>
+                                    <span>{pendingGeneration.cost} {t('aiChat.tokens', 'токен(ов)')}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                            <button
+                                onClick={handleConfirmGeneration}
+                                disabled={isGeneratingImage}
+                                className="flex-1 py-2.5 px-4 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                                {isGeneratingImage ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('aiChat.generating', 'Генерация...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={16} />
+                                        {t('aiChat.generate', 'Сгенерировать')}
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={handleCancelGeneration}
+                                disabled={isGeneratingImage}
+                                className="py-2.5 px-4 rounded-xl bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 disabled:opacity-50 transition-colors flex items-center gap-2"
+                            >
+                                <XCircle size={16} />
+                                {t('aiChat.cancelGeneration', 'Отмена')}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Input */}
                 <div className={`px-4 py-3 border-t border-white/10 bg-black/80 backdrop-blur-xl ${bottomPadding}`}>

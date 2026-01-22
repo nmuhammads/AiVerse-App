@@ -785,6 +785,13 @@
         "modelChangeMessage": "Вы переключаетесь на модель {{model}}. Что сделать с текущей историей чата?",
         "keepHistory": "Сохранить историю",
         "clearHistory": "Очистить историю",
-        "cancel": "Отмена"
+        "cancel": "Отмена",
+        "confirmGeneration": "Сгенерировать изображение?",
+        "tokens": "токен(ов)",
+        "generate": "Сгенерировать",
+        "generating": "Генерация...",
+        "cancelGeneration": "Отмена",
+        "generationError": "❌ Ошибка генерации. Попробуйте ещё раз.",
+        "generationCancelled": "Генерация отменена."
     }
 }

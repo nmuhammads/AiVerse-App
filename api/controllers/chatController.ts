@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express'
 import { streamChatCompletion, getChatCompletion, type ChatMessage, type ChatModel } from '../services/chatService'
+import { generateNanoGPTImage, isValidNanoImageModel, getNanoImagePrice, NANO_IMAGE_MODELS, type NanoImageModel } from '../services/nanoImageService'
 
 const AVAILABLE_MODELS: ChatModel[] = [
     'deepseek/deepseek-v3.2',
@@ -82,7 +83,7 @@ export async function handleChat(req: Request, res: Response) {
 
 /**
  * GET /api/chat/models
- * Получить список доступных моделей
+ * Получить список доступных моделей чата
  */
 export function getAvailableModels(_req: Request, res: Response) {
     res.json({
@@ -96,3 +97,68 @@ export function getAvailableModels(_req: Request, res: Response) {
         ]
     })
 }
+
+/**
+ * GET /api/chat/image-models
+ * Получить список доступных моделей для генерации изображений
+ */
+export function getImageModels(_req: Request, res: Response) {
+    res.json({
+        models: NANO_IMAGE_MODELS
+    })
+}
+
+/**
+ * POST /api/chat/generate-image
+ * Генерация изображения через AI-агент
+ */
+export async function handleGenerateImage(req: Request, res: Response) {
+    try {
+        const { prompt, model, size = '1024x1024' } = req.body
+
+        // Валидация
+        if (!prompt || typeof prompt !== 'string') {
+            return res.status(400).json({ error: 'Prompt is required' })
+        }
+
+        if (!model || !isValidNanoImageModel(model)) {
+            return res.status(400).json({
+                error: 'Invalid model',
+                available: NANO_IMAGE_MODELS.map(m => m.id)
+            })
+        }
+
+        const price = getNanoImagePrice(model as NanoImageModel)
+
+        console.log('[ChatController] Generating image:', {
+            model,
+            prompt: prompt.slice(0, 50),
+            size,
+            price
+        })
+
+        // TODO: Проверка баланса пользователя
+        // TODO: Списание токенов
+
+        const result = await generateNanoGPTImage({
+            prompt,
+            model: model as NanoImageModel,
+            size
+        })
+
+        res.json({
+            success: true,
+            imageUrl: result.url,
+            imageBase64: result.b64_json,
+            cost: result.cost || price,
+            remainingBalance: result.remainingBalance
+        })
+
+    } catch (error) {
+        console.error('[ChatController] Image generation error:', error)
+        res.status(500).json({
+            error: error instanceof Error ? error.message : 'Image generation failed'
+        })
+    }
+}
+

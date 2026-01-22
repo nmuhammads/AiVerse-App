@@ -748,6 +748,13 @@
         "modelChangeMessage": "You are switching to {{model}}. What would you like to do with the current chat history?",
         "keepHistory": "Keep history",
         "clearHistory": "Clear history",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "confirmGeneration": "Generate image?",
+        "tokens": "token(s)",
+        "generate": "Generate",
+        "generating": "Generating...",
+        "cancelGeneration": "Cancel",
+        "generationError": "❌ Generation failed. Please try again.",
+        "generationCancelled": "Generation cancelled."
     }
 }
