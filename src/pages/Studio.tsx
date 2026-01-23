@@ -224,7 +224,7 @@ export default function Studio() {
   // Режим чата - фиксированная позиция между header и tabbar
   if (studioMode === 'chat') {
     return (
-      <div className="bg-black min-h-dvh" style={{ paddingTop }}>
+      <div className="bg-black h-dvh overflow-hidden" style={{ paddingTop }}>
         {/* Header */}
         <div className="mx-auto max-w-3xl w-full px-4 py-4">
           <StudioHeader
