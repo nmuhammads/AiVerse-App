@@ -221,7 +221,10 @@ body {
   /* iOS: bottom-2 (8px) + safe-area + extra space for generate button */
   --tabbar-offset-ios: calc(18px + var(--tabbar-height) + env(safe-area-inset-bottom));
   /* Android: 2rem (32px) + safe-area + extra padding */
-  --tabbar-offset-android: calc(37px + var(--tabbar-height) + env(safe-area-inset-bottom) + 10px);
+  --tabbar-offset-android: calc(45px + var(--tabbar-height) + env(safe-area-inset-bottom) + 10px);
+  
+  /* Extra space for generate button above tabbar offset */
+  --generate-btn-space: 70px;
   
   /* Header offset for top positioning - includes Telegram header */
   --header-offset-ios: calc(env(safe-area-inset-top) + 55px);
@@ -244,6 +247,15 @@ body {
 
 .pb-tabbar-android {
   padding-bottom: var(--tabbar-offset-android);
+}
+
+/* Extra padding for Studio content to scroll above generate button */
+.pb-studio-ios {
+  padding-bottom: calc(var(--tabbar-offset-ios) + var(--generate-btn-space));
+}
+
+.pb-studio-android {
+  padding-bottom: calc(var(--tabbar-offset-android) + var(--generate-btn-space));
 }
 
 /* Chat container - fills space between header and tabbar dynamically */

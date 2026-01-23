@@ -188,6 +188,7 @@ export default function Studio() {
   const isAndroid = platform === 'android'
   // Используем CSS классы для позиционирования над TabBar
   const tabbarOffsetClass = isAndroid ? 'pb-tabbar-android' : 'pb-tabbar-ios'
+  const studioOffsetClass = isAndroid ? 'pb-studio-android' : 'pb-studio-ios' // extra padding for generate button
   const aboveTabbarClass = isAndroid ? 'above-tabbar-android' : 'above-tabbar-ios'
   const chatContainerClass = isAndroid ? 'chat-container-android' : 'chat-container-ios'
 
@@ -271,7 +272,7 @@ export default function Studio() {
   // Режим Studio
   return (
     <div
-      className={`bg-black flex flex-col min-h-0 min-h-dvh ${tabbarOffsetClass}`}
+      className={`bg-black flex flex-col min-h-0 min-h-dvh ${studioOffsetClass}`}
       style={{ paddingTop }}
     >
       <div className="mx-auto max-w-3xl w-full px-4 flex-1 min-h-0 flex flex-col gap-6 py-4">
