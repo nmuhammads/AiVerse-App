@@ -247,9 +247,10 @@ body {
 }
 
 /* Chat container - fills space between header and tabbar dynamically */
+/* StudioHeader height: ~40px buttons + py-4 (32px) = ~72px, using 80px for safety */
 .chat-container-ios {
   position: fixed;
-  top: calc(var(--header-offset-ios) + 60px); /* header offset + StudioHeader height */
+  top: calc(var(--header-offset-ios) + 80px);
   bottom: var(--tabbar-offset-ios);
   left: 0;
   right: 0;
@@ -257,7 +258,7 @@ body {
 
 .chat-container-android {
   position: fixed;
-  top: calc(var(--header-offset-android) + 60px); /* header offset + StudioHeader height */
+  top: calc(var(--header-offset-android) + 80px);
   bottom: var(--tabbar-offset-android);
   left: 0;
   right: 0;
