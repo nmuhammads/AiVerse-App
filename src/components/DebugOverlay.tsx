@@ -1,5 +1,6 @@
+import WebApp from '@twa-dev/sdk'
 import { useState, useEffect, useRef } from 'react'
-import { X, Copy, Trash2, ChevronDown, ChevronUp, Bug } from 'lucide-react'
+import { X, Copy, Trash2, ChevronDown, ChevronUp, Bug, Scan } from 'lucide-react'
 
 interface LogEntry {
     id: number
@@ -103,6 +104,73 @@ export function DebugOverlay() {
         setLogs([])
     }
 
+    const inspectLayout = () => {
+        const visualViewport = window.visualViewport
+
+        // Measure safe areas
+        const div = document.createElement('div')
+        div.style.paddingTop = 'env(safe-area-inset-top)'
+        div.style.paddingBottom = 'env(safe-area-inset-bottom)'
+        document.body.appendChild(div)
+        const computed = window.getComputedStyle(div)
+        const safeAreaTop = computed.paddingTop
+        const safeAreaBottom = computed.paddingBottom
+        document.body.removeChild(div)
+
+        const report = {
+            timestamp: new Date().toLocaleTimeString(),
+            platform: WebApp.platform,
+            window: {
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight,
+                outerHeight: window.outerHeight,
+                devicePixelRatio: window.devicePixelRatio
+            },
+            visualViewport: visualViewport ? {
+                width: visualViewport.width,
+                height: visualViewport.height,
+                scale: visualViewport.scale,
+                pageTop: visualViewport.pageTop,
+                offsetTop: visualViewport.offsetTop
+            } : 'N/A',
+            telegram: {
+                isExpanded: WebApp.isExpanded,
+                viewportHeight: WebApp.viewportHeight,
+                viewportStableHeight: WebApp.viewportStableHeight,
+                headerColor: WebApp.headerColor,
+                backgroundColor: WebApp.backgroundColor,
+                version: WebApp.version
+            },
+            safeArea: {
+                top: safeAreaTop,
+                bottom: safeAreaBottom
+            },
+            document: {
+                clientHeight: document.documentElement.clientHeight,
+                scrollHeight: document.documentElement.scrollHeight,
+                bodyScrollHeight: document.body.scrollHeight
+            }
+        }
+
+        const text = JSON.stringify(report, null, 2)
+
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Layout Report скопирован!')
+        }).catch((err) => {
+            console.error('Copy failed', err)
+            // Fallback
+            const textarea = document.createElement('textarea')
+            textarea.value = text
+            document.body.appendChild(textarea)
+            textarea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textarea)
+            alert('Layout Report скопирован (fallback)!')
+        })
+
+        captureLog('info', ['Layout Inspection:', report])
+    }
+
     const getLogColor = (type: LogEntry['type']) => {
         switch (type) {
             case 'error': return 'text-red-400'
@@ -137,6 +205,9 @@ export function DebugOverlay() {
                     <span className="text-xs font-bold text-white">Debug Logs ({logs.length})</span>
                 </div>
                 <div className="flex items-center gap-1">
+                    <button onClick={inspectLayout} className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400" title="Inspect Layout">
+                        <Scan size={14} />
+                    </button>
                     <button onClick={copyLogs} className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400">
                         <Copy size={14} />
                     </button>
