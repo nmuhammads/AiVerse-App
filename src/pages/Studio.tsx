@@ -199,7 +199,14 @@ export default function Studio() {
     }
   }, [studioMode])
 
-  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 44px)' : 'calc(env(safe-area-inset-top) + 110px)'
+  // Different padding for Chat (fixed inset-0) and Studio (in-flow)
+  // Chat ignores App padding, so needs full safe-area + header calculation
+  const chatPaddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 44px)' : 'calc(env(safe-area-inset-top) + 110px)'
+
+  // Studio is inside App which already has safe-area padding
+  // So we only need to offset the Header height
+  const studioPaddingTop = platform === 'ios' ? '54px' : '90px'
+
   const isAndroid = platform === 'android'
   // Используем CSS классы для позиционирования над TabBar
   const tabbarOffsetClass = isAndroid ? 'pb-tabbar-android' : 'pb-tabbar-ios'
@@ -240,7 +247,7 @@ export default function Studio() {
   // Режим чата - фиксированная позиция между header и tabbar
   if (studioMode === 'chat') {
     return (
-      <div className="bg-black fixed inset-0 overflow-hidden z-0" style={{ paddingTop }}>
+      <div className="bg-black fixed inset-0 overflow-hidden z-0" style={{ paddingTop: chatPaddingTop }}>
         {/* Header - prevent touch scrolling on background */}
         <div className="mx-auto max-w-3xl w-full px-4 pt-4 pb-1 touch-none select-none">
           <StudioHeader
@@ -288,7 +295,7 @@ export default function Studio() {
   return (
     <div
       className={`bg-black flex flex-col min-h-0 min-h-dvh ${studioOffsetClass}`}
-      style={{ paddingTop }}
+      style={{ paddingTop: studioPaddingTop }}
     >
       <div className="mx-auto max-w-3xl w-full px-4 flex-1 min-h-0 flex flex-col gap-6 py-4">
         <StudioHeader
@@ -342,19 +349,6 @@ export default function Studio() {
             />
           )}
 
-          {/* Checking PromptInput props in Step 1320:
-                isOptimizing={isOptimizing}
-                onPromptChange={setPrompt}
-                onClearPrompt={() => setPrompt('')}
-                onClearParent={...}
-                onOptimize={handleOptimizePrompt}
-                onDescribe={...}
-                
-                It DOES NOT have setIsPromptPrivate, setParentAuthorUsername, setParentGenerationId in Step 1320.
-                So I should NOT include them if they were removed/not there. 
-                I will stick to Step 1320 content for props.
-            */}
-
           {/* 4. Reference Image for IMAGES mode */}
           <ImageUploader
             t={t}
@@ -371,8 +365,6 @@ export default function Studio() {
             }}
             onRemoveUploadedImage={removeUploadedImage}
             onSetUploadedImages={setUploadedImages}
-          // Step 1238 chunk had uploadedVideoUrl etc. But Step 1320 content is different.
-          // I assume Step 1320 is the source of truth for existing file state.
           />
 
           <SettingsPanel
