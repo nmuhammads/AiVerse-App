@@ -13,6 +13,7 @@ export interface NanoImageParams {
     model: NanoImageModel
     size?: string
     n?: number
+    image?: string
 }
 
 export interface NanoImageResult {
@@ -38,9 +39,43 @@ export const NANO_IMAGE_MODELS: { id: NanoImageModel; name: string; price: numbe
  * Генерация изображения через NanoGPT API
  */
 export async function generateNanoGPTImage(params: NanoImageParams): Promise<NanoImageResult> {
-    const { prompt, model, size = '1024x1024', n = 1 } = params
+    const { prompt, model, size = '1024x1024', n = 1, image } = params
 
-    console.log('[NanoImageService] Generating image:', { model, prompt: prompt.slice(0, 50), size })
+    console.log('[NanoImageService] Generating image:', { model, prompt: prompt.slice(0, 50), size, hasImage: !!image })
+
+    const body: any = {
+        model,
+        prompt,
+        n,
+        size,
+        response_format: 'url'
+    }
+
+    if (image) {
+        // Если передан URL, нужно скачать и конвертировать в base64 data url
+        if (image.startsWith('http')) {
+            try {
+                console.log('[NanoImageService] Downloading image for i2i:', image)
+                const imgRes = await fetch(image)
+                if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`)
+
+                const arrayBuffer = await imgRes.arrayBuffer()
+                const buffer = Buffer.from(arrayBuffer)
+                const base64 = buffer.toString('base64')
+                const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
+
+                body.imageDataUrl = `data:${mimeType};base64,${base64}`
+                console.log('[NanoImageService] Converted image to base64, size:', base64.length)
+            } catch (e) {
+                console.error('[NanoImageService] Failed to convert image to base64:', e)
+                // Fallback: try sending URL directly as a last resort (though likely to fail based on docs)
+                body.imageDataUrl = image
+            }
+        } else {
+            // Already a data url or something else
+            body.imageDataUrl = image
+        }
+    }
 
     const response = await fetch(NANOGPT_IMAGE_URL, {
         method: 'POST',
@@ -48,13 +83,7 @@ export async function generateNanoGPTImage(params: NanoImageParams): Promise<Nan
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${NANOGPT_API_KEY}`
         },
-        body: JSON.stringify({
-            model,
-            prompt,
-            n,
-            size,
-            response_format: 'url' // Получаем URL вместо base64
-        })
+        body: JSON.stringify(body)
     })
 
     const data = await response.json()

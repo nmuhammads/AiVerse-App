@@ -6,6 +6,7 @@
 import { Request, Response } from 'express'
 import { streamChatCompletion, getChatCompletion, type ChatMessage, type ChatModel } from '../services/chatService'
 import { generateNanoGPTImage, isValidNanoImageModel, getNanoImagePrice, NANO_IMAGE_MODELS, type NanoImageModel } from '../services/nanoImageService'
+import { uploadImageFromBase64 } from '../services/r2Service'
 
 const AVAILABLE_MODELS: ChatModel[] = [
     'deepseek/deepseek-v3.2',
@@ -37,16 +38,17 @@ export async function handleChat(req: Request, res: Response) {
         }
 
         // Валидация формата сообщений
-        const validMessages: ChatMessage[] = messages.map((m: { role?: string; content?: string }) => ({
+        const validMessages: ChatMessage[] = messages.map((m: any) => ({
             role: m.role === 'user' || m.role === 'assistant' ? m.role : 'user',
-            content: String(m.content || '')
+            content: m.content // Allow string or array
         }))
 
         console.log('[ChatController] Request:', {
             model,
             stream,
             messageCount: validMessages.length,
-            lastMessage: validMessages[validMessages.length - 1]?.content?.slice(0, 50)
+            // Log full content of the last message to see if image_url is there
+            lastMessageContent: JSON.stringify(validMessages[validMessages.length - 1]?.content)
         })
 
         if (stream) {
@@ -151,7 +153,7 @@ async function supaPatch(table: string, filter: string, body: unknown) {
  */
 export async function handleGenerateImage(req: Request, res: Response) {
     try {
-        const { prompt, model, size = '1024x1024', user_id } = req.body
+        const { prompt, model, size = '1024x1024', user_id, image } = req.body
 
         // Валидация
         if (!prompt || typeof prompt !== 'string') {
@@ -176,7 +178,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
             prompt: prompt.slice(0, 50),
             size,
             price,
-            user_id
+            user_id,
+            hasImage: !!image
         })
 
         // Проверка баланса пользователя
@@ -201,7 +204,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
             model: model, // Просто модель без префикса
             status: 'pending',
             cost: price,
-            media_type: 'image'
+            media_type: 'image',
+            image_url: image || undefined // Store source image if i2i
         }
 
         const genRes = await supaPost('generations', genBody)
@@ -220,7 +224,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
         const result = await generateNanoGPTImage({
             prompt,
             model: model as NanoImageModel,
-            size
+            size,
+            image
         })
 
         // Обновляем запись generation со статусом completed
@@ -251,3 +256,35 @@ export async function handleGenerateImage(req: Request, res: Response) {
 }
 
 
+/**
+ * POST /api/chat/upload
+ * Загрузка изображения в R2 для чата
+ */
+export async function handleUploadImage(req: Request, res: Response) {
+    try {
+        const { image } = req.body
+
+        if (!image || typeof image !== 'string') {
+            return res.status(400).json({ error: 'Image data is required' })
+        }
+
+        // Простая валидация base64
+        if (!image.startsWith('data:image/')) {
+            return res.status(400).json({ error: 'Invalid image format. Expected base64 data URL.' })
+        }
+
+        // Загрузка в R2 (папка chat-uploads)
+        const publicUrl = await uploadImageFromBase64(image, 'chat-uploads')
+
+        res.json({
+            success: true,
+            url: publicUrl
+        })
+
+    } catch (error) {
+        console.error('[ChatController] Upload error:', error)
+        res.status(500).json({
+            error: error instanceof Error ? error.message : 'Upload failed'
+        })
+    }
+}

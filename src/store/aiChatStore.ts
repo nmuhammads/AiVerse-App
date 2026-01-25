@@ -21,12 +21,13 @@ export interface PendingImageGeneration {
     model: ImageModel
     size: string
     cost: number
+    image?: string
 }
 
 export interface ChatMessage {
     id: string
     role: 'user' | 'assistant'
-    content: string
+    content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>
     timestamp: number
     // Для изображений
     imageUrl?: string
@@ -49,7 +50,7 @@ interface AIChatState {
     closeChat: () => void
     minimizeChat: () => void
     restoreChat: () => void
-    addMessage: (role: 'user' | 'assistant', content: string) => string
+    addMessage: (role: 'user' | 'assistant', content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>) => string
     addImageMessage: (imageUrl: string, prompt: string) => string
     updateMessage: (id: string, content: string) => void
     clearMessages: () => void

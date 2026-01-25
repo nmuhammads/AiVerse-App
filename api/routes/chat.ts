@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express'
-import { handleChat, getAvailableModels, getImageModels, handleGenerateImage } from '../controllers/chatController.js'
+import { handleChat, getAvailableModels, getImageModels, handleGenerateImage, handleUploadImage } from '../controllers/chatController.js'
 
 const router = Router()
 
@@ -18,6 +18,9 @@ router.get('/image-models', getImageModels)
 
 // POST /api/chat/generate-image - сгенерировать изображение
 router.post('/generate-image', handleGenerateImage)
+
+// POST /api/chat/upload - загрузить изображение
+router.post('/upload', handleUploadImage)
 
 export default router
 
