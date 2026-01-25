@@ -201,7 +201,8 @@ export default function Studio() {
 
   // Different padding for Chat (fixed inset-0) and Studio (in-flow)
   // Chat ignores App padding, so needs full safe-area + header calculation
-  const chatPaddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 44px)' : 'calc(env(safe-area-inset-top) + 135px)'
+  const chatHeaderTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 8px)' : 'calc(env(safe-area-inset-top) + 8px)'
+  const chatContainerTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 88px)' : 'calc(env(safe-area-inset-top) + 88px)'
 
   // Studio is inside App which already has safe-area padding
   // So we only need to offset the Header height
@@ -247,9 +248,12 @@ export default function Studio() {
   // Режим чата - фиксированная позиция между header и tabbar
   if (studioMode === 'chat') {
     return (
-      <div className="bg-black fixed inset-0 overflow-hidden z-0" style={{ paddingTop: chatPaddingTop }}>
+      <div className="bg-black fixed inset-0 overflow-hidden z-0">
         {/* Header - prevent touch scrolling on background */}
-        <div className="relative z-40 mx-auto max-w-3xl w-full px-4 pt-4 pb-1 touch-none select-none">
+        <div
+          className="fixed left-0 right-0 z-50 mx-auto max-w-3xl w-full px-4 pt-4 pb-1 touch-none select-none bg-black"
+          style={{ top: chatHeaderTop }}
+        >
           <StudioHeader
             t={t}
             balance={balance}
@@ -259,7 +263,7 @@ export default function Studio() {
         </div>
 
         {/* Chat Container - fixed position between header and tabbar */}
-        <div className={`${chatContainerClass} mx-auto max-w-3xl px-4 z-30`}>
+        <div className={`${chatContainerClass} mx-auto max-w-3xl px-4 z-30`} style={{ top: chatContainerTop }}>
           <div className="h-full bg-black rounded-2xl border border-white/5 overflow-hidden">
             <AIChatOverlay variant="inline" />
           </div>
