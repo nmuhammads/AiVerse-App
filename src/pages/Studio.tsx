@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { type ModelType } from '@/store/generationStore'
 import { DevModeBanner } from '@/components/DevModeBanner'
 import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
@@ -184,6 +185,19 @@ export default function Studio() {
     imageCount,
   } = useStudio()
 
+  // Prevent body scroll when in chat mode
+  useEffect(() => {
+    if (studioMode === 'chat') {
+      const originalStyle = window.getComputedStyle(document.body).overflow
+      document.body.style.overflow = 'hidden'
+      document.body.style.overscrollBehavior = 'none'
+      return () => {
+        document.body.style.overflow = originalStyle
+        document.body.style.overscrollBehavior = 'auto'
+      }
+    }
+  }, [studioMode])
+
   const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
   const isAndroid = platform === 'android'
   // Используем CSS классы для позиционирования над TabBar
@@ -225,9 +239,9 @@ export default function Studio() {
   // Режим чата - фиксированная позиция между header и tabbar
   if (studioMode === 'chat') {
     return (
-      <div className="bg-black h-dvh overflow-hidden" style={{ paddingTop }}>
-        {/* Header */}
-        <div className="mx-auto max-w-3xl w-full px-4 py-4">
+      <div className="bg-black fixed inset-0 overflow-hidden z-0" style={{ paddingTop }}>
+        {/* Header - prevent touch scrolling on background */}
+        <div className="mx-auto max-w-3xl w-full px-4 pt-4 pb-1 touch-none select-none">
           <StudioHeader
             t={t}
             balance={balance}

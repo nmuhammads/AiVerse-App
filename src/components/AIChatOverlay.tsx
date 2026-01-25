@@ -445,16 +445,16 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         <div className="relative">
                             <button
                                 onClick={() => setShowModelSelector(!showModelSelector)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 text-sm text-white/80 hover:bg-white/15 transition-colors"
+                                className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-white/10 text-[13px] font-medium text-white/80 hover:bg-white/15 transition-colors"
                             >
-                                <span className="max-w-[100px] truncate">
+                                <span className="max-w-[90px] truncate">
                                     {MODELS.find(m => m.id === selectedModel)?.name || 'Model'}
                                 </span>
-                                <ChevronDown size={14} />
+                                <ChevronDown size={12} className="opacity-40" />
                             </button>
 
                             {showModelSelector && (
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
+                                <div className="absolute left-0 top-full mt-1 w-48 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
                                     {MODELS.map(model => (
                                         <button
                                             key={model.id}
@@ -484,16 +484,16 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         <div className="relative">
                             <button
                                 onClick={() => setShowImageModelSelector(!showImageModelSelector)}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/30 text-xs text-violet-300 hover:bg-violet-600/30 transition-colors"
+                                className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/30 text-[13px] font-medium text-violet-300 hover:bg-violet-600/30 transition-colors"
                             >
                                 <ImageIcon size={12} />
-                                <span className="max-w-[70px] truncate">
-                                    {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.name || 'Image'}
+                                <span className="max-w-[60px] truncate">
+                                    {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.name.split(' ')[0] || 'Image'}
                                 </span>
-                                <span className="text-[10px] text-violet-400/70">
+                                <span className="text-[9px] text-violet-400/70 font-bold bg-violet-400/10 px-1 rounded-sm">
                                     {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.price || 2}т
                                 </span>
-                                <ChevronDown size={12} />
+                                <ChevronDown size={12} className="opacity-40" />
                             </button>
 
                             {showImageModelSelector && (
@@ -527,10 +527,10 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         {messages.length > 0 && (
                             <button
                                 onClick={clearMessages}
-                                className="p-2 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/15 transition-colors"
+                                className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/15 transition-colors"
                                 title={t('aiChat.clear', 'Очистить чат')}
                             >
-                                <Trash2 size={18} />
+                                <Trash2 size={16} />
                             </button>
                         )}
 
