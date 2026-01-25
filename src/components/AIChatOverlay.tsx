@@ -1,21 +1,27 @@
-/**
- * AI Chat Overlay
- * Полноэкранный интерфейс чата с ИИ
- */
-
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2, ImageIcon, Check, XCircle, Plus } from 'lucide-react'
-import { useAIChatStore, type ChatModel, type ImageModel, type PendingImageGeneration } from '@/store/aiChatStore'
+import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2, ImageIcon, Check, XCircle, Plus, Menu, Copy } from 'lucide-react'
+import {
+    useAIChatStore,
+    type ChatModel,
+    type ImageModel,
+    type PendingImageGeneration,
+    selectMessages,
+    selectSessions,
+    selectActiveSessionId
+} from '@/store/aiChatStore'
+import { ChatFeaturesOnboarding } from '@/components/ChatFeaturesOnboarding'
 import WebApp from '@twa-dev/sdk'
+// import { format } from 'date-fns'
+// import { ru } from 'date-fns/locale'
 
-const MODELS: { id: ChatModel; name: string }[] = [
-    { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2' },
-    { id: 'zai-org/glm-4.7', name: 'GLM-4.7' },
-    { id: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' },
-    { id: 'Qwen/Qwen3-235B-A22B', name: 'Qwen3 235B' },
-    { id: 'openai/gpt-oss-20b', name: 'GPT 4 mini' },
-    { id: 'openai/gpt-oss-120b', name: 'GPT 4' }
+const MODELS: { id: ChatModel; name: string; shortName: string }[] = [
+    { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2', shortName: 'DeepSeek' },
+    { id: 'zai-org/glm-4.7', name: 'GLM-4.7', shortName: 'GLM 4' },
+    { id: 'minimax/minimax-m2.1', name: 'MiniMax M2.1', shortName: 'MiniMax' },
+    { id: 'Qwen/Qwen3-235B-A22B', name: 'Qwen3 235B', shortName: 'Qwen 3' },
+    { id: 'openai/gpt-oss-20b', name: 'GPT 4 mini', shortName: 'GPT 4m' },
+    { id: 'openai/gpt-oss-120b', name: 'GPT 4', shortName: 'GPT 4' }
 ]
 
 // Модели для генерации изображений
@@ -26,6 +32,14 @@ const IMAGE_MODELS: { id: ImageModel; name: string; price: number }[] = [
 
 // Модели поддерживающие i2i
 const I2I_COMPATIBLE_MODELS: ImageModel[] = ['qwen-image']
+
+// Подсказки для начала диалога
+const SUGGESTIONS = [
+    { text: 'Как генерировать фото?', icon: '🎨' },
+    { text: 'Как изменить фото?', icon: '🖼️' },
+    { text: 'Что ты умеешь?', icon: 'ℹ️' },
+    { text: 'Как создать видео?', icon: '📹' }
+]
 
 /**
  * Парсинг JSON команды генерации из текста ответа AI
@@ -77,63 +91,93 @@ function getMessageImage(content: string | any[]): string | undefined {
     return undefined
 }
 
-function parseMarkdown(text: string): React.ReactNode[] {
-    const lines = text.split('\n')
+const CodeBlock = ({ language, code }: { language: string, code: string }) => {
+    const [copied, setCopied] = useState(false)
+    const handleCopy = () => {
+        navigator.clipboard.writeText(code)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    return (
+        <div className="my-2 rounded-lg overflow-hidden bg-black/30 border border-white/10 group">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
+                <span className="text-xs text-white/50 font-mono">{language || 'code'}</span>
+                <button onClick={handleCopy} className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors">
+                    {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                    <span className="text-[10px] uppercase tracking-wider">{copied ? 'Скопировано' : 'Копировать'}</span>
+                </button>
+            </div>
+            <div className="relative">
+                <pre className="p-3 overflow-x-auto text-sm font-mono text-white/90 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+                    <code>{code}</code>
+                </pre>
+            </div>
+        </div>
+    )
+}
+
+function parseMarkdown(text: string): React.ReactNode {
+    if (!text) return null
+    const parts = text.split(/```(\w*)\n?([\s\S]*?)```/g)
     const elements: React.ReactNode[] = []
-    lines.forEach((line, lineIndex) => {
-        if (line.startsWith('### ')) {
-            elements.push(<h4 key={lineIndex} className="font-semibold text-white/90 mt-2 mb-1">{parseInline(line.slice(4))}</h4>)
-            return
+
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 3 === 0) {
+            const textPart = parts[i]
+            if (textPart) {
+                const lines = textPart.split('\n')
+                let currentPara: React.ReactNode[] = []
+                lines.forEach((line, lineIdx) => {
+                    const listItem = line.match(/^(\d+\.|-|\*)\s+(.*)$/)
+                    const heading = line.match(/^(#{1,6})\s+(.*)$/)
+                    if (heading) {
+                        if (currentPara.length > 0) {
+                            elements.push(<p key={`p-${i}-${lineIdx}-prev`} className="mb-2 whitespace-pre-wrap">{currentPara}</p>)
+                            currentPara = []
+                        }
+                        const level = heading[1].length
+                        const fontSize = level === 1 ? 'text-xl' : level === 2 ? 'text-lg' : 'text-base'
+                        elements.push(<div key={`h-${i}-${lineIdx}`} className={`${fontSize} font-bold text-white mt-4 mb-2`}>{parseInline(heading[2])}</div>)
+                    } else if (listItem) {
+                        if (currentPara.length > 0) {
+                            elements.push(<p key={`p-${i}-${lineIdx}-prev`} className="mb-2 whitespace-pre-wrap">{currentPara}</p>)
+                            currentPara = []
+                        }
+                        elements.push(
+                            <div key={`li-${i}-${lineIdx}`} className="flex gap-2 mb-1 ml-1">
+                                <span className="text-white/60 min-w-[1.2em]">{listItem[1]}</span>
+                                <div>{parseInline(listItem[2])}</div>
+                            </div>
+                        )
+                    } else if (line.trim() === '') {
+                        if (currentPara.length > 0) {
+                            elements.push(<p key={`p-${i}-${lineIdx}`} className="mb-2 whitespace-pre-wrap">{currentPara}</p>)
+                            currentPara = []
+                        }
+                    } else {
+                        if (currentPara.length > 0) currentPara.push(<br key={`br-${i}-${lineIdx}`} />)
+                        currentPara.push(parseInline(line))
+                    }
+                })
+                if (currentPara.length > 0) {
+                    elements.push(<p key={`p-${i}-end`} className="mb-2 whitespace-pre-wrap last:mb-0">{currentPara}</p>)
+                }
+            }
+        } else if (i % 3 === 1) {
+            elements.push(<CodeBlock key={`code-${i}`} language={parts[i]} code={parts[i + 1]} />)
+            i++
         }
-        if (line.startsWith('## ')) {
-            elements.push(<h3 key={lineIndex} className="font-bold text-white mt-3 mb-1">{parseInline(line.slice(3))}</h3>)
-            return
-        }
-        if (line.startsWith('# ')) {
-            elements.push(<h2 key={lineIndex} className="font-bold text-lg text-white mt-3 mb-2">{parseInline(line.slice(2))}</h2>)
-            return
-        }
-        if (line.match(/^[\-\*] /)) {
-            elements.push(<li key={lineIndex} className="ml-4 list-disc">{parseInline(line.slice(2))}</li>)
-            return
-        }
-        if (line.match(/^\d+\. /)) {
-            const match = line.match(/^(\d+)\. (.*)$/)
-            if (match) elements.push(<li key={lineIndex} className="ml-4 list-decimal">{parseInline(match[2])}</li>)
-            return
-        }
-        if (line.trim() === '') {
-            elements.push(<br key={lineIndex} />)
-            return
-        }
-        elements.push(<p key={lineIndex} className="mb-1">{parseInline(line)}</p>)
-    })
-    return elements
+    }
+    return <div className="space-y-1 text-[15px] leading-relaxed select-text">{elements}</div>
 }
 
 function parseInline(text: string): React.ReactNode {
-    const parts: React.ReactNode[] = []
-    let remaining = text
-    let keyCounter = 0
-    while (remaining.length > 0) {
-        const boldMatch = remaining.match(/^(.*)\*\*(.+?)\*\*(.*)$/s)
-        if (boldMatch) {
-            if (boldMatch[1]) parts.push(parseInline(boldMatch[1]))
-            parts.push(<strong key={keyCounter++} className="font-semibold">{boldMatch[2]}</strong>)
-            remaining = boldMatch[3]
-            continue
-        }
-        const codeMatch = remaining.match(/^(.*)`(.+?)`(.*)$/s)
-        if (codeMatch) {
-            if (codeMatch[1]) parts.push(codeMatch[1])
-            parts.push(<code key={keyCounter++} className="bg-white/20 px-1 py-0.5 rounded text-xs font-mono">{codeMatch[2]}</code>)
-            remaining = codeMatch[3]
-            continue
-        }
-        parts.push(remaining)
-        break
-    }
-    return parts.length === 1 ? parts[0] : <>{parts}</>
+    return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, idx) => {
+        if (part.startsWith('`') && part.endsWith('`')) return <code key={idx} className="bg-white/20 px-1.5 py-0.5 rounded text-xs font-mono text-violet-100">{part.slice(1, -1)}</code>
+        if (part.startsWith('**') && part.endsWith('**')) return <strong key={idx} className="font-semibold text-white">{part.slice(2, -2)}</strong>
+        return part
+    })
 }
 
 interface AIChatOverlayProps {
@@ -144,7 +188,6 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
     const { t } = useTranslation()
     const {
         isOpen,
-        messages,
         selectedModel,
         isLoading,
         pendingGeneration,
@@ -160,10 +203,19 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         setImageModel,
         setLoading,
         setPendingGeneration,
-        setGeneratingImage
+        setGeneratingImage,
+        createSession,
+        switchSession,
+        deleteSession,
+        renameSession
     } = useAIChatStore()
 
+    const messages = useAIChatStore(selectMessages)
+    const sessions = useAIChatStore(selectSessions)
+    const activeSessionId = useAIChatStore(selectActiveSessionId)
+
     const [input, setInput] = useState('')
+    const [showHistory, setShowHistory] = useState(false)
     const [showModelSelector, setShowModelSelector] = useState(false)
     const [showImageModelSelector, setShowImageModelSelector] = useState(false)
     const [showModelConfirm, setShowModelConfirm] = useState(false)
@@ -195,7 +247,11 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 100)
         }
-    }, [isOpen])
+        // Ensure a session exists on open
+        if (isOpen && !activeSessionId) {
+            createSession()
+        }
+    }, [isOpen, activeSessionId, createSession])
 
     if (!isOpen && variant !== 'inline') return null
 
@@ -408,6 +464,14 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         setPendingModel(null)
     }
 
+    const handleNewChat = () => {
+        createSession()
+        setShowHistory(false)
+        if (isInline) {
+            setTimeout(() => inputRef.current?.focus(), 100)
+        }
+    }
+
     return (
         <>
             {showModelConfirm && pendingModel && (
@@ -438,6 +502,12 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                 </div>
             )}
 
+
+
+
+
+            {(isOpen || isInline) && <ChatFeaturesOnboarding />}
+
             {!isInline && <div className="fixed inset-0 z-[45] bg-black" />}
 
             <div
@@ -447,20 +517,40 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                 }
                 style={isInline ? {} : { top: headerOffset }}
             >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div className="flex items-center justify-between px-3 py-3 border-b border-white/10">
                     <div className="flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-violet-400" />
-                        <span className="font-semibold text-white">{t('aiChat.title', 'AI Ассистент')}</span>
+                        <div className="flex items-center gap-0 -ml-2">
+                            <button
+                                onClick={() => setShowHistory(!showHistory)}
+                                className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <Menu size={20} />
+                            </button>
+                            <button
+                                onClick={handleNewChat}
+                                className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                                title={t('aiChat.newChat', 'Новый чат')}
+                            >
+                                <Plus size={20} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <Bot className="w-5 h-5 text-violet-400" />
+                            <span className="font-semibold text-white whitespace-nowrap text-sm sm:text-base leading-none">
+                                {t('aiChat.title', 'AI Ассистент')}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         <div className="relative">
                             <button
+                                id="chat-model-selector"
                                 onClick={() => setShowModelSelector(!showModelSelector)}
                                 className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-white/10 text-[13px] font-medium text-white/80 hover:bg-white/15 transition-colors"
                             >
                                 <span className="max-w-[90px] truncate">
-                                    {MODELS.find(m => m.id === selectedModel)?.name || 'Model'}
+                                    {MODELS.find(m => m.id === selectedModel)?.shortName || 'Model'}
                                 </span>
                                 <ChevronDown size={12} className="opacity-40" />
                             </button>
@@ -490,6 +580,7 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
 
                         <div className="relative">
                             <button
+                                id="image-model-selector"
                                 onClick={() => setShowImageModelSelector(!showImageModelSelector)}
                                 className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/30 text-[13px] font-medium text-violet-300 hover:bg-violet-600/30 transition-colors"
                             >
@@ -557,6 +648,60 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                     </div>
                 </div>
 
+                {/* History Sidebar (Inside Container) */}
+                {showHistory && (
+                    <div className="absolute inset-x-0 bottom-0 top-[60px] z-50 flex overflow-hidden">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowHistory(false)} />
+
+                        <div className="relative w-72 h-full bg-zinc-900 border-r border-white/10 flex flex-col animate-in slide-in-from-left duration-200">
+                            <div className="p-4 border-b border-white/10">
+                                <span className="font-semibold text-white">История чатов</span>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                {sessions.map(session => (
+                                    <button
+                                        key={session.id}
+                                        onClick={() => {
+                                            switchSession(session.id)
+                                            setShowHistory(false)
+                                        }}
+                                        className={`w-full p-3 rounded-xl text-left text-sm transition-colors group relative ${activeSessionId === session.id
+                                            ? 'bg-white/10 text-white'
+                                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                            }`}
+                                    >
+                                        <div className="pr-6 truncate font-medium">{session.title || 'Новый чат'}</div>
+                                        <div className="text-xs text-white/30 mt-1">
+                                            {new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(session.updatedAt)}
+                                        </div>
+                                        <div
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                if (confirm('Удалить этот чат?')) deleteSession(session.id)
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 transition-opacity text-white/40 hover:text-red-400"
+                                        >
+                                            <Trash2 size={14} />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Bottom New Chat Button */}
+                            <div className="p-4 border-t border-white/10 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                                <button
+                                    onClick={handleNewChat}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 transition-colors shadow-lg shadow-violet-500/20"
+                                >
+                                    <Plus size={20} />
+                                    <span>Новый чат</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div
                     ref={messagesContainerRef}
                     className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4"
@@ -566,7 +711,27 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         <div className="flex flex-col items-center justify-center h-full text-center text-white/40">
                             <Bot className="w-12 h-12 mb-4 opacity-50" />
                             <p className="text-lg font-medium">{t('aiChat.welcome', 'Привет! Я AI-ассистент AiVerse')}</p>
-                            <p className="text-sm mt-2">{t('aiChat.welcomeHint', 'Спроси меня о генерации изображений или промптах')}</p>
+                            <p className="text-sm mt-2 mb-8">{t('aiChat.welcomeHint', 'Спроси меня о генерации изображений или промптах')}</p>
+
+                            <div className="grid grid-cols-2 gap-2 max-w-sm px-4 w-full">
+                                {SUGGESTIONS.map((suggestion, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => {
+                                            if (inputRef.current) {
+                                                setInput(suggestion.text)
+                                                inputRef.current.focus()
+                                                // We set value and focus, allowing user to edit before sending
+                                                // Or we could trigger handleSend if we wanted instant send
+                                            }
+                                        }}
+                                        className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-sm text-white/70 hover:text-white"
+                                    >
+                                        <span className="text-xl">{suggestion.icon}</span>
+                                        <span className="font-medium">{suggestion.text}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     ) : (
                         messages.map(msg => (

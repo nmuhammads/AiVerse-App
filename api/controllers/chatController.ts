@@ -23,7 +23,7 @@ const AVAILABLE_MODELS: ChatModel[] = [
  */
 export async function handleChat(req: Request, res: Response) {
     try {
-        const { messages, model = 'openai/gpt-oss-120b', stream = true } = req.body
+        const { messages, model = 'Qwen/Qwen3-235B-A22B', stream = true } = req.body
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return res.status(400).json({ error: 'Messages array is required' })
@@ -93,9 +93,9 @@ export function getAvailableModels(_req: Request, res: Response) {
             { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2' },
             { id: 'zai-org/glm-4.7', name: 'GLM-4.7' },
             { id: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' },
-            { id: 'Qwen/Qwen3-235B-A22B', name: 'Qwen3 235B' },
+            { id: 'Qwen/Qwen3-235B-A22B', name: 'Qwen3 235B', default: true },
             { id: 'openai/gpt-oss-20b', name: 'GPT 4 mini' },
-            { id: 'openai/gpt-oss-120b', name: 'GPT 4', default: true }
+            { id: 'openai/gpt-oss-120b', name: 'GPT 4' }
         ]
     })
 }

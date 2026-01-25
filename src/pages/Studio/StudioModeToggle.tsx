@@ -19,6 +19,7 @@ export function StudioModeToggle() {
             </button>
             <span className="text-2xl text-zinc-600 font-light">|</span>
             <button
+                id="chat-mode-toggle"
                 onClick={() => setStudioMode('chat')}
                 className={cn(
                     "text-xl transition-all duration-300",

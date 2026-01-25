@@ -5,6 +5,7 @@ import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
 import { DescribeImageModal } from '@/components/DescribeImageModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { AIChatOverlay } from '@/components/AIChatOverlay'
+import { ChatOnboardingOverlay } from '@/components/ChatOnboardingOverlay'
 import { useTranslation } from 'react-i18next'
 import { Zap, Pencil } from 'lucide-react'
 
@@ -510,6 +511,7 @@ export default function Studio() {
         />
 
       </div>
+      <ChatOnboardingOverlay />
     </div>
   )
 }
