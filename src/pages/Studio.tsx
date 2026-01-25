@@ -199,7 +199,7 @@ export default function Studio() {
     }
   }, [studioMode])
 
-  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
+  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 64px)' : 'calc(env(safe-area-inset-top) + 85px)'
   const isAndroid = platform === 'android'
   // Используем CSS классы для позиционирования над TabBar
   const tabbarOffsetClass = isAndroid ? 'pb-tabbar-android' : 'pb-tabbar-ios'
