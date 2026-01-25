@@ -210,7 +210,7 @@ export default function Studio() {
 
   // Studio is inside App which already has safe-area padding
   // So we only need to offset the Header height
-  const studioPaddingTop = platform === 'ios' ? '54px' : '90px'
+  const studioPaddingTop = platform === 'ios' ? '54px' : '56px'
 
   const isAndroid = platform === 'android'
   // Используем CSS классы для позиционирования над TabBar
