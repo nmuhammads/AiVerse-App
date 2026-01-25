@@ -201,7 +201,7 @@ export default function Studio() {
 
   // Different padding for Chat (fixed inset-0) and Studio (in-flow)
   // Chat ignores App padding, so needs full safe-area + header calculation
-  const chatPaddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 44px)' : 'calc(env(safe-area-inset-top) + 110px)'
+  const chatPaddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 44px)' : 'calc(env(safe-area-inset-top) + 135px)'
 
   // Studio is inside App which already has safe-area padding
   // So we only need to offset the Header height
