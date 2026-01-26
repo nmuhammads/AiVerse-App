@@ -628,7 +628,7 @@ export function useStudio() {
     })()
 
     const isGenerateDisabled = (!prompt.trim() && selectedModel !== 'kling-mc' && !(isPromptPrivate && parentGenerationId))
-        || (aspectRatio === 'Auto' && selectedModel !== 'kling-mc')
+        || (aspectRatio === 'Auto' && !['kling-mc', 'qwen-image'].includes(selectedModel))
         || (generationMode === 'image' && uploadedImages.length === 0)
         || (selectedModel === 'kling-mc' && (!uploadedVideoUrl || (characterOrientation === 'image' && videoDurationSeconds > 10) || (characterOrientation === 'video' && videoDurationSeconds > 30)))
 

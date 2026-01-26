@@ -26,6 +26,7 @@ const MODEL_PRICES: Record<ModelType, number> = {
     'kling-t2v': 55,
     'kling-i2v': 55,
     'kling-mc': 30,
+    'qwen-image': 3,
 }
 
 // Цены GPT Image по качеству
@@ -47,6 +48,7 @@ export const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
     'kling-t2v': ['1:1', '16:9', '9:16'],
     'kling-i2v': ['1:1', '16:9', '9:16'],
     'kling-mc': ['1:1', '16:9', '9:16'],
+    'qwen-image': ['Auto', '1:1', '16:9', '9:16', '4:3', '3:4'],
 }
 
 // Дефолтные соотношения для моделей
@@ -62,6 +64,7 @@ const DEFAULT_RATIOS: Record<ModelType, AspectRatio> = {
     'kling-t2v': '16:9',
     'kling-i2v': '16:9',
     'kling-mc': '16:9',
+    'qwen-image': '3:4',
 }
 
 export interface MultiGenerationState {
