@@ -16,43 +16,68 @@ export function supaHeaders() {
 }
 
 export async function supaSelect(table: string, query: string) {
-    const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
-    const r = await fetch(url, { headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'count=exact' } })
-    const data = await r.json().catch(() => null)
-    return { ok: r.ok, data, headers: Object.fromEntries(r.headers.entries()) }
+    try {
+        const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
+        const r = await fetch(url, { headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'count=exact' } })
+        const data = await r.json().catch(() => null)
+        return { ok: r.ok, data, headers: Object.fromEntries(r.headers.entries()) }
+    } catch (e) {
+        console.error(`[SupaBase] Select error (${table}):`, e)
+        return { ok: false, data: null, headers: {} }
+    }
 }
 
 export async function supaPost(table: string, body: unknown, params = '') {
-    const url = `${SUPABASE_URL}/rest/v1/${table}${params}`
-    const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) })
-    const data = await r.json().catch(() => null)
-    return { ok: r.ok, data }
+    try {
+        const url = `${SUPABASE_URL}/rest/v1/${table}${params}`
+        const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) })
+        const data = await r.json().catch(() => null)
+        return { ok: r.ok, data }
+    } catch (e) {
+        console.error(`[SupaBase] Post error (${table}):`, e)
+        return { ok: false, data: null }
+    }
 }
 
 export async function supaPatch(table: string, filter: string, body: unknown) {
-    const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-    const r = await fetch(url, { method: 'PATCH', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const data = await r.json().catch(() => null)
-    return { ok: r.ok, data }
+    try {
+        const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
+        const r = await fetch(url, { method: 'PATCH', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        const data = await r.json().catch(() => null)
+        return { ok: r.ok, data }
+    } catch (e) {
+        console.error(`[SupaBase] Patch error (${table}):`, e)
+        return { ok: false, data: null }
+    }
 }
 
 export async function supaStorageUpload(pathname: string, buf: Buffer, contentType = 'image/jpeg') {
-    const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_BUCKET)}/${pathname}`
+    try {
+        const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_BUCKET)}/${pathname}`
 
-    const r = await fetch(url, {
-        method: 'POST',
-        headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
-        body: buf as any
-    })
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
+            body: buf as any
+        })
 
-    const data = await r.json().catch(() => null)
-    return { ok: r.ok, data }
+        const data = await r.json().catch(() => null)
+        return { ok: r.ok, data }
+    } catch (e) {
+        console.error(`[SupaBase] Upload error (${pathname}):`, e)
+        return { ok: false, data: null }
+    }
 }
 
 export async function supaDelete(table: string, filter: string) {
-    const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-    const r = await fetch(url, { method: 'DELETE', headers: { ...supaHeaders(), 'Content-Type': 'application/json' } })
-    return { ok: r.ok }
+    try {
+        const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
+        const r = await fetch(url, { method: 'DELETE', headers: { ...supaHeaders(), 'Content-Type': 'application/json' } })
+        return { ok: r.ok }
+    } catch (e) {
+        console.error(`[SupaBase] Delete error (${table}):`, e)
+        return { ok: false }
+    }
 }
 
 // ============ App Config Functions ============

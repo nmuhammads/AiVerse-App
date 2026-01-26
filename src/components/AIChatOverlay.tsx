@@ -219,8 +219,8 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
     const [pendingModel, setPendingModel] = useState<ChatModel | null>(null)
     const [attachedImage, setAttachedImage] = useState<string | null>(null)
     const [isProcessingImage, setIsProcessingImage] = useState(false)
+    const [expandedImage, setExpandedImage] = useState<string | null>(null)
     const isInline = variant === 'inline'
-    const isChatModelLocked = selectedImageModel === 'qwen-image-plus'
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -566,6 +566,27 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
 
     return (
         <>
+            {/* Image Viewer Overlay */}
+            {expandedImage && (
+                <div
+                    className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => setExpandedImage(null)}
+                >
+                    <button
+                        onClick={() => setExpandedImage(null)}
+                        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors z-[210]"
+                    >
+                        <X size={24} />
+                    </button>
+                    <img
+                        src={expandedImage}
+                        alt="Full view"
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
+
             {showModelConfirm && pendingModel && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm">
                     <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
@@ -634,27 +655,16 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         <div className="relative">
                             <button
                                 id="chat-model-selector"
-                                onClick={() => {
-                                    if (isChatModelLocked) {
-                                        // WebApp.showAlert might be flaky in some dev environments
-                                        alert(t('aiChat.qwenPlusLocked', 'Qwen Image + работает только в связке с Qwen 3'))
-                                        return
-                                    }
-                                    setShowModelSelector(!showModelSelector)
-                                }}
-                                className={`h-8 flex items-center gap-1 px-2.5 rounded-lg text-[13px] font-medium transition-colors ${isChatModelLocked
-                                    ? 'bg-violet-900/20 border border-violet-500/20 text-violet-300 cursor-not-allowed'
-                                    : 'bg-white/10 text-white/80 hover:bg-white/15'
-                                    }`}
-                                title={isChatModelLocked ? t('aiChat.modelLocked', 'Модель зафиксирована для Qwen Image +') : ''}
+                                onClick={() => setShowModelSelector(!showModelSelector)}
+                                className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-white/10 text-[13px] font-medium text-white/80 hover:bg-white/15 transition-colors"
                             >
                                 <span className="max-w-[90px] truncate">
                                     {MODELS.find(m => m.id === selectedModel)?.shortName || 'Model'}
                                 </span>
-                                {isChatModelLocked ? <Lock size={12} className="opacity-60" /> : <ChevronDown size={12} className="opacity-40" />}
+                                <ChevronDown size={12} className="opacity-40" />
                             </button>
 
-                            {showModelSelector && !isChatModelLocked && (
+                            {showModelSelector && (
                                 <div className="absolute left-0 top-full mt-1 w-48 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
                                     {MODELS.map(model => (
                                         <button
@@ -707,9 +717,6 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                                 disabled={!isCompatible}
                                                 onClick={() => {
                                                     setImageModel(model.id)
-                                                    if (model.id === 'qwen-image-plus') {
-                                                        setModel('Qwen/Qwen3-235B-A22B')
-                                                    }
                                                     setShowImageModelSelector(false)
                                                 }}
                                                 className={`w-full px-3 py-2.5 text-left text-sm transition-colors flex items-center justify-between gap-3 ${selectedImageModel === model.id
@@ -847,7 +854,12 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'bg-violet-600 text-white' : 'bg-white/10 text-white'}`}>
                                     {(msg.imageUrl || getMessageImage(msg.content)) && (
                                         <div className="mb-2">
-                                            <img src={msg.imageUrl || getMessageImage(msg.content)} alt={msg.imagePrompt || 'Attached image'} className="rounded-xl max-w-full" />
+                                            <img
+                                                src={msg.imageUrl || getMessageImage(msg.content)}
+                                                alt={msg.imagePrompt || 'Attached image'}
+                                                className="rounded-xl max-w-full cursor-zoom-in hover:brightness-110 transition-all"
+                                                onClick={() => setExpandedImage(msg.imageUrl || getMessageImage(msg.content) || null)}
+                                            />
                                             {msg.imagePrompt && <p className="text-xs text-white/50 mt-2 italic">{msg.imagePrompt}</p>}
                                         </div>
                                     )}
