@@ -386,7 +386,28 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
 
             const data = await response.json()
             if (!response.ok) throw new Error(data.error || 'Generation failed')
-            if (data.imageUrl) addImageMessage(data.imageUrl, pendingGeneration.prompt)
+            if (data.imageUrl) {
+                addImageMessage(data.imageUrl, pendingGeneration.prompt)
+                try {
+                    const sendResp = await fetch('/api/telegram/sendDocument', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: userId,
+                            file_url: data.imageUrl,
+                            caption: pendingGeneration.prompt
+                        })
+                    })
+                    const sendData = await sendResp.json().catch(() => null)
+                    if (!sendResp.ok || !sendData?.ok) {
+                        console.error('[AIChatOverlay] Send to Telegram failed:', sendData?.error || sendResp.statusText)
+                        addMessage('assistant', t('aiChat.sendToTelegramError', 'Не удалось отправить файл в Telegram.'))
+                    }
+                } catch (sendError) {
+                    console.error('[AIChatOverlay] Send to Telegram error:', sendError)
+                    addMessage('assistant', t('aiChat.sendToTelegramError', 'Не удалось отправить файл в Telegram.'))
+                }
+            }
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
