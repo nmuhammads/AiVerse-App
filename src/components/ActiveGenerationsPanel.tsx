@@ -170,7 +170,7 @@ export function ActiveGenerationsPanel({ onViewResult }: ActiveGenerationsPanelP
     const completedCount = generations.filter(g => g.status !== 'processing').length
 
     return (
-        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 relative">
+        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 relative max-h-[120px] overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">

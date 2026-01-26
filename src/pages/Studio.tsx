@@ -7,6 +7,7 @@ import { PaymentModal } from '@/components/PaymentModal'
 import { AIChatOverlay } from '@/components/AIChatOverlay'
 import { ChatOnboardingOverlay } from '@/components/ChatOnboardingOverlay'
 import { ChatModeExitOnboarding } from '@/components/ChatModeExitOnboarding'
+import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
 import { useTranslation } from 'react-i18next'
 import { Zap, Pencil } from 'lucide-react'
 
@@ -73,6 +74,9 @@ function StudioHeader({ t, balance, onOpenEditor, onOpenPayment }: StudioHeaderP
 }
 
 export default function Studio() {
+  const activeGens = useActiveGenerationsStore(state => state.generations)
+  const hasActiveGens = activeGens.length > 0
+
   const {
     t,
     platform,
@@ -301,6 +305,7 @@ export default function Studio() {
     )
   }
 
+
   // Режим Studio
   return (
     <div
@@ -456,6 +461,9 @@ export default function Studio() {
               onGenerate={handleGenerate}
             />
           </div>
+
+          {/* Spacer to push content above fixed panel */}
+          <div className={hasActiveGens ? 'h-[200px]' : 'h-24'} />
         </>
 
         <InsufficientBalanceModal
