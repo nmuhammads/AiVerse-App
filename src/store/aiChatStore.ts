@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export type ChatModel =
     | 'deepseek/deepseek-v3.2'
@@ -14,7 +14,7 @@ export type ChatModel =
     | 'openai/gpt-oss-20b'
     | 'openai/gpt-oss-120b'
 
-export type ImageModel = 'z-image-turbo' | 'qwen-image'
+export type ImageModel = 'z-image-turbo' | 'qwen-image' | 'qwen-image-plus'
 
 export interface PendingImageGeneration {
     prompt: string
@@ -74,13 +74,41 @@ interface AIChatState {
 
     addMessage: (role: 'user' | 'assistant', content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>) => string
     addImageMessage: (imageUrl: string, prompt: string) => string
-    updateMessage: (id: string, content: string) => void
+    updateMessage: (id: string, content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>) => void
     clearMessages: () => void // Clear CURRENT chat messages
     setModel: (model: ChatModel) => void
     setImageModel: (model: ImageModel) => void
     setLoading: (loading: boolean) => void
     setPendingGeneration: (pending: PendingImageGeneration | null) => void
     setGeneratingImage: (generating: boolean) => void
+}
+
+const safeLocalStorage = {
+    getItem: (key: string): string | null => {
+        try {
+            return localStorage.getItem(key)
+        } catch (e) {
+            console.error('Failed to get item from localStorage:', e)
+            return null
+        }
+    },
+    setItem: (key: string, value: string): void => {
+        try {
+            localStorage.setItem(key, value)
+        } catch (e) {
+            console.error('Failed to set item in localStorage:', e)
+            if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+                console.warn('LocalStorage quota exceeded. Preventing crash.')
+            }
+        }
+    },
+    removeItem: (key: string): void => {
+        try {
+            localStorage.removeItem(key)
+        } catch (e) {
+            console.error('Failed to remove item from localStorage:', e)
+        }
+    },
 }
 
 export const useAIChatStore = create<AIChatState>()(
@@ -267,6 +295,7 @@ export const useAIChatStore = create<AIChatState>()(
         }),
         {
             name: 'aiverse-chat',
+            storage: createJSONStorage(() => safeLocalStorage),
             partialize: (state) => ({
                 // Persist sessions and settings
                 sessions: state.sessions,
@@ -274,22 +303,8 @@ export const useAIChatStore = create<AIChatState>()(
                 selectedModel: state.selectedModel,
                 isMinimized: state.isMinimized
             }),
-            // Migration logic for old data
             onRehydrateStorage: () => (state) => {
-                // If we have no sessions but somehow we have raw 'messages' in localStorage (from old version)
-                // We typically catch this by checking if 'sessions' is empty after hydration.
-                // But partialize controls what is saved.
-                // If old version saved 'messages', and new version loads 'sessions', we might lose data unless we handle it.
-                // However, zustand persist usually merges. 
-                // Let's rely on a manual check in useEffect or assume user is okay with reset or 
-                // handle it via a custom migration if we really want. 
-                // For this task, "start fresh" or simple migration is usually acceptable.
-                // I'll add a simple check in a component to migrate if needed, but for now 
-                // basic implementation is priority.
                 if (state && state.sessions.length === 0) {
-                    // Check if there are hidden messages from legacy state? 
-                    // Zustand persist doesn't expose them if they are not in the new interface.
-                    // We will start with empty or create one.
                     state.createSession()
                 }
             }
@@ -301,9 +316,10 @@ export const useAIChatStore = create<AIChatState>()(
 export const selectIsOpen = (state: AIChatState) => state.isOpen
 export const selectIsMinimized = (state: AIChatState) => state.isMinimized
 // Derived selector for current messages
+const EMPTY_MESSAGES: ChatMessage[] = []
 export const selectMessages = (state: AIChatState) => {
     const session = state.sessions.find(s => s.id === state.activeSessionId)
-    return session?.messages || []
+    return session?.messages || EMPTY_MESSAGES
 }
 export const selectSessions = (state: AIChatState) => state.sessions
 export const selectActiveSessionId = (state: AIChatState) => state.activeSessionId

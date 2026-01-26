@@ -756,6 +756,13 @@
         "cancelGeneration": "Cancel",
         "generationError": "❌ Generation failed. Please try again.",
         "generationCancelled": "Generation cancelled.",
-        "selectImageModel": "Image model"
+        "selectImageModel": "Image model",
+        "newChat": "New Chat",
+        "continueChat": "Continue in this chat",
+        "requestSent": "Request sent, processing...",
+        "uploadError": "Image upload error",
+        "sendToTelegramError": "Failed to send file to Telegram.",
+        "onlyImages": "Only images are allowed",
+        "imageTooLarge": "Image size must not exceed 5MB"
     }
 }

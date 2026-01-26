@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2, ImageIcon, Check, XCircle, Plus, Menu, Copy } from 'lucide-react'
+import { X, Minimize2, Send, Loader2, ChevronDown, Bot, User, Trash2, ImageIcon, Check, XCircle, Plus, Menu, Copy, Lock } from 'lucide-react'
 import {
     useAIChatStore,
     type ChatModel,
@@ -12,8 +12,6 @@ import {
 } from '@/store/aiChatStore'
 import { ChatFeaturesOnboarding } from '@/components/ChatFeaturesOnboarding'
 import WebApp from '@twa-dev/sdk'
-// import { format } from 'date-fns'
-// import { ru } from 'date-fns/locale'
 
 const MODELS: { id: ChatModel; name: string; shortName: string }[] = [
     { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2', shortName: 'DeepSeek' },
@@ -25,13 +23,14 @@ const MODELS: { id: ChatModel; name: string; shortName: string }[] = [
 ]
 
 // Модели для генерации изображений
-const IMAGE_MODELS: { id: ImageModel; name: string; price: number }[] = [
-    { id: 'z-image-turbo', name: 'Z-Image Turbo', price: 2 },
-    { id: 'qwen-image', name: 'Qwen Image', price: 2 }
+const IMAGE_MODELS: { id: ImageModel; name: string; price: number; shortName: string }[] = [
+    { id: 'z-image-turbo', name: 'Z-Image Turbo', price: 2, shortName: 'Z-Image' },
+    { id: 'qwen-image', name: 'Qwen Image', price: 2, shortName: 'Qwen' },
+    { id: 'qwen-image-plus', name: 'Qwen Image +', price: 4, shortName: 'Qwen +' }
 ]
 
 // Модели поддерживающие i2i
-const I2I_COMPATIBLE_MODELS: ImageModel[] = ['qwen-image']
+const I2I_COMPATIBLE_MODELS: ImageModel[] = ['qwen-image', 'qwen-image-plus']
 
 // Подсказки для начала диалога
 const SUGGESTIONS = [
@@ -130,7 +129,7 @@ function parseMarkdown(text: string): React.ReactNode {
                 let currentPara: React.ReactNode[] = []
                 lines.forEach((line, lineIdx) => {
                     const listItem = line.match(/^(\d+\.|-|\*)\s+(.*)$/)
-                    const heading = line.match(/^(#{1,6})\s+(.*)$/)
+                    const heading = line.match(/^(#{1, 6})\s+(.*)$/)
                     if (heading) {
                         if (currentPara.length > 0) {
                             elements.push(<p key={`p-${i}-${lineIdx}-prev`} className="mb-2 whitespace-pre-wrap">{currentPara}</p>)
@@ -186,29 +185,27 @@ interface AIChatOverlayProps {
 
 export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
     const { t } = useTranslation()
-    const {
-        isOpen,
-        selectedModel,
-        isLoading,
-        pendingGeneration,
-        isGeneratingImage,
-        selectedImageModel,
-        closeChat,
-        minimizeChat,
-        addMessage,
-        addImageMessage,
-        updateMessage,
-        clearMessages,
-        setModel,
-        setImageModel,
-        setLoading,
-        setPendingGeneration,
-        setGeneratingImage,
-        createSession,
-        switchSession,
-        deleteSession,
-        renameSession
-    } = useAIChatStore()
+    const isOpen = useAIChatStore(state => state.isOpen)
+    const selectedModel = useAIChatStore(state => state.selectedModel)
+    const isLoading = useAIChatStore(state => state.isLoading)
+    const pendingGeneration = useAIChatStore(state => state.pendingGeneration)
+    const isGeneratingImage = useAIChatStore(state => state.isGeneratingImage)
+    const selectedImageModel = useAIChatStore(state => state.selectedImageModel)
+
+    const closeChat = useAIChatStore(state => state.closeChat)
+    const minimizeChat = useAIChatStore(state => state.minimizeChat)
+    const addMessage = useAIChatStore(state => state.addMessage)
+    const addImageMessage = useAIChatStore(state => state.addImageMessage)
+    const updateMessage = useAIChatStore(state => state.updateMessage)
+    const clearMessages = useAIChatStore(state => state.clearMessages)
+    const setModel = useAIChatStore(state => state.setModel)
+    const setImageModel = useAIChatStore(state => state.setImageModel)
+    const setLoading = useAIChatStore(state => state.setLoading)
+    const setPendingGeneration = useAIChatStore(state => state.setPendingGeneration)
+    const setGeneratingImage = useAIChatStore(state => state.setGeneratingImage)
+    const createSession = useAIChatStore(state => state.createSession)
+    const switchSession = useAIChatStore(state => state.switchSession)
+    const deleteSession = useAIChatStore(state => state.deleteSession)
 
     const messages = useAIChatStore(selectMessages)
     const sessions = useAIChatStore(selectSessions)
@@ -223,6 +220,8 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
     const [attachedImage, setAttachedImage] = useState<string | null>(null)
     const [isProcessingImage, setIsProcessingImage] = useState(false)
     const isInline = variant === 'inline'
+    const isChatModelLocked = selectedImageModel === 'qwen-image-plus'
+
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -247,11 +246,7 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 100)
         }
-        // Ensure a session exists on open
-        if (isOpen && !activeSessionId) {
-            createSession()
-        }
-    }, [isOpen, activeSessionId, createSession])
+    }, [isOpen])
 
     if (!isOpen && variant !== 'inline') return null
 
@@ -262,28 +257,37 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         setInput('')
         setLoading(true)
 
-        addMessage('user', attachedImage ? [
+        const userMsgId = addMessage('user', attachedImage ? [
             { type: 'text', text: text },
             { type: 'image_url', image_url: { url: attachedImage } }
         ] : text)
 
-        const assistantMsgId = addMessage('assistant', '')
+        const assistantMsgId = addMessage('assistant', attachedImage ? t('aiChat.requestSent', 'Запрос отправлен, начинаю обработку...') : '')
 
         try {
             let messageContent: any = text
             if (attachedImage) {
-                const uploadRes = await fetch('/api/chat/upload', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: attachedImage })
-                })
+                let imageUrl = attachedImage
+                if (attachedImage.startsWith('data:image/')) {
+                    const uploadRes = await fetch('/api/chat/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: attachedImage })
+                    })
 
-                if (!uploadRes.ok) {
-                    throw new Error(t('aiChat.uploadError', 'Ошибка загрузки изображения'))
+                    if (!uploadRes.ok) {
+                        throw new Error(t('aiChat.uploadError', 'Ошибка загрузки изображения'))
+                    }
+
+                    const uploadData = await uploadRes.json()
+                    imageUrl = uploadData.url
+
+                    // Update user message with the public URL instead of base64 to save storage space
+                    updateMessage(userMsgId, [
+                        { type: 'text', text: text },
+                        { type: 'image_url', image_url: { url: imageUrl } }
+                    ])
                 }
-
-                const uploadData = await uploadRes.json()
-                const imageUrl = uploadData.url
 
                 messageContent = [
                     { type: 'text', text: text },
@@ -346,7 +350,7 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
             const imageCommand = parseImageCommand(fullContent)
             if (imageCommand) {
                 const cleanContent = removeImageCommand(fullContent)
-                updateMessage(assistantMsgId, cleanContent)
+                updateMessage(assistantMsgId, cleanContent || t('aiChat.requestSent', 'Запрос отправлен, начинаю обработку...'))
                 setPendingGeneration(imageCommand)
             }
 
@@ -424,6 +428,49 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         addMessage('assistant', t('aiChat.generationCancelled', 'Генерация отменена.'))
     }
 
+    const compressImage = async (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = (event) => {
+                const img = new Image()
+                img.src = event.target?.result as string
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    let width = img.width
+                    let height = img.height
+
+                    // Resize if too large (max 2048px)
+                    const MAX_SIZE = 2048
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height = Math.round((height * MAX_SIZE) / width)
+                            width = MAX_SIZE
+                        } else {
+                            width = Math.round((width * MAX_SIZE) / height)
+                            height = MAX_SIZE
+                        }
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        reject(new Error('Canvas context not available'))
+                        return
+                    }
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    // Compress to JPEG 0.8
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+                    resolve(dataUrl)
+                }
+                img.onerror = (e) => reject(e)
+            }
+            reader.onerror = (e) => reject(e)
+        })
+    }
+
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -431,25 +478,49 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
             alert(t('aiChat.onlyImages', 'Можно прикреплять только изображения'))
             return
         }
-        if (file.size > 5 * 1024 * 1024) {
-            alert(t('aiChat.imageTooLarge', 'Размер изображения не должен превышать 5МБ'))
+
+        if (file.size > 20 * 1024 * 1024) {
+            alert(t('aiChat.imageTooLarge', 'Файл слишком большой (>20MB)'))
             return
         }
 
         setIsProcessingImage(true)
         try {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                setAttachedImage(reader.result as string)
-                setIsProcessingImage(false)
-                if (!I2I_COMPATIBLE_MODELS.includes(selectedImageModel)) {
-                    setImageModel('qwen-image')
+            let resultDataUrl: string
+
+            if (file.size > 3 * 1024 * 1024) {
+                try {
+                    resultDataUrl = await compressImage(file)
+                } catch (e) {
+                    console.error('Compression failed:', e)
+                    resultDataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader()
+                        reader.onloadend = () => resolve(reader.result as string)
+                        reader.readAsDataURL(file)
+                    })
                 }
-                if (fileInputRef.current) fileInputRef.current.value = ''
+            } else {
+                resultDataUrl = await new Promise((resolve) => {
+                    const reader = new FileReader()
+                    reader.onloadend = () => resolve(reader.result as string)
+                    reader.readAsDataURL(file)
+                })
             }
-            reader.readAsDataURL(file)
+
+            if (resultDataUrl.length > 7 * 1024 * 1024) {
+                alert(t('aiChat.imageTooLarge', 'После сжатия изображение всё ещё слишком большое'))
+                setIsProcessingImage(false)
+                return
+            }
+
+            setAttachedImage(resultDataUrl)
+            setIsProcessingImage(false)
+            if (!I2I_COMPATIBLE_MODELS.includes(selectedImageModel)) {
+                setImageModel('qwen-image')
+            }
+            if (fileInputRef.current) fileInputRef.current.value = ''
         } catch (error) {
-            console.error('Error reading file:', error)
+            console.error('Error reading/processing file:', error)
             setIsProcessingImage(false)
         }
     }
@@ -465,15 +536,15 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
     const headerOffset = isInline ? '0px' : (platform === 'ios' ? 'calc(env(safe-area-inset-top) + 65px)' : 'calc(env(safe-area-inset-top) + 90px)')
     const bottomPadding = isInline ? '' : (platform === 'ios' ? 'pb-[env(safe-area-inset-bottom)]' : 'pb-4')
 
-    const handleModelChangeKeepHistory = () => {
+    const handleModelChangeContinue = () => {
         if (pendingModel) setModel(pendingModel)
         setShowModelConfirm(false)
         setPendingModel(null)
     }
 
-    const handleModelChangeClearHistory = () => {
+    const handleModelChangeNewChat = () => {
         if (pendingModel) {
-            clearMessages()
+            createSession()
             setModel(pendingModel)
         }
         setShowModelConfirm(false)
@@ -509,11 +580,11 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                             </p>
                         </div>
                         <div className="flex flex-col gap-2 p-4 pt-0">
-                            <button onClick={handleModelChangeKeepHistory} className="w-full py-3 px-4 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 transition-colors">
-                                {t('aiChat.keepHistory', 'Сохранить историю')}
+                            <button onClick={handleModelChangeNewChat} className="w-full py-3 px-4 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 transition-colors">
+                                {t('aiChat.newChat', 'Новый чат')}
                             </button>
-                            <button onClick={handleModelChangeClearHistory} className="w-full py-3 px-4 rounded-xl bg-white/10 text-white/80 font-medium hover:bg-white/15 transition-colors">
-                                {t('aiChat.clearHistory', 'Очистить историю')}
+                            <button onClick={handleModelChangeContinue} className="w-full py-3 px-4 rounded-xl bg-white/10 text-white/80 font-medium hover:bg-white/15 transition-colors">
+                                {t('aiChat.continueChat', 'Продолжить в данном чате')}
                             </button>
                             <button onClick={handleModelChangeCancel} className="w-full py-3 px-4 rounded-xl text-white/50 font-medium hover:text-white/70 transition-colors">
                                 {t('aiChat.cancel', 'Отмена')}
@@ -522,10 +593,6 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                     </div>
                 </div>
             )}
-
-
-
-
 
             {(isOpen || isInline) && <ChatFeaturesOnboarding />}
 
@@ -567,16 +634,27 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                         <div className="relative">
                             <button
                                 id="chat-model-selector"
-                                onClick={() => setShowModelSelector(!showModelSelector)}
-                                className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-white/10 text-[13px] font-medium text-white/80 hover:bg-white/15 transition-colors"
+                                onClick={() => {
+                                    if (isChatModelLocked) {
+                                        // WebApp.showAlert might be flaky in some dev environments
+                                        alert(t('aiChat.qwenPlusLocked', 'Qwen Image + работает только в связке с Qwen 3'))
+                                        return
+                                    }
+                                    setShowModelSelector(!showModelSelector)
+                                }}
+                                className={`h-8 flex items-center gap-1 px-2.5 rounded-lg text-[13px] font-medium transition-colors ${isChatModelLocked
+                                    ? 'bg-violet-900/20 border border-violet-500/20 text-violet-300 cursor-not-allowed'
+                                    : 'bg-white/10 text-white/80 hover:bg-white/15'
+                                    }`}
+                                title={isChatModelLocked ? t('aiChat.modelLocked', 'Модель зафиксирована для Qwen Image +') : ''}
                             >
                                 <span className="max-w-[90px] truncate">
                                     {MODELS.find(m => m.id === selectedModel)?.shortName || 'Model'}
                                 </span>
-                                <ChevronDown size={12} className="opacity-40" />
+                                {isChatModelLocked ? <Lock size={12} className="opacity-60" /> : <ChevronDown size={12} className="opacity-40" />}
                             </button>
 
-                            {showModelSelector && (
+                            {showModelSelector && !isChatModelLocked && (
                                 <div className="absolute left-0 top-full mt-1 w-48 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
                                     {MODELS.map(model => (
                                         <button
@@ -606,8 +684,8 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                 className="h-8 flex items-center gap-1 px-2.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/30 text-[13px] font-medium text-violet-300 hover:bg-violet-600/30 transition-colors"
                             >
                                 <ImageIcon size={12} />
-                                <span className="max-w-[60px] truncate">
-                                    {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.name.split(' ')[0] || 'Image'}
+                                <span className="max-w-[80px] truncate">
+                                    {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.shortName || 'Image'}
                                 </span>
                                 <span className="text-[9px] text-violet-400/70 font-bold bg-violet-400/10 px-1 rounded-sm">
                                     {IMAGE_MODELS.find(m => m.id === selectedImageModel)?.price || 2}т
@@ -616,9 +694,10 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                             </button>
 
                             {showImageModelSelector && (
-                                <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-900 border border-violet-500/30 rounded-lg shadow-xl overflow-hidden z-10">
-                                    <div className="px-3 py-2 text-xs text-white/40 border-b border-white/10">
-                                        {t('aiChat.selectImageModel', 'Модель генерации')}
+                                <div className="absolute right-0 top-full mt-1 w-60 bg-zinc-900 border border-violet-500/30 rounded-lg shadow-xl overflow-hidden z-10">
+                                    <div className="px-3 py-2 text-xs text-white/40 border-b border-white/10 flex justify-between items-center">
+                                        <span>{t('aiChat.selectImageModel', 'Модель генерации')}</span>
+                                        <span className="text-[10px] text-white/30">Цена</span>
                                     </div>
                                     {IMAGE_MODELS.map(model => {
                                         const isCompatible = !attachedImage || I2I_COMPATIBLE_MODELS.includes(model.id)
@@ -628,20 +707,25 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                                 disabled={!isCompatible}
                                                 onClick={() => {
                                                     setImageModel(model.id)
+                                                    if (model.id === 'qwen-image-plus') {
+                                                        setModel('Qwen/Qwen3-235B-A22B')
+                                                    }
                                                     setShowImageModelSelector(false)
                                                 }}
-                                                className={`w-full px-3 py-2.5 text-left text-sm transition-colors flex items-center justify-between ${selectedImageModel === model.id
+                                                className={`w-full px-3 py-2.5 text-left text-sm transition-colors flex items-center justify-between gap-3 ${selectedImageModel === model.id
                                                     ? 'bg-violet-600 text-white'
                                                     : isCompatible ? 'text-white/80 hover:bg-white/10' : 'text-white/30 cursor-not-allowed'
                                                     }`}
                                             >
-                                                <div className="flex flex-col">
-                                                    <span>{model.name}</span>
-                                                    {!isCompatible && <span className="text-[10px] text-red-400">Not for i2i</span>}
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-medium truncate">{model.name}</span>
+                                                    {!isCompatible && <span className="text-[10px] text-red-400 leading-none mt-0.5">Не для фото-редактора</span>}
                                                 </div>
-                                                <span className={`text-xs ${selectedImageModel === model.id ? 'text-white/80' : 'text-white/50'}`}>
-                                                    {model.price} {t('aiChat.tokens', 'токен')}
-                                                </span>
+                                                <div className={`flex flex-col items-end shrink-0 ${selectedImageModel === model.id ? 'text-white/90' : 'text-white/50'}`}>
+                                                    <span className="text-xs font-bold font-mono bg-white/10 px-1.5 py-0.5 rounded">
+                                                        {model.price}т
+                                                    </span>
+                                                </div>
                                             </button>
                                         )
                                     })}
@@ -742,8 +826,6 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                             if (inputRef.current) {
                                                 setInput(suggestion.text)
                                                 inputRef.current.focus()
-                                                // We set value and focus, allowing user to edit before sending
-                                                // Or we could trigger handleSend if we wanted instant send
                                             }
                                         }}
                                         className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-sm text-white/70 hover:text-white"

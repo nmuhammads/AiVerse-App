@@ -276,6 +276,12 @@ export async function handleUploadImage(req: Request, res: Response) {
         // Загрузка в R2 (папка chat-uploads)
         const publicUrl = await uploadImageFromBase64(image, 'chat-uploads')
 
+        // If upload fails, r2Service returns the original base64. 
+        // We should NOT return this to the client as a "url", because it will break the chat generation flow.
+        if (publicUrl.startsWith('data:')) {
+            throw new Error('Failed to upload image to storage server')
+        }
+
         res.json({
             success: true,
             url: publicUrl

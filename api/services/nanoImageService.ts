@@ -5,8 +5,9 @@
 
 const NANOGPT_API_KEY = process.env.NANOGPT_API_KEY || ''
 const NANOGPT_IMAGE_URL = 'https://nano-gpt.com/v1/images/generations'
+const NANOGPT_NSFW_URL = 'https://nano-gpt.com/api/nsfw/image'
 
-export type NanoImageModel = 'z-image-turbo' | 'qwen-image'
+export type NanoImageModel = 'z-image-turbo' | 'qwen-image' | 'qwen-image-plus'
 
 export interface NanoImageParams {
     prompt: string
@@ -26,13 +27,15 @@ export interface NanoImageResult {
 // Цены моделей (токены)
 export const NANO_IMAGE_PRICES: Record<NanoImageModel, number> = {
     'z-image-turbo': 2,
-    'qwen-image': 2
+    'qwen-image': 2,
+    'qwen-image-plus': 4
 }
 
 // Доступные модели для AI-агента
 export const NANO_IMAGE_MODELS: { id: NanoImageModel; name: string; price: number }[] = [
     { id: 'z-image-turbo', name: 'Z-Image Turbo', price: 2 },
-    { id: 'qwen-image', name: 'Qwen Image', price: 2 }
+    { id: 'qwen-image', name: 'Qwen Image', price: 2 },
+    { id: 'qwen-image-plus', name: 'Qwen Image +', price: 4 }
 ]
 
 /**
@@ -43,13 +46,31 @@ export async function generateNanoGPTImage(params: NanoImageParams): Promise<Nan
 
     console.log('[NanoImageService] Generating image:', { model, prompt: prompt.slice(0, 50), size, hasImage: !!image })
 
+    // Map internal 'plus' model to actual provider model
+    const providerModel = model === 'qwen-image-plus' ? 'qwen-image' : model
+
     const body: any = {
-        model,
+        model: providerModel,
         prompt,
         n,
-        size,
         response_format: 'url'
     }
+
+    if (model === 'qwen-image' || model === 'qwen-image-plus') {
+        // Qwen uses 'resolution' instead of 'size' for BOTH t2i and i2i
+        // For i2i (with image), default to 'auto' to preserve aspect ratio
+        // For t2i, use the provided size (e.g. '1024x1024')
+        body.resolution = (image && size === '1024x1024') ? 'auto' : size
+    } else {
+        body.size = size
+    }
+
+    console.log('[NanoImageService] Request payload params:', {
+        model,
+        resolution: body.resolution,
+        size: body.size,
+        hasImage: !!image
+    })
 
     if (image) {
         // Если передан URL, нужно скачать и конвертировать в base64 data url
@@ -86,28 +107,89 @@ export async function generateNanoGPTImage(params: NanoImageParams): Promise<Nan
         body: JSON.stringify(body)
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-        console.error('[NanoImageService] Error:', data)
-        throw new Error(data.error?.message || 'Image generation failed')
+        if (response.status === 413) {
+            throw new Error('Image is too large for AI processing. Please use a smaller image (under 4MB).')
+        }
+
+        const text = await response.text()
+        let errorMsg = `Image generation failed with status ${response.status}`
+        try {
+            const json = JSON.parse(text)
+            if (json.error) {
+                // Handle both object with message and simple string cases
+                errorMsg = typeof json.error === 'string' ? json.error : (json.error.message || JSON.stringify(json.error))
+            }
+        } catch {
+            // If not JSON, use the text body or status text
+            if (text.length < 200) errorMsg += `: ${text}`
+        }
+
+        console.error('[NanoImageService] Error:', { status: response.status, text: text.slice(0, 200) })
+        throw new Error(errorMsg)
     }
 
-    console.log('[NanoImageService] Generation successful:', {
-        hasUrl: !!data.data?.[0]?.url,
-        cost: data.cost,
-        remainingBalance: data.remainingBalance
-    })
+    const data = await response.json()
+
+    console.log('[NanoImageService] API Response:', JSON.stringify(data, null, 2))
 
     const imageData = data.data?.[0]
     if (!imageData) {
         throw new Error('No image data in response')
     }
 
+    let resultUrl = imageData.url
+    const resultB64 = imageData.b64_json
+    let totalCost = data.cost || 0
+
+    // --- NSFW CHECK ---
+    // Skip NSFW check for 'plus' models (unrestricted)
+    if (model !== 'qwen-image-plus') {
+        try {
+            const checkImage = resultUrl || (resultB64 ? `data:image/jpeg;base64,${resultB64}` : null)
+            if (checkImage) {
+                console.log('[NanoImageService] Checking NSFW...')
+                const nsfwRes = await fetch(NANOGPT_NSFW_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': NANOGPT_API_KEY
+                    },
+                    body: JSON.stringify({
+                        imageUrl: checkImage,
+                        model: 'nsfw-classifier'
+                    })
+                })
+
+                if (nsfwRes.ok) {
+                    const nsfwData = await nsfwRes.json()
+                    if (nsfwData.cost) totalCost += nsfwData.cost
+                    console.log('[NanoImageService] NSFW Check Result:', nsfwData)
+
+                    if (nsfwData.is_nsfw) {
+                        throw new Error('Generated image contains explicit content (NSFW) and cannot be shown.')
+                    }
+                } else {
+                    console.warn('[NanoImageService] NSFW check failed (status):', nsfwRes.status)
+                }
+            }
+        } catch (e: any) {
+            if (e.message?.includes('explicit content')) throw e
+            console.error('[NanoImageService] NSFW check error:', e)
+            // Optionally decide if we fail open or closed. For now fail open (allow image if check fails technically)
+        }
+    }
+
+    console.log('[NanoImageService] Generation successful:', {
+        hasUrl: !!resultUrl,
+        cost: totalCost,
+        remainingBalance: data.remainingBalance
+    })
+
     return {
-        url: imageData.url,
-        b64_json: imageData.b64_json,
-        cost: data.cost,
+        url: resultUrl,
+        b64_json: resultB64,
+        cost: totalCost,
         remainingBalance: data.remainingBalance
     }
 }
@@ -116,7 +198,7 @@ export async function generateNanoGPTImage(params: NanoImageParams): Promise<Nan
  * Валидация модели
  */
 export function isValidNanoImageModel(model: string): model is NanoImageModel {
-    return ['z-image-turbo', 'qwen-image'].includes(model)
+    return ['z-image-turbo', 'qwen-image', 'qwen-image-plus'].includes(model)
 }
 
 /**

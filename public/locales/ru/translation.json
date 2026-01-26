@@ -794,6 +794,13 @@
         "cancelGeneration": "Отмена",
         "generationError": "❌ Ошибка генерации. Попробуйте ещё раз.",
         "generationCancelled": "Генерация отменена.",
-        "selectImageModel": "Модель генерации"
+        "selectImageModel": "Модель генерации",
+        "newChat": "Новый чат",
+        "continueChat": "Продолжить в данном чате",
+        "requestSent": "Запрос отправлен, начинаю обработку...",
+        "uploadError": "Ошибка загрузки изображения",
+        "sendToTelegramError": "Не удалось отправить файл в Telegram.",
+        "onlyImages": "Можно прикреплять только изображения",
+        "imageTooLarge": "Размер изображения не должен превышать 5МБ"
     }
 }

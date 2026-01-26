@@ -40,7 +40,7 @@ const SYSTEM_PROMPT = `Ты — AI-ассистент приложения AiVer
 {
   "prompt": "подробное описание на английском",
   "model": "z-image-turbo",
-  "size": "1024x1024",
+  "resolution": "1024x1024",
   "image": "https://..." // ТОЧНАЯ ССЫЛКА НА КАРТИНКУ ИЗ СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ
 }
 \`\`\`
@@ -50,10 +50,20 @@ const SYSTEM_PROMPT = `Ты — AI-ассистент приложения AiVer
 - ЗАПРЕЩЕНО ПРИДУМЫВАТЬ ССЫЛКИ или использовать example.com.
 - Это включит режим Image-to-Image (i2i).
 - В "prompt" опиши ЧТО ИЗМЕНИТЬ или КАКОЙ СТИЛЬ ПРИМЕНИТЬ к этому изображению.
+- ДЛЯ МОДЕЛИ "resolution": Устанавливай "auto" ПО УМОЛЧАНИЮ, если пользователь не указал конкретное соотношение сторон. Если указал — используй запрошенный формат (например, 1024x1024).
 
 ДОСТУПНЫЕ МОДЕЛИ ДЛЯ ГЕНЕРАЦИИ В ЧАТЕ:
 - z-image-turbo (2 токена) — быстрая генерация, хорошее качество
-- qwen-image (2 токена) — Qwen Image, художественный стиль
+- qwen-image (2 токена) — Qwen Image, художественный стиль. ВАЖНО: Использует параметр "resolution".
+- qwen-image-plus (4 токена) — Qwen Image +, без ограничений (18+ разрешено).
+
+  Доступные разрешения для Qwen:
+  - 1024x1024 (Square HD)
+  - 512x512 (Square)
+  - 768x1024 (Portrait 3:4)
+  - 576x1024 (Portrait 9:16)
+  - 1024x768 (Landscape 4:3)
+  - 1024x576 (Landscape 16:9)
 
 ВАЖНО — ПРАВИЛА ОБРАБОТКИ ПРОМПТА:
 1. В поле "prompt" (в JSON) ты должен вставить ТЕКСТ ЗАПРОСА ПОЛЬЗОВАТЕЛЯ.
@@ -61,6 +71,19 @@ const SYSTEM_PROMPT = `Ты — AI-ассистент приложения AiVer
 3. ЕДИНСТВЕННОЕ допустимое изменение — это перевод на английский язык (если запрос был не на английском). Перевод должен быть МАКСИМАЛЬНО ТОЧНЫМ и ДОСЛОВНЫМ, без творческой адаптации.
 4. Если запрос уже на английском — вставляй его в json ИДЕНТИЧНО, символ в символ.
 5. Твоя задача — просто превратить намерение пользователя в JSON команду, ничего не выдумывая от себя.
+
+⛔️ ПРАВИЛА БЕЗОПАСНОСТИ (СТРОГО):
+Ты ЗАПРЕЩЕНО генерировать JSON команду для создания следующего контента, ЕСЛИ выбрана модель "z-image-turbo" или "qwen-image":
+- Порнография, сексуально откровенный контент, нагота (NSFW, 18+).
+- Насилие, расчленение, кровь.
+- Незаконные действия.
+
+ИСКЛЮЧЕНИЕ: Модель "qwen-image-plus" НЕ ИМЕЕТ ограничений на NSFW контент. Для неё эти запреты НЕ действуют.
+
+ЕСЛИ пользователь просит NSFW контент и выбрана обычная модель:
+1. НЕ ГЕНЕРИРУЙ JSON команду.
+2. Вежливо откажи, объяснив, что не можешь создавать такой контент (на языке пользователя).
+
 
 КАК ГЕНЕРИРОВАТЬ ИЗОБРАЖЕНИЯ В СТУДИИ:
 1. Открой вкладку "Студия" в нижнем меню
@@ -161,7 +184,12 @@ export async function* streamChatCompletion(
         ...messages
     ]
 
-    console.log('[ChatService] Starting stream to NanoGPT:', { model, messageCount: messages.length })
+    console.log('[ChatService] Starting stream to NanoGPT:', {
+        model,
+        messageCount: messages.length,
+        // Log last user message for context (truncated)
+        lastMessage: messages.length > 0 ? JSON.stringify(messages[messages.length - 1]).slice(0, 200) : 'none'
+    })
 
     const response = await fetch(`${NANOGPT_BASE_URL}/chat/completions`, {
         method: 'POST',
@@ -178,8 +206,18 @@ export async function* streamChatCompletion(
     })
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `Stream failed: ${response.status}`)
+        let errorMsg = `Stream failed: ${response.status} ${response.statusText}`
+        try {
+            const errorData = await response.json()
+            errorMsg = errorData.error?.message || errorMsg
+        } catch {
+            try {
+                const textData = await response.text()
+                if (textData) errorMsg += ` - ${textData.slice(0, 200)}`
+            } catch { /* ignore */ }
+        }
+        console.error('[ChatService] Stream request failed:', errorMsg)
+        throw new Error(errorMsg)
     }
 
     const reader = response.body?.getReader()
@@ -211,11 +249,17 @@ export async function* streamChatCompletion(
                     if (content) {
                         yield content
                     }
-                } catch {
-                    // Skip invalid JSON
+                } catch (e) {
+                    console.error('[ChatService] Failed to parse stream chunk:', {
+                        line: line.slice(0, 100), // Log only first 100 chars
+                        error: e
+                    })
                 }
             }
         }
+    } catch (e) {
+        console.error('[ChatService] Stream processing error:', e)
+        throw e
     } finally {
         reader.releaseLock()
     }
