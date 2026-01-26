@@ -643,12 +643,14 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
                                 <Plus size={20} />
                             </button>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <Bot className="w-5 h-5 text-violet-400" />
-                            <span className="font-semibold text-white whitespace-nowrap text-sm sm:text-base leading-none">
-                                {t('aiChat.title', 'AI Ассистент')}
-                            </span>
-                        </div>
+                        {!isInline && (
+                            <div className="flex items-center gap-1.5">
+                                <Bot className="w-5 h-5 text-violet-400" />
+                                <span className="font-semibold text-white whitespace-nowrap text-sm sm:text-base leading-none">
+                                    {t('aiChat.title', 'AI Ассистент')}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2">
