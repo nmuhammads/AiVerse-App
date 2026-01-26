@@ -8,12 +8,12 @@ import { useNavigate } from 'react-router-dom'
 // Configuration for the current announcement
 const ANNOUNCEMENT = {
     enabled: true, // Set to true to enable the announcement
-    id: 'announcement_kling_motion_control',
-    title: 'Kling 2.6 Motion Control 🎬',
-    description: 'Новая модель для создания видео!\n\nЗагрузите фото персонажа и референс-видео с движением — AI перенесёт движения на вашего персонажа.\n\nПоддержка видео до 30 секунд в качестве 720p/1080p.',
-    image: '/announcements/kling_motion_control.png',
+    id: 'ai_chat_launch',
+    title: 'Встречайте AI Чат 🤖',
+    description: '• Умный собеседник: Общайтесь с AI как с другом, он помнит контекст диалога.\n• Генерация артов: Создавайте изображения прямо в чате по запросу.\n• История: Все ваши диалоги сохраняются.\n• Удобство: Знакомый интерфейс мессенджера.',
+    image: '/announcements/ai_chat_launch.png',
     buttonText: 'Попробовать',
-    link: '/studio', // Redirect to studio
+    link: '/chat', // Redirect to chat
     secondaryButtonText: 'Закрыть',
     secondaryLink: '' // Close modal
 }
