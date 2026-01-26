@@ -7,6 +7,7 @@ export function StudioModeToggle() {
     return (
         <div className="flex items-center gap-1.5 select-none">
             <button
+                id="studio-mode-toggle"
                 onClick={() => setStudioMode('studio')}
                 className={cn(
                     "text-xl transition-all duration-300",

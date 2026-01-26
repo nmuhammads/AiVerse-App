@@ -6,6 +6,7 @@ import { DescribeImageModal } from '@/components/DescribeImageModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { AIChatOverlay } from '@/components/AIChatOverlay'
 import { ChatOnboardingOverlay } from '@/components/ChatOnboardingOverlay'
+import { ChatModeExitOnboarding } from '@/components/ChatModeExitOnboarding'
 import { useTranslation } from 'react-i18next'
 import { Zap, Pencil } from 'lucide-react'
 
@@ -295,6 +296,7 @@ export default function Studio() {
           isOpen={showTimeoutModal}
           onClose={() => setShowTimeoutModal(false)}
         />
+        <ChatModeExitOnboarding />
       </div>
     )
   }

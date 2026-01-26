@@ -157,6 +157,13 @@ export function useStudio() {
     useEffect(() => {
         const remixId = searchParams.get('remix')
         const contestEntry = searchParams.get('contest_entry')
+        const mode = searchParams.get('mode')
+
+        if (mode === 'chat') {
+            setStudioMode('chat')
+        } else if (mode === 'studio') {
+            setStudioMode('studio')
+        }
 
         if (contestEntry) {
             setContestEntryId(Number(contestEntry))

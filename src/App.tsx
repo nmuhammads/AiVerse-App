@@ -51,6 +51,10 @@ function StartParamRouter() {
         navigate("/studio", { replace: true, state: { fromDeepLink: true } });
         return;
       }
+      if (p === "chat") {
+        navigate("/studio?mode=chat", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
       if (p === "home") {
         navigate("/", { replace: true });
         return;
@@ -168,6 +172,7 @@ export default function App() {
           <div className="flex-1">
             <Routes>
               <Route path="/" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
+              <Route path="/chat" element={<Navigate to="/studio?mode=chat" replace />} />
               <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
               <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
               <Route path="/profile" element={<PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary>} />
