@@ -59,13 +59,9 @@ export async function getFeed(req: Request, res: Response) {
             order = 'likes_count.desc,created_at.desc'
         }
 
-        // Filter by current month (Adjusted for UTC+3 - Moscow/CIS time)
+        // Filter by last 7 days
         const now = new Date()
-        // Add 3 hours to current UTC time to get target local time
-        const targetTime = new Date(now.getTime() + (3 * 60 * 60 * 1000))
-        // Create start of month based on target year/month, but in UTC format for DB comparison
-        // We want "2025-12-01 00:00:00" in UTC effectively
-        const startOfMonth = new Date(Date.UTC(targetTime.getUTCFullYear(), targetTime.getUTCMonth(), 1)).toISOString()
+        const startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)).toISOString()
 
         const model = req.query.model ? String(req.query.model) : null
         const includeUnpublished = req.query.include_unpublished === 'true'
@@ -89,7 +85,7 @@ export async function getFeed(req: Request, res: Response) {
             // BUT we must only show completed generations
             baseQuery = `user_id=eq.${currentUserId}&status=eq.completed`
         } else {
-            baseQuery = `status=neq.deleted&is_published=eq.true&created_at=gte.${startOfMonth}`
+            baseQuery = `status=neq.deleted&is_published=eq.true&created_at=gte.${startDate}`
         }
 
         let queryParts = []
