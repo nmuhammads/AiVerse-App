@@ -360,6 +360,7 @@ export default function Studio() {
               }}
               onOptimize={handleOptimizePrompt}
               onDescribe={() => { impact('light'); setIsDescribeModalOpen(true) }}
+              selectedModel={selectedModel}
 
             />
           )}

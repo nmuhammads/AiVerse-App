@@ -26,7 +26,7 @@ const MODEL_PRICES: Record<ModelType, number> = {
     'kling-t2v': 55,
     'kling-i2v': 55,
     'kling-mc': 30,
-    'qwen-image': 3,
+    'qwen-image': 2,
 }
 
 // Цены GPT Image по качеству

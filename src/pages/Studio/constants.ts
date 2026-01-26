@@ -29,7 +29,7 @@ export const MODEL_PRICES: Record<ModelType, number> = {
     'p-image-edit': 2,
     'seedance-1.5-pro': 42,
     'gpt-image-1.5': 5,
-    'qwen-image': 3,
+    'qwen-image': 2,
     'test-model': 0,
     'kling-t2v': 55,
     'kling-i2v': 55,

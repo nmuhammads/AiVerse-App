@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Image as ImageIcon, Loader2, Sparkles, Wand2, X } from 'lucide-react'
+import { Image as ImageIcon, Loader2, Sparkles, Wand2, X, Info } from 'lucide-react'
+import { type ModelType } from '@/store/generationStore'
 
 type TranslationFn = ReturnType<typeof useTranslation>['t']
 
@@ -14,6 +15,7 @@ type PromptInputProps = {
   onClearParent: () => void
   onOptimize: () => void
   onDescribe: () => void
+  selectedModel: ModelType
 }
 
 export function PromptInput({
@@ -27,6 +29,7 @@ export function PromptInput({
   onClearParent,
   onOptimize,
   onDescribe,
+  selectedModel,
 }: PromptInputProps) {
   return (
     <div className="relative mt-1">
@@ -69,6 +72,15 @@ export function PromptInput({
           </>
         )}
       </div>
+
+      {selectedModel === 'qwen-image' && (
+        <div className="flex items-center gap-2 mt-2 px-1 animate-in fade-in slide-in-from-top-1">
+          <Info size={14} className="text-violet-400 shrink-0" />
+          <p className="text-xs text-violet-300 font-medium">
+            Подсказка: эта модель лучше понимает запросы на английском языке
+          </p>
+        </div>
+      )}
 
       {!isPromptPrivate && (
         <div className="flex gap-2 mt-2">
