@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image as ImageIcon, Loader2, Sparkles, Wand2, X, Info } from 'lucide-react'
 import { type ModelType } from '@/store/generationStore'
@@ -31,6 +32,18 @@ export function PromptInput({
   onDescribe,
   selectedModel,
 }: PromptInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleFocus = () => {
+    // Небольшая задержка для корректной работы с виртуальной клавиатурой
+    setTimeout(() => {
+      textareaRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 300)
+  }
+
   return (
     <div className="relative mt-1">
       {parentAuthorUsername && (
@@ -56,8 +69,10 @@ export function PromptInput({
         ) : (
           <>
             <textarea
+              ref={textareaRef}
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
+              onFocus={handleFocus}
               placeholder={t('studio.prompt.placeholder')}
               className={`prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar ${parentAuthorUsername ? 'border-violet-500/30 focus:border-violet-500/50' : ''}`}
             />
