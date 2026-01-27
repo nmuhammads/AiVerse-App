@@ -653,22 +653,6 @@ export async function sendRemixShare(req: Request, res: Response) {
     const ownerUserId = req.body?.owner_user_id ? String(req.body.owner_user_id) : null
     const model = typeof req.body?.model === 'string' ? String(req.body.model) : null
 
-    // Build caption with model name and author
-    const authorText = ownerUsername ? `\n👤 Автор: @${ownerUsername}` : ''
-    let caption = `✨ AI Verse${authorText}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
-    if (model) {
-      const modelNames: Record<string, string> = {
-        'flux': 'Flux',
-        'seedream4': 'Seedream 4',
-        'seedream4-5': 'Seedream 4.5',
-        'nanobanana': 'NanoBanana',
-        'nanobanana-pro': 'NanoBanana Pro',
-        'seedance-1.5-pro': 'Seedance Pro'
-      }
-      const displayName = modelNames[model] || model
-      caption = `✨ AI Verse${authorText}\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми кнопку «Повторить» ниже! 👇`
-    }
-
     if (!API || !chat_id || (!photo && !video) || !generationId) {
       return res.status(400).json({ ok: false, error: 'invalid payload' })
     }
@@ -690,6 +674,23 @@ export async function sendRemixShare(req: Request, res: Response) {
       ? `https://t.me/${botUsername}?startapp=ref-${refValue}-remix-${generationId}`
       : `https://t.me/${botUsername}?startapp=remix-${generationId}`
 
+    // Build caption with model name, author, and remix link
+    const authorText = ownerUsername ? `\n👤 Автор: @${ownerUsername}` : ''
+    const remixLink = `<a href="${remixUrl}">Повторить ↻</a>`
+    let caption = `✨ AI Verse${authorText}\n\nХочешь сделать так же? Жми ${remixLink} 👇`
+    if (model) {
+      const modelNames: Record<string, string> = {
+        'flux': 'Flux',
+        'seedream4': 'Seedream 4',
+        'seedream4-5': 'Seedream 4.5',
+        'nanobanana': 'NanoBanana',
+        'nanobanana-pro': 'NanoBanana Pro',
+        'seedance-1.5-pro': 'Seedance Pro'
+      }
+      const displayName = modelNames[model] || model
+      caption = `✨ AI Verse${authorText}\n🎨 Модель: ${displayName}\n\nХочешь сделать так же? Жми ${remixLink} 👈 👇`
+    }
+
     const kb = {
       inline_keyboard: [[
         { text: 'Повторить ↻', url: remixUrl }
@@ -707,6 +708,7 @@ export async function sendRemixShare(req: Request, res: Response) {
     const payload: any = {
       chat_id,
       caption,
+      parse_mode: 'HTML',
       reply_markup: kb
     }
     payload[mediaKey] = mediaUrl
@@ -771,6 +773,7 @@ export async function sendRemixShare(req: Request, res: Response) {
       const form = new FormData()
       form.append('chat_id', String(chat_id))
       form.append('caption', caption)
+      form.append('parse_mode', 'HTML')
       // Append fields dynamically based on type
       const method = isVideoContentType ? 'sendVideo' : 'sendPhoto'
       const fieldName = isVideoContentType ? 'video' : 'photo'
