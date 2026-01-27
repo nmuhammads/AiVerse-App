@@ -180,7 +180,7 @@ export async function webhook(req: Request, res: Response) {
       console.log('[MyContest] Final organizerName:', organizerName)
 
       // Find active contest
-      const query = `?status=eq.active&organizer_name=ilike.${encodeURIComponent(organizerName)}&select=*`
+      const query = `?status=eq.active&organizer_name=ilike.${encodeURIComponent('%' + organizerName + '%')}&select=*`
       console.log('[MyContest] Supabase query:', query)
       const q = await supaSelect('contests', query)
       console.log('[MyContest] Supabase result:', { ok: q.ok, dataLength: q.data?.length, data: q.data })
