@@ -39,7 +39,7 @@ export function PromptInput({
     setTimeout(() => {
       textareaRef.current?.scrollIntoView({
         behavior: 'smooth',
-        block: 'start',
+        block: 'nearest',
       })
     }, 300)
   }
@@ -74,7 +74,7 @@ export function PromptInput({
               onChange={(e) => onPromptChange(e.target.value)}
               onFocus={handleFocus}
               placeholder={t('studio.prompt.placeholder')}
-              style={{ scrollMarginTop: '80px' }}
+              style={{ scrollMarginTop: '100px' }}
               className={`prompt-input min-h-[120px] bg-zinc-900/30 backdrop-blur-sm no-scrollbar ${parentAuthorUsername ? 'border-violet-500/30 focus:border-violet-500/50' : ''}`}
             />
             {prompt && (
