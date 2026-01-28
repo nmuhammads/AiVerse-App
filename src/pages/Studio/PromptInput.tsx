@@ -37,9 +37,17 @@ export function PromptInput({
   const handleFocus = () => {
     // Небольшая задержка для корректной работы с виртуальной клавиатурой
     setTimeout(() => {
-      textareaRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
+      if (!textareaRef.current) return
+
+      const rect = textareaRef.current.getBoundingClientRect()
+      const viewportHeight = window.visualViewport?.height || window.innerHeight
+      // Позиционируем поле в верхней трети видимой области (примерно 30% от верха)
+      const targetPosition = viewportHeight * 0.25
+      const scrollOffset = rect.top - targetPosition
+
+      window.scrollBy({
+        top: scrollOffset,
+        behavior: 'smooth'
       })
     }, 300)
   }
