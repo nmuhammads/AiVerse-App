@@ -3,6 +3,7 @@ import { uploadToEditedBucket, uploadImageFromBase64 } from '../services/r2Servi
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
 import { createInpaintPrediction } from '../services/replicateService.js'
 import { createAnglesPrediction } from '../services/wavespeedService.js'
+import { logBalanceChange } from '../services/balanceAuditService.js'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || ''
 const RUNPOD_BASE_URL = 'https://api.runpod.ai/v2'
@@ -134,6 +135,7 @@ export async function handleImageEdit(req: Request, res: Response) {
 
             // Списание токенов
             await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance - price })
+            logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance - price, reason: 'editor', metadata: { mode: mode || 'edit' } })
             console.log(`[Editor] Deducted ${price} tokens from user ${user_id}`)
         }
 
@@ -172,6 +174,7 @@ export async function handleImageEdit(req: Request, res: Response) {
                         const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
                         const balance = userRes?.data?.[0]?.balance || 0
                         await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                        logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance + price, reason: 'refund', metadata: { mode: 'angles', error: 'TIMEOUT' } })
                         console.log(`[Editor] Refunded ${price} tokens to user ${user_id}`)
                     }
                     return res.json({ status: 'pending', message: 'Processing, please check later' })
@@ -183,6 +186,7 @@ export async function handleImageEdit(req: Request, res: Response) {
                     const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
                     const balance = userRes?.data?.[0]?.balance || 0
                     await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance + price, reason: 'refund', metadata: { mode: 'angles', error: 'WaveSpeed failed' } })
                     console.log(`[Editor] Refunded ${price} tokens due to error`)
                 }
                 throw err
@@ -203,6 +207,7 @@ export async function handleImageEdit(req: Request, res: Response) {
                     const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
                     const balance = userRes?.data?.[0]?.balance || 0
                     await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance + price, reason: 'refund', metadata: { mode: 'inpaint', error: 'Replicate failed' } })
                     console.log(`[Editor] Refunded ${price} tokens due to error`)
                 }
                 throw err
@@ -226,6 +231,7 @@ export async function handleImageEdit(req: Request, res: Response) {
                     const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
                     const balance = userRes?.data?.[0]?.balance || 0
                     await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + price })
+                    logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance + price, reason: 'refund', metadata: { mode: 'edit', error: 'TIMEOUT' } })
                     console.log(`[Editor] Refunded ${price} tokens to user ${user_id}`)
                 }
                 return res.json({ status: 'pending', message: 'Processing, please check later' })
@@ -281,6 +287,7 @@ export async function handleImageEdit(req: Request, res: Response) {
                 const userRes = await supaSelect('users', `?user_id=eq.${user_id}&select=balance`)
                 const balance = userRes?.data?.[0]?.balance || 0
                 await supaPatch('users', `?user_id=eq.${user_id}`, { balance: balance + EDITOR_PRICE })
+                logBalanceChange({ userId: user_id, oldBalance: balance, newBalance: balance + EDITOR_PRICE, reason: 'refund', metadata: { mode: mode || 'edit', error: 'Editor failed' } })
                 console.log(`[Editor] Refunded ${EDITOR_PRICE} tokens due to error`)
             } catch (refundError) {
                 console.error('[Editor] Refund failed:', refundError)

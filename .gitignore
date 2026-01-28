@@ -36,3 +36,4 @@ migrations/*
 scripts/temp_migrate.js
 uploads/*
 logs/*
+user_692574150_logs.json

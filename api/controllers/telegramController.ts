@@ -26,6 +26,7 @@ export async function tg(method: string, payload: Record<string, unknown>) {
 }
 
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
+import { logBalanceChange } from '../services/balanceAuditService.js'
 
 export async function webhook(req: Request, res: Response) {
   try {
@@ -91,6 +92,7 @@ export async function webhook(req: Request, res: Response) {
           })
 
           if (updateRes.ok) {
+            logBalanceChange({ userId, oldBalance: currentBalance, newBalance, reason: 'payment', metadata: { baseTokens, bonusTokens, promoActive, spinsToAdd } })
             const spinText = spinsToAdd > 0 ? `\n🎰 Бонус: +${spinsToAdd} ${spinsToAdd === 1 ? 'спин' : 'спина'} для Колеса Фортуны!` : ''
             const promoText = promoActive ? `\n(Включая новогодний бонус +${bonusTokens} 🎁)` : ''
             await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.${promoText}${spinText}` })

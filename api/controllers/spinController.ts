@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
+import { logBalanceChange } from '../services/balanceAuditService.js'
 
 // Segments configuration
 // Indices mapping to UI Wheel segments: [500, 25, 50, 100, 50, 25, 250, 50, 200, 75, 120, 50]
@@ -94,6 +95,11 @@ export async function handleSpin(req: Request, res: Response) {
         if (!updateRes.ok) {
             console.error('Failed to update user spin/balance', updateRes)
             return res.status(500).json({ error: 'Transaction failed' })
+        }
+
+        // Log balance change (fire and forget)
+        if (prize.type === 'token') {
+            logBalanceChange({ userId: user_id, oldBalance: currentBalance, newBalance, reason: 'spin', metadata: { prizeValue: prize.value, prizeIndex: prize.index } })
         }
 
         // Log History (Fire and forget, or await)

@@ -7,6 +7,7 @@ import { Request, Response } from 'express'
 import { streamChatCompletion, getChatCompletion, type ChatMessage, type ChatModel } from '../services/chatService'
 import { generateNanoGPTImage, isValidNanoImageModel, getNanoImagePrice, NANO_IMAGE_MODELS, type NanoImageModel } from '../services/nanoImageService'
 import { uploadImageFromBase64 } from '../services/r2Service'
+import { logBalanceChange } from '../services/balanceAuditService'
 
 const AVAILABLE_MODELS: ChatModel[] = [
     'deepseek/deepseek-v3.2',
@@ -218,6 +219,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
         // Списание токенов
         const newBalance = currentBalance - price
         await supaPatch('users', `?user_id=eq.${user_id}`, { balance: newBalance })
+        logBalanceChange({ userId: Number(user_id), oldBalance: currentBalance, newBalance, reason: 'chat', referenceId: generationId, metadata: { model, price } })
         console.log(`[ChatController] Balance debited: ${currentBalance} -> ${newBalance}`)
 
         // Генерация изображения

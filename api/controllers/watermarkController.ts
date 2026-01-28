@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { supaSelect, supaPost, supaPatch, supaDelete } from '../services/supabaseService.js'
 import sharp from 'sharp'
 import { uploadImageFromBase64 } from '../services/r2Service.js'
+import { logBalanceChange } from '../services/balanceAuditService.js'
 
 // Simple Kie.ai interfaces
 interface KieJobsResponse {
@@ -319,6 +320,7 @@ export async function generateWatermark(req: Request, res: Response) {
         // 6. Deduct balance
         const newBalance = (user.balance || 0) - price
         await supaPatch('users', `?user_id=eq.${userId}`, { balance: newBalance })
+        logBalanceChange({ userId, oldBalance: user.balance || 0, newBalance, reason: 'watermark', metadata: { model, action: 'generate' } })
 
         // 7. Update/Create watermark record
         const { data: existing } = await supaSelect('user_watermarks', `?user_id=eq.${userId}&limit=1`)
@@ -572,6 +574,7 @@ export async function removeBackground(req: Request, res: Response) {
         // 6. Deduct balance
         const newBalance = balance - price
         await supaPatch('users', `?user_id=eq.${userId}`, { balance: newBalance })
+        logBalanceChange({ userId, oldBalance: balance, newBalance, reason: 'watermark', metadata: { action: 'remove-background' } })
 
         // 7. Update/Create watermark record in DB
         const { data: existing } = await supaSelect('user_watermarks', `?user_id=eq.${userId}&limit=1`)

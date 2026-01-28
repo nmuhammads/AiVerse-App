@@ -12,6 +12,7 @@ import { createNotification, getUserNotificationSettings } from './notificationC
 import { createPiapiTask, pollPiapiTask, checkPiapiTask } from '../services/piapiService.js'
 import { getAppConfig, setAppConfig } from '../services/supabaseService.js'
 import { generateNanoGPTImage } from '../services/nanoImageService.js'
+import { logBalanceChange, safeRefund } from '../services/balanceAuditService.js'
 
 interface KieAIRequest {
   model: string
@@ -1399,6 +1400,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
           if (typeof currBal === 'number') {
             const nextBal = Math.max(0, currBal - cost)
             await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
+            logBalanceChange({ userId: Number(user_id), oldBalance: currBal, newBalance: nextBal, reason: 'generation', referenceId: generationId, metadata: { model } })
             console.log(`[DB] Balance debited at start for user ${user_id}: ${currBal} -> ${nextBal}`)
           }
         }
@@ -1528,7 +1530,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
         finalError = 'Из-за политик разработчика нейросети модель вернула ошибку. Попробуйте сгенерировать, выбрав модель Seedream (рекомендуем Seedream 4.5 для лучшего качества).'
       }
 
-      // Mark as failed and REFUND tokens
+      // Mark as failed and REFUND tokens (with protection)
       if (generationId) {
         await supaPatch('generations', `?id=eq.${generationId}`, {
           status: 'failed',
@@ -1536,13 +1538,10 @@ export async function handleGenerateImage(req: Request, res: Response) {
         })
 
         if (cost > 0 && user_id) {
-          const balQ = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(user_id))}&select=balance`)
-          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-          const nextBal = currBal + cost
-          await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(user_id))}`, { balance: nextBal })
-          console.log(`[DB] Refunded ${cost} tokens to user ${user_id}: ${currBal} -> ${nextBal}`)
+          await safeRefund({ generationId, userId: Number(user_id), amount: cost, metadata: { model, error: finalError } })
         }
       }
+
       return res.status(500).json({ error: finalError })
     }
 
@@ -1695,14 +1694,10 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         continue
       }
 
-      // Возврат токенов ТОЛЬКО после успешного атомарного обновления
+      // Возврат токенов ONLY после успешного атомарного обновления (с защитой)
       const cost = gen.cost || 0
       if (cost > 0) {
-        const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
-        const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-        const nextBal = currBal + cost
-        await supaPatch('users', `?user_id=eq.${gen.user_id}`, { balance: nextBal })
-        console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
+        await safeRefund({ generationId: gen.id, userId: gen.user_id, amount: cost, metadata: { model: gen.model, error: 'Missing model and task ID' } })
       }
 
       updated++
@@ -1725,14 +1720,10 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         continue
       }
 
-      // Возврат токенов ТОЛЬКО после успешного атомарного обновления
+      // Возврат токенов ONLY после успешного атомарного обновления (с защитой)
       const cost = gen.cost || (gen.model ? MODEL_PRICES[gen.model] : 0) || 0
       if (cost > 0) {
-        const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
-        const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-        const nextBal = currBal + cost
-        await supaPatch('users', `?user_id=eq.${gen.user_id}`, { balance: nextBal })
-        console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
+        await safeRefund({ generationId: gen.id, userId: gen.user_id, amount: cost, metadata: { model: gen.model, error: 'Missing task ID' } })
       }
 
       updated++
@@ -1800,14 +1791,10 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
           continue
         }
 
-        // Возврат токенов ТОЛЬКО после успешного атомарного обновления
+        // Возврат токенов ТОЛЬКО после успешного атомарного обновления (с защитой)
         const cost = gen.cost || MODEL_PRICES[gen.model] || 0
         if (cost > 0) {
-          const balQ = await supaSelect('users', `?user_id=eq.${gen.user_id}&select=balance`)
-          const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-          const nextBal = currBal + cost
-          await supaPatch('users', `?user_id=eq.${gen.user_id}`, { balance: nextBal })
-          console.log(`[CheckStatus] Refunded ${cost} tokens to user ${gen.user_id}: ${currBal} -> ${nextBal}`)
+          await safeRefund({ generationId: gen.id, userId: gen.user_id, amount: cost, metadata: { model: gen.model, error: result.error } })
         }
 
         updated++
@@ -2189,6 +2176,7 @@ export async function handleRemoveBackground(req: Request, res: Response) {
 
     // 7. Deduct balance
     await supaPatch('users', `?user_id=eq.${userId}`, { balance: balance - price })
+    logBalanceChange({ userId, oldBalance: balance, newBalance: balance - price, reason: 'editor', referenceId: source_generation_id, metadata: { action: 'remove-background' } })
 
     // 8. Record in generations table
     let newGenId = null
@@ -2327,6 +2315,7 @@ export async function handleUpscale(req: Request, res: Response) {
 
     // 5. Deduct balance
     await supaPatch('users', `?user_id=eq.${userId}`, { balance: balance - price })
+    logBalanceChange({ userId, oldBalance: balance, newBalance: balance - price, reason: 'editor', referenceId: source_generation_id, metadata: { action: 'upscale' } })
 
     // 6. Record in generations table (store API result URL directly)
     let newGenId = null
@@ -2389,16 +2378,27 @@ function getMultiModelPrice(model: string, gptQuality?: string, resolution?: str
   return MODEL_PRICES[model] || 0
 }
 
-// Возврат токенов пользователю
-async function refundTokens(userId: number, amount: number): Promise<void> {
+// Возврат токенов пользователю с защитой от двойного рефанда
+async function refundTokens(userId: number, amount: number, generationId?: number, metadata?: Record<string, unknown>): Promise<void> {
   if (!userId || amount <= 0) return
 
+  // Если есть generationId, используем защищённый рефанд
+  if (generationId) {
+    const result = await safeRefund({ generationId, userId, amount, metadata })
+    if (result.alreadyRefunded) {
+      console.log(`[Refund] Generation ${generationId} already refunded, skipping`)
+    }
+    return
+  }
+
+  // Fallback для случаев без generationId (legacy)
   try {
     const userResult = await supaSelect('users', `?user_id=eq.${encodeURIComponent(String(userId))}&select=balance`)
     if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
       const currentBalance = userResult.data[0].balance || 0
       const newBalance = currentBalance + amount
       await supaPatch('users', `?user_id=eq.${encodeURIComponent(String(userId))}`, { balance: newBalance })
+      logBalanceChange({ userId, oldBalance: currentBalance, newBalance, reason: 'refund', metadata })
       console.log(`[Refund] Returned ${amount} tokens to user ${userId}: ${currentBalance} -> ${newBalance}`)
     }
   } catch (e) {
@@ -2582,8 +2582,12 @@ export async function handleMultiGenerate(req: Request, res: Response) {
     // 6. API Key
     const apiKey = process.env.KIE_API_KEY
     if (!apiKey) {
-      // Вернуть токены
-      await refundTokens(user_id, totalCost)
+      // Вернуть токены за каждую генерацию
+      for (let i = 0; i < generationIds.length; i++) {
+        if (generationIds[i] > 0) {
+          await refundTokens(user_id, modelCosts[i] || 0, generationIds[i])
+        }
+      }
       return res.status(500).json({ error: 'API key not configured' })
     }
 
@@ -2659,8 +2663,8 @@ export async function handleMultiGenerate(req: Request, res: Response) {
           })
           console.log(`[MultiGen] Model ${model} failed: ${errorMsg}, genId: ${genId}`)
 
-          // Вернуть токены за эту модель
-          await refundTokens(user_id, modelCost)
+          // Вернуть токены за эту модель (с защитой от двойного рефанда)
+          await refundTokens(user_id, modelCost, genId)
 
           // Уведомление об ошибке
           try {
@@ -2738,11 +2742,10 @@ export async function handlePiapiWebhook(req: Request, res: Response) {
       const genData = await supaSelect('generations', `?id=eq.${generationId}&select=cost`)
       const cost = genData.ok && Array.isArray(genData.data) ? (genData.data[0]?.cost || 15) : 15
 
-      const balQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
-      const currBal = Array.isArray(balQ.data) && balQ.data[0]?.balance != null ? Number(balQ.data[0].balance) : 0
-      await supaPatch('users', `?user_id=eq.${userId}`, { balance: currBal + cost })
+      await safeRefund({ generationId, userId, amount: cost, metadata: { api_provider: 'piapi', error: errorMsg } })
 
       console.log(`[PiAPI Webhook] Generation ${generationId} failed, refunded ${cost}`)
+
     }
 
     res.json({ received: true })

@@ -8,6 +8,7 @@ import {
   supaHeaders
 } from '../services/supabaseService.js'
 import { uploadImageFromBase64, uploadImageFromUrl } from '../services/r2Service.js'
+import { logBalanceChange } from '../services/balanceAuditService.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const DEFAULT_BOT_SOURCE = process.env.TELEGRAM_BOT_USERNAME || 'AiVerseAppBot'
@@ -625,6 +626,7 @@ export async function claimChannelReward(req: Request, res: Response) {
       console.error('Failed to update balance:', balanceUpdate.data)
       return res.status(500).json({ error: 'Failed to update balance' })
     }
+    logBalanceChange({ userId, oldBalance: currentBalance, newBalance, reason: 'channel_reward', metadata: { channel: CHANNEL_USERNAME, tokens: CHANNEL_REWARD_TOKENS } })
 
     // Record in channel_subscribers
     const record = await supaPost('channel_subscribers', {
