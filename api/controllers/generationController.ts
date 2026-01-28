@@ -1675,7 +1675,7 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
   // Расширенное логирование
   console.log(`[CheckStatus] Found ${pending.length} pending generation(s):`)
   for (const gen of pending) {
-    console.log(`  - ID: ${gen.id}, model: ${gen.model}, task_id: ${gen.task_id || 'MISSING'}, cost: ${gen.cost || 0}`)
+    console.log(`  - ID: ${gen.id}, model: ${gen.model}, task_id: ${gen.task_id || 'MISSING'}, api_provider: ${gen.api_provider || 'kie'}, cost: ${gen.cost || 0}`)
   }
 
   for (const gen of pending) {
@@ -1741,11 +1741,37 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
 
     let result = { status: 'pending', imageUrl: '', error: '' }
 
+    // Определить провайдер API (по умолчанию kie)
+    const provider = gen.api_provider || 'kie'
+
     try {
-      // Check API status via Kie.ai Jobs API (universal for all models)
-      console.log(`[CheckStatus] Checking gen ${gen.id} with task_id ${gen.task_id}...`)
-      result = await checkJobsTask(apiKey, gen.task_id)
-      console.log(`[CheckStatus] Gen ${gen.id} API result: status=${result.status}, hasUrl=${!!result.imageUrl}, error=${result.error || 'none'}`)
+      if (provider === 'piapi') {
+        // Проверка Piapi генерации
+        console.log(`[CheckStatus] Checking Piapi gen ${gen.id} with task_id ${gen.task_id}...`)
+        const piapiResult = await checkPiapiTask(gen.task_id)
+
+        if (piapiResult.code === 200 && piapiResult.data) {
+          const status = piapiResult.data.status
+
+          if (status === 'completed') {
+            const imageUrl = piapiResult.data.output?.image_url ||
+              piapiResult.data.output?.image_urls?.[0]
+            if (imageUrl) {
+              result = { status: 'success', imageUrl, error: '' }
+            }
+          } else if (status === 'failed') {
+            const errorMsg = piapiResult.data.error?.message || 'Piapi task failed'
+            result = { status: 'failed', imageUrl: '', error: errorMsg }
+          }
+          // Если pending - оставляем result как есть
+        }
+        console.log(`[CheckStatus] Piapi gen ${gen.id} result: status=${result.status}, hasUrl=${!!result.imageUrl}, error=${result.error || 'none'}`)
+      } else {
+        // Проверка Kie.ai генерации (существующий код)
+        console.log(`[CheckStatus] Checking Kie gen ${gen.id} with task_id ${gen.task_id}...`)
+        result = await checkJobsTask(apiKey, gen.task_id)
+        console.log(`[CheckStatus] Kie gen ${gen.id} result: status=${result.status}, hasUrl=${!!result.imageUrl}, error=${result.error || 'none'}`)
+      }
 
       if (result.status === 'success' && result.imageUrl) {
         let cost = gen.cost
@@ -1787,7 +1813,7 @@ export async function handleCheckPendingGenerations(req: Request, res: Response)
         updated++
       }
     } catch (e) {
-      console.error(`[CheckStatus] Error checking gen ${gen.id}:`, e)
+      console.error(`[CheckStatus] Error checking ${provider} gen ${gen.id}:`, e)
     }
   }
 
