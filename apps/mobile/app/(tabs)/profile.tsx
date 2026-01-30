@@ -1,24 +1,123 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, FlatList, RefreshControl, Dimensions, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { api } from '../../lib/api';
+import { useUserStore } from '../../store/userStore';
+import { colors, spacing, borderRadius } from '../../theme';
+
+interface Generation {
+    id: number;
+    image_url: string;
+    video_url?: string;
+    prompt: string;
+    likes_count: number;
+    created_at: string;
+    media_type: 'image' | 'video';
+}
+
+interface UserInfo {
+    user_id: number;
+    username: string;
+    first_name: string;
+    last_name?: string;
+    avatar_url?: string;
+    balance: number;
+}
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_COLUMNS = 3;
+const GRID_GAP = 2;
+const ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
 
 export default function ProfileScreen() {
+    const insets = useSafeAreaInsets();
+    const userId = useUserStore((state) => state.user.id);
+    const setBalance = useUserStore((state) => state.setBalance);
+
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [generations, setGenerations] = useState<Generation[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchUserData = useCallback(async () => {
+        try {
+            // Fetch user info
+            const userResponse = await api.get<{ user: UserInfo }>(`/user/info/${userId}`);
+            if (userResponse.user) {
+                setUserInfo(userResponse.user);
+                setBalance(userResponse.user.balance);
+            }
+
+            // Fetch user generations
+            const gensResponse = await api.get<{ items: Generation[] }>(
+                `/feed?user_id=${userId}&include_unpublished=true&limit=50`
+            );
+            if (gensResponse.items) {
+                setGenerations(gensResponse.items);
+            }
+        } catch (error) {
+            console.error('Failed to fetch user data:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [userId, setBalance]);
+
+    useEffect(() => {
+        fetchUserData();
+    }, [fetchUserData]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchUserData();
+    }, [fetchUserData]);
+
+    const displayName = userInfo?.first_name || 'User';
+    const username = userInfo?.username ? `@${userInfo.username.replace(/^@/, '')}` : `@user_${userId}`;
+    const avatarUrl = userInfo?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userId}`;
+
+    const renderGeneration = ({ item }: { item: Generation }) => (
+        <TouchableOpacity style={styles.gridItem}>
+            <Image
+                source={{ uri: item.image_url || item.video_url }}
+                style={styles.gridImage}
+                resizeMode="cover"
+            />
+            {item.media_type === 'video' && (
+                <View style={styles.videoBadge}>
+                    <Text style={styles.videoBadgeText}>▶</Text>
+                </View>
+            )}
+        </TouchableOpacity>
+    );
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.loadingContainer]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
+            refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            }
+        >
             <View style={styles.header}>
                 <View style={styles.avatarContainer}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>👤</Text>
-                    </View>
-                    <View style={styles.proBadge}>
-                        <Text style={styles.proBadgeText}>PRO</Text>
-                    </View>
+                    <Image source={{ uri: avatarUrl }} style={styles.avatar} />
                 </View>
-                <Text style={styles.name}>Guest User</Text>
-                <Text style={styles.username}>@guest</Text>
+                <Text style={styles.name}>{displayName}</Text>
+                <Text style={styles.username}>{username}</Text>
             </View>
 
             <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                    <Text style={styles.statValue}>0</Text>
+                    <Text style={styles.statValue}>{generations.length}</Text>
                     <Text style={styles.statLabel}>Generations</Text>
                 </View>
                 <View style={styles.statItem}>
@@ -26,7 +125,9 @@ export default function ProfileScreen() {
                     <Text style={styles.statLabel}>Followers</Text>
                 </View>
                 <View style={styles.statItem}>
-                    <Text style={styles.statValue}>0</Text>
+                    <Text style={styles.statValue}>
+                        {generations.reduce((sum, g) => sum + (g.likes_count || 0), 0)}
+                    </Text>
                     <Text style={styles.statLabel}>Likes</Text>
                 </View>
             </View>
@@ -34,7 +135,7 @@ export default function ProfileScreen() {
             <View style={styles.balanceCard}>
                 <Text style={styles.balanceLabel}>Token Balance</Text>
                 <View style={styles.balanceRow}>
-                    <Text style={styles.balanceValue}>6</Text>
+                    <Text style={styles.balanceValue}>{userInfo?.balance ?? 0}</Text>
                     <Text style={styles.balanceUnit}>tokens</Text>
                 </View>
                 <TouchableOpacity style={styles.topUpButton}>
@@ -44,11 +145,30 @@ export default function ProfileScreen() {
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>My Generations</Text>
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyIcon}>🎨</Text>
-                    <Text style={styles.emptyText}>No generations yet</Text>
-                    <Text style={styles.emptyHint}>Create your first masterpiece in Studio!</Text>
-                </View>
+                {generations.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>🎨</Text>
+                        <Text style={styles.emptyText}>No generations yet</Text>
+                        <Text style={styles.emptyHint}>Create your first masterpiece in Studio!</Text>
+                    </View>
+                ) : (
+                    <View style={styles.gridContainer}>
+                        {generations.map((item) => (
+                            <TouchableOpacity key={item.id} style={styles.gridItem}>
+                                <Image
+                                    source={{ uri: item.image_url || item.video_url }}
+                                    style={styles.gridImage}
+                                    resizeMode="cover"
+                                />
+                                {item.media_type === 'video' && (
+                                    <View style={styles.videoBadge}>
+                                        <Text style={styles.videoBadgeText}>▶</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
             </View>
 
             <View style={styles.section}>
@@ -229,5 +349,37 @@ const styles = StyleSheet.create({
         color: '#444',
         fontSize: 12,
         marginTop: 20,
+    },
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 2,
+    },
+    gridItem: {
+        width: ITEM_SIZE,
+        height: ITEM_SIZE,
+        position: 'relative',
+    },
+    gridImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 4,
+    },
+    videoBadge: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+    },
+    videoBadgeText: {
+        color: '#fff',
+        fontSize: 10,
     },
 });

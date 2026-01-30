@@ -6,13 +6,13 @@ import { useRouter } from 'expo-router';
 import { FeedHeader, FeedFilters, FeedCard, FeedDetailModal, SearchBar, FeedItem } from '../../components/feed';
 import { FeedSkeletonGrid } from '../../components/ui';
 import { colors, spacing } from '../../theme';
-
-// API Base URL - configure based on environment
-const API_BASE_URL = 'https://aiverse-telegram-app-production.up.railway.app/api';
+import { api, getApiUrl } from '../../lib/api';
+import { useUserStore } from '../../store/userStore';
 
 export default function FeedScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const userId = useUserStore((state) => state.user.id);
 
     // State
     const [items, setItems] = useState<FeedItem[]>([]);
@@ -56,8 +56,8 @@ export default function FeedScreen() {
                 params.append('model', modelFilter);
             }
 
-            console.log(`Fetching feed from: ${API_BASE_URL}/feed?${params}`);
-            const response = await fetch(`${API_BASE_URL}/feed?${params}`);
+            console.log(`Fetching feed from: ${getApiUrl()}/api/feed?${params}`);
+            const response = await fetch(`${getApiUrl()}/api/feed?${params}&user_id=${userId}`);
 
             if (!response.ok) {
                 console.error(`Feed fetch failed: ${response.status} ${response.statusText}`);
@@ -166,6 +166,8 @@ export default function FeedScreen() {
     }, [fetchFeed]);
 
     const handleLike = useCallback(async (item: FeedItem) => {
+        const wasLiked = item.is_liked;
+
         // Optimistic update
         setItems(prev =>
             prev.map(i =>
@@ -188,17 +190,28 @@ export default function FeedScreen() {
             } : null);
         }
 
-        // TODO: API call for like
-        // try {
-        //     await fetch(`${API_BASE_URL}/feed/like`, {
-        //         method: 'POST',
-        //         headers: { 'Content-Type': 'application/json' },
-        //         body: JSON.stringify({ generationId: item.id, userId: currentUserId }),
-        //     });
-        // } catch (error) {
-        //     // Revert on error
-        // }
-    }, [selectedItem]);
+        // Real API call for like
+        try {
+            await api.post('/feed/like', {
+                generationId: Number(item.id),
+                userId: userId,
+            });
+        } catch (error) {
+            console.error('Like failed:', error);
+            // Revert on error
+            setItems(prev =>
+                prev.map(i =>
+                    i.id === item.id
+                        ? {
+                            ...i,
+                            is_liked: wasLiked,
+                            likes_count: wasLiked ? i.likes_count + 1 : i.likes_count - 1,
+                        }
+                        : i
+                )
+            );
+        }
+    }, [selectedItem, userId]);
 
     const handleItemPress = useCallback((item: FeedItem) => {
         setSelectedItem(item);

@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../../theme';
+import { api } from '../../lib/api';
+import { useUserStore } from '../../store/userStore';
 
 // Components
 import {
@@ -58,15 +60,49 @@ export default function StudioScreen() {
         }
     }, [params]);
 
+    const userId = useUserStore((state) => state.user.id);
+
     const handleGenerate = async () => {
         if (!prompt.trim() && selectedModel !== 'kling-mc') return;
 
         setIsGenerating(true);
-        // Simulation of generation
-        setTimeout(() => {
+        try {
+            // Call real API
+            const response = await api.post<{
+                success: boolean;
+                generationId?: number;
+                error?: string;
+            }>('/generation/generate', {
+                prompt: prompt.trim(),
+                model: selectedModel,
+                aspect_ratio: aspectRatio,
+                user_id: userId,
+                media_type: mediaType,
+                images: uploadedImages.length > 0 ? uploadedImages : undefined,
+                // Video params
+                video_duration: mediaType === 'video' ? videoDuration : undefined,
+                video_resolution: mediaType === 'video' ? videoResolution : undefined,
+                fixed_lens: mediaType === 'video' ? fixedLens : undefined,
+                generate_audio: mediaType === 'video' ? generateAudio : undefined,
+            });
+
+            if (response.success && response.generationId) {
+                Alert.alert(
+                    'Generation Started',
+                    `Your ${mediaType} is being generated. You'll be notified when it's ready.`,
+                    [{ text: 'OK' }]
+                );
+                // Clear prompt after successful start
+                setPrompt('');
+            } else {
+                Alert.alert('Error', response.error || 'Generation failed');
+            }
+        } catch (error: any) {
+            console.error('Generation error:', error);
+            Alert.alert('Error', error.message || 'Failed to start generation');
+        } finally {
             setIsGenerating(false);
-            Alert.alert('Success', 'Generation started! (Simulation)');
-        }, 2000);
+        }
     };
 
     const handleOptimize = async () => {
