@@ -40,16 +40,17 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 /**
- * Request logger middleware (DEBUG)
+ * Request logger middleware (DISABLED - too noisy in production)
+ * Uncomment for debugging:
  */
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now()
-  res.on('finish', () => {
-    const duration = Date.now() - start
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`)
-  })
-  next()
-})
+// app.use((req: Request, res: Response, next: NextFunction) => {
+//   const start = Date.now()
+//   res.on('finish', () => {
+//     const duration = Date.now() - start
+//     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`)
+//   })
+//   next()
+// })
 
 /**
  * API Routes
