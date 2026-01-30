@@ -1,0 +1,777 @@
+{
+    "settings": {
+        "title": "Settings",
+        "sections": {
+            "general": "General",
+            "remix": "Remixes",
+            "social": "Social",
+            "about": "About",
+            "notifications": "Notifications",
+            "tools": "Tools"
+        },
+        "items": {
+            "language": "Language",
+            "languageValue": "English",
+            "theme": "Theme",
+            "themeValue": "Dark",
+            "addToHome": "Add to Home Screen",
+            "accumulations": "Accumulations",
+            "subscriptions": "Subscriptions & Followers",
+            "support": "Support",
+            "storage": "Data Storage",
+            "storageValue": "60 days",
+            "version": "Version"
+        },
+        "messages": {
+            "themeToast": "Oops, only dark mode is available for now",
+            "storageToast": "Images are stored for 60 days. Originals in maximum quality are sent to the bot chat and stored there indefinitely 💾"
+        },
+        "notifications": {
+            "telegram": "Telegram Notifications",
+            "hint": "Configure here",
+            "options": {
+                "news": "News",
+                "remix": "Remixes",
+                "generation": "Generations",
+                "likes": "Likes"
+            }
+        },
+        "fingerprint": {
+            "title": "Check Prompt Author",
+            "description": "Paste a prompt received via 'With prompt' to find out its author",
+            "placeholder": "Paste prompt here...",
+            "check": "Check",
+            "author": "Author",
+            "found": "Author found!",
+            "notFound": "Author fingerprint not found",
+            "noFingerprint": "No author fingerprint in this prompt"
+        }
+    },
+    "watermark": {
+        "title": "Watermark",
+        "textLabel": "Watermark text",
+        "textPlaceholder": "Your text...",
+        "opacity": "Opacity",
+        "position": "Position",
+        "save": "Save",
+        "saved": "Watermark saved",
+        "deleted": "Watermark deleted",
+        "generate": "Generate AI",
+        "previewPlaceholder": "Preview",
+        "generated": "✨ Watermark created!",
+        "insufficientBalance": "Insufficient balance",
+        "switchToText": "Switch to text",
+        "switchToAi": "Switch to AI watermark",
+        "switchedToAi": "Switched to AI watermark",
+        "tabs": {
+            "generator": "Generator",
+            "custom": "Custom"
+        },
+        "uploadSection": "Upload image",
+        "uploadImage": "Upload image",
+        "uploaded": "✨ Image uploaded!",
+        "customLoaded": "Image uploaded",
+        "invalidFileType": "Please select an image",
+        "removeBg": "Remove background",
+        "bgRemoved": "✨ Background removed!",
+        "removingBg": "Removing background...",
+        "bgRemovedLabel": "Background removed",
+        "saveAsIs": "Save as is",
+        "uploadPreview": {
+            "title": "Image preview"
+        },
+        "replaceWarning": {
+            "title": "⚠️ Replace watermark?",
+            "text": "Current watermark will be permanently deleted and replaced with a new one.",
+            "confirm": "Replace"
+        }
+    },
+    "home": {
+        "tabs": {
+            "new": "New",
+            "popular": "Popular",
+            "following": "Following"
+        },
+        "searchPlaceholder": "Find prompt...",
+        "search": {
+            "posts": "Posts",
+            "users": "Users",
+            "usersPlaceholder": "Search users...",
+            "noUsersFound": "No users found",
+            "searching": "Searching..."
+        },
+        "feedTitle": "Feed for {{date}}",
+        "models": {
+            "all": "All Models"
+        },
+        "empty": "No posts",
+        "loadingMore": "Loading more..."
+    },
+    "studio": {
+        "title": "Studio",
+        "tokens": "tokens",
+        "models": {
+            "nanobanana": {
+                "name": "NanoBanana",
+                "desc": "3 tokens"
+            },
+            "nanobanana-pro": {
+                "name": "NanoBanana Pro",
+                "desc": "15 tokens"
+            },
+            "seedream4": {
+                "name": "Seedream 4",
+                "desc": "4 tokens"
+            },
+            "seedream4-5": {
+                "name": "Seedream 4.5",
+                "desc": "7 tokens"
+            },
+            "gpt-image-1.5": {
+                "name": "GPT image 1.5",
+                "desc": "from 5 tokens"
+            },
+            "qwen-image": {
+                "name": "Qwen Image",
+                "desc": "3 tokens"
+            },
+            "test-model": {
+                "name": "🧪 Test Model",
+                "desc": "0 tokens"
+            },
+            "seedance-1.5-pro": {
+                "name": "Seedance Pro",
+                "desc": "from 24 tokens"
+            },
+            "kling-t2v": {
+                "name": "Kling AI",
+                "desc": "from 30 tokens"
+            }
+        },
+        "kling": {
+            "motionControl": "Motion Control",
+            "duration": "Duration",
+            "sound": "Sound",
+            "referenceImage": "Reference Image",
+            "mc": {
+                "uploadImage": "Upload Character Photo",
+                "imageHint": "Face must be visible (head + shoulders + torso)",
+                "orientation": "Character Orientation",
+                "orientationHint": "Choose where to take the gaze direction and body position from",
+                "asImage": "As in Photo",
+                "asImageDesc1": "Pose and direction from photo",
+                "max10s": "max 10s",
+                "asVideo": "As in Video",
+                "asVideoDesc1": "Pose and direction from video",
+                "max30s": "max 30s",
+                "uploadVideo": "Upload Motion Video",
+                "videoHint": "MP4/MOV, 3-30s, min 720p",
+                "uploadVideoBtn": "Upload video",
+                "changeVideo": "Change Video",
+                "selectVideo": "Select Video",
+                "validDuration": "✓ Valid",
+                "invalidDuration": "✕ Too long",
+                "durationError": "Video too long. Max: {{max}}s",
+                "quality": "Quality",
+                "optionalPrompt": "Prompt",
+                "optional": "Optional",
+                "promptPlaceholder": "Describe details: clothes, background, style...",
+                "promptHint": "Prompt is optional. Use to change details: clothes, background, style, etc.",
+                "perSec": "s"
+            }
+        },
+        "tokens_1": "{{count}} token",
+        "tokens_2": "{{count}} tokens",
+        "tokens_5": "{{count}} tokens",
+        "mediaType": {
+            "image": "Photo",
+            "video": "Video"
+        },
+        "mode": {
+            "textToImage": "Text to Image",
+            "imageToImage": "Image to Image",
+            "textToVideo": "Text to Video",
+            "imageToVideo": "Image to Video"
+        },
+        "video": {
+            "modelDesc": "Generate video from text or image",
+            "duration": "Duration",
+            "seconds": "sec",
+            "resolution": "Resolution",
+            "camera": "Camera",
+            "cameraStatic": "Static",
+            "cameraDynamic": "Dynamic",
+            "cameraStaticHint": "Camera is fixed — objects move within the frame",
+            "cameraDynamicHint": "Camera moves freely — cinematic effect",
+            "audio": "Audio",
+            "audioOff": "No audio",
+            "audioOn": "With audio",
+            "audioWarning": "⚠️ Enabling audio doubles the generation cost",
+            "startFrame": "Start frame",
+            "endFrame": "End frame",
+            "addStartFrame": "Add",
+            "addEndFrame": "Optional",
+            "framesHint": "Start frame is required. End frame is optional to control the final look of the video."
+        },
+        "prompt": {
+            "from": "Prompt from {{username}}",
+            "placeholder": "Describe your idea..."
+        },
+        "upload": {
+            "limitError": "Maximum {{limit}} photos",
+            "modelLimitError": "Maximum {{limit}} photos for this model",
+            "more": "More",
+            "paste": "Paste",
+            "addReferences": "Add references (up to {{limit}})",
+            "selectPhoto": "Select photo",
+            "pasteHint": "Press and hold here → Paste",
+            "copyHint": "Copy photo → press and hold purple area → Paste",
+            "remixHint": "When remixing, replace reference photos with your own (one or more) if necessary"
+        },
+        "aspectRatio": "Aspect Ratio",
+        "quality": {
+            "label": "Quality",
+            "2k": "2K (10 tokens)",
+            "4k": "4K (15 tokens)"
+        },
+        "generate": {
+            "button": "Generate",
+            "generating": "Creating masterpiece...",
+            "waitMessage": "If the process takes too long, you can minimize the app. \nThe result will appear in <1>My Generations</1> in profile\nand will be sent to <3>Telegram chat</3>."
+        },
+        "errors": {
+            "promptRequired": "Enter a prompt",
+            "imageRequired": "Upload an image",
+            "pasteInstruction": "Copy photo and long press here → Paste",
+            "generationError": "Generation error",
+            "timeout": "Timeout. Generation may finish in background, check history later.",
+            "videoTimeout": "Video generation takes up to 30 minutes. Check generation history later.",
+            "network": "Network error. Check internet or try again later."
+        },
+        "result": {
+            "title": "Result",
+            "videoTitle": "Video Ready",
+            "save": "Save",
+            "sendToChat": "Send to Chat",
+            "close": "Close Window"
+        },
+        "promptHelper": {
+            "optimize": "✨ Enhance Prompt",
+            "optimizing": "Enhancing...",
+            "describe": "📝 Prompt from Photo",
+            "describing": "Describing...",
+            "describeTitle": "Describe Image",
+            "describeSubtitle": "AI will create a prompt from your photo",
+            "uploadImage": "Upload an image",
+            "uploadHint": "Click or drag to upload",
+            "pasteImage": "Paste from clipboard",
+            "generatePrompt": "Generate Prompt",
+            "noPrompt": "Enter a prompt to enhance",
+            "noImageInClipboard": "No image in clipboard",
+            "pasteError": "Failed to paste image",
+            "optimizeSuccess": "Prompt enhanced!",
+            "describeSuccess": "Prompt generated!",
+            "error": "Processing failed",
+            "v1Description": "Detailed description using AI model for prompt generation.",
+            "v2Description": "Advanced mode with instructions for AI on how to describe the prompt using details from the reference photo."
+        }
+    },
+    "profile": {
+        "guest": "Guest",
+        "pro": "PRO",
+        "stats": {
+            "generations": "Generations",
+            "followers": "Followers",
+            "likes": "Likes",
+            "remixes": "Remixes"
+        },
+        "balance": {
+            "tokens": "tokens",
+            "success": "Balance topped up successfully. Thank you for your purchase!"
+        },
+        "actions": {
+            "share": {
+                "title": "AiVerse Profile",
+                "text": "Check out my profile and works in AiVerse 🎨"
+            },
+            "close": "Close",
+            "change": "Change",
+            "selectFromGallery": "Select from Gallery",
+            "pastePrompt": "Press and hold to paste photo",
+            "back": "Back"
+        },
+        "history": {
+            "title": "My Generations",
+            "empty": "History is empty",
+            "loadMore": "Load more"
+        },
+        "storage": {
+            "text": "Images are stored in the app for <0>60 days</0>. Originals are sent to the bot chat and stored there <1>indefinitely</1> 💾"
+        },
+        "filters": {
+            "all": "All",
+            "published": "Public",
+            "private": "Private",
+            "photo": "Photo",
+            "video": "Video"
+        },
+        "preview": {
+            "saveToGallery": "Save to Gallery",
+            "sendToChat": "File",
+            "shareRemix": "Share Remix",
+            "publish": "Publish to Feed",
+            "unpublish": "Remove from Feed",
+            "delete": "Delete",
+            "publicLabel": "Public",
+            "showPrompt": "Show & Copy",
+            "hidePrompt": "Hide Prompt",
+            "copyPrompt": "Copy Prompt",
+            "copied": "Copied!",
+            "promptPrivate": "Prompt hidden",
+            "promptPublic": "Hide prompt",
+            "hiddenByAuthor": "🔒 Hidden by author",
+            "sendToSection": "Send to Chat",
+            "sendWithPrompt": "With Refs",
+            "sendWithPromptHint": "Send to chat with prompt and referral link",
+            "sendWithWatermark": "Ref & Watermark",
+            "sendWithWatermarkHint": "Send with watermark and referral link",
+            "noWatermarkSettings": "First set up watermark in Settings",
+            "buttonPrivate": "Private Prompt",
+            "buttonPublic": "Open Prompt"
+        },
+        "deleteConfirm": {
+            "title": "Delete generation?",
+            "description": "This action cannot be undone",
+            "cancel": "Cancel",
+            "confirm": "Delete"
+        },
+        "publishConfirm": {
+            "title": "Publish to Feed?",
+            "description": "Your work will be seen by other users",
+            "cancel": "Cancel",
+            "confirm": "Publish",
+            "publishOpen": "Publish with Open Prompt",
+            "publishPrivate": "Publish with Private Prompt"
+        }
+    },
+    "spin": {
+        "title": "Fortune",
+        "available": "Available:",
+        "spins": "spins",
+        "spinButton": "SPIN",
+        "spinning": "Spinning...",
+        "balanceHint": "Top up balance from 300 tokens to get spins",
+        "eventDisabled": {
+            "title": "Event Unavailable",
+            "description": "Wheel of Fortune is temporarily unavailable. Stay tuned!",
+            "back": "Back to Events",
+            "toast": "Event is temporarily unavailable"
+        },
+        "errors": {
+            "spin": "Spin error",
+            "network": "Network error"
+        },
+        "win": {
+            "jackpot": "🎉 Jackpot!",
+            "congrats": "Congratulations!",
+            "youWon": "You won:",
+            "tokens": "tokens",
+            "claim": "Claim! ✨"
+        },
+        "info": {
+            "title": "Wheel of Fortune",
+            "description": "Spin the wheel and win tokens! All segments have equal chances.",
+            "oddsTitle": "Odds",
+            "howToGet": "How to get spins?",
+            "conditions": {
+                "1": "• Top up from 300 tokens → 1 spin",
+                "2": "• Top up from 800 tokens → 2 spins",
+                "3": "• Top up from 1500 tokens → 3 spins"
+            },
+            "close": "Got it"
+        }
+    },
+    "subscriptions": {
+        "title": "Subscriptions",
+        "tabs": {
+            "followers": "Followers",
+            "following": "Following"
+        },
+        "empty": {
+            "followers": "No followers yet",
+            "following": "You are not following anyone yet"
+        }
+    },
+    "payment": {
+        "title": "Top up balance",
+        "subtitle": "Select a token package",
+        "devModeWarning": "⚠️ Test Payment Mode",
+        "devModeDescription": "You will be redirected to the production bot for payment. This is a test environment.",
+        "methods": {
+            "stars": "Stars",
+            "card": "Card",
+            "sbp": "SBP"
+        },
+        "packages": {
+            "tokens": "{{count}} tokens",
+            "bonus": "Bonus",
+            "spins": "+{{count}} 🎰 spin",
+            "spins_other": "+{{count}} 🎰 spins",
+            "popular": "POPULAR"
+        },
+        "button": {
+            "pay": "Pay {{amount}} {{symbol}} via {{method}}",
+            "processing": "Processing...",
+            "bonus": "Buy with +15% bonus tokens"
+        },
+        "messages": {
+            "description": "Purchase {{count}} AiVerse tokens",
+            "success": "Payment successful! Tokens credited.",
+            "status": "Payment status: {{status}}",
+            "errorInvoice": "Error creating invoice: {{error}}",
+            "errorNetwork": "Network error",
+            "sbpCommission": "Service commission charged for SBP payments",
+            "minPurchase": "Minimum purchase via administrator with bonus — 200 tokens"
+        }
+    },
+    "generationSelector": {
+        "title": "Select creation",
+        "empty": "You have no generations yet.",
+        "select": "Select"
+    },
+    "events": {
+        "pageTitle": "Events",
+        "tabs": {
+            "contests": "Contests",
+            "events": "Events"
+        },
+        "filters": {
+            "active": "Active",
+            "upcoming": "Upcoming",
+            "completed": "Completed"
+        },
+        "empty": {
+            "active": "No active contests",
+            "upcoming": "No upcoming contests",
+            "completed": "No completed contests",
+            "events": "No events right now"
+        },
+        "contestStatus": {
+            "until": "Until ",
+            "starts": "Starts ",
+            "ended": "Ended "
+        },
+        "spin": {
+            "title": "Wheel of Fortune",
+            "description": "Try your luck and win prizes!",
+            "unavailable": "Event temporarily unavailable"
+        },
+        "comingSoon": "New events coming soon!"
+    },
+    "leaderboard": {
+        "title": {
+            "month": "Top for {{month}}",
+            "allTime": "Top all time"
+        },
+        "period": {
+            "month": "For {{month}}",
+            "allTime": "All time"
+        },
+        "tabs": {
+            "likes": "Likes",
+            "remixes": "Remixes"
+        },
+        "empty": "Empty for now...",
+        "badges": {
+            "legend": "Legend",
+            "pro": "Pro",
+            "expert": "Expert"
+        }
+    },
+    "accumulations": {
+        "title": "Accumulations",
+        "forRemix": "For remix",
+        "loading": "Loading...",
+        "empty": {
+            "title": "History is empty",
+            "description": "Tokens received for remixes of your works by other users will be displayed here."
+        }
+    },
+    "publicProfile": {
+        "stats": {
+            "generations": "Generations",
+            "followers": "Followers",
+            "likes": "Likes",
+            "remixes": "Remixes"
+        },
+        "follow": "Follow",
+        "unfollow": "Unfollow",
+        "publicGenerations": "Public generations",
+        "empty": "No public works",
+        "loadMore": "Load more"
+    },
+    "contestDetail": {
+        "status": {
+            "active": "Active",
+            "completed": "Completed",
+            "upcoming": "Upcoming",
+            "until": "Until {{date}}"
+        },
+        "organizer": "Organizer: {{name}}",
+        "tabs": {
+            "info": "Info",
+            "gallery": "Gallery",
+            "leaderboard": "Leaderboard"
+        },
+        "sections": {
+            "description": "Description",
+            "rules": "Rules",
+            "prizes": "Prizes"
+        },
+        "prizePlace": "#{{place}} Place",
+        "emptyGallery": "No entries yet. Be the first!",
+        "sorting": {
+            "new": "New",
+            "top": "Top"
+        },
+        "filter": {
+            "allModels": "All models",
+            "nanobanana": "NanoBanana",
+            "nanobanana_pro": "NanoBanana Pro",
+            "seedream4": "SeeDream 4",
+            "seedream4_5": "SeeDream 4.5",
+            "gptimage1_5": "GPT Image 1.5"
+        },
+        "loadingMore": "Loading more...",
+        "join": "Join",
+        "messages": {
+            "successJoin": "Work added to contest!",
+            "errorJoin": "Error adding work",
+            "errorNetwork": "Network error",
+            "errorLike": "Error liking",
+            "notFound": "Contest not found"
+        },
+        "likes": "{{count}} likes"
+    },
+    "nav": {
+        "home": "Home",
+        "events": "Events",
+        "studio": "Studio",
+        "top": "Top",
+        "profile": "Profile"
+    },
+    "common": {
+        "guest": "Guest",
+        "empty": "Empty",
+        "cancel": "Cancel",
+        "done": "Done",
+        "error": "Error",
+        "topUp": "Top Up",
+        "loading": "Loading..."
+    },
+    "generationForm": {
+        "title": "AI Image Generator",
+        "subtitle": "Create amazing images with AI",
+        "resultTitle": "Generation Result",
+        "labels": {
+            "model": "Select Model",
+            "upload": "Upload Image (Optional for Edit)",
+            "aspectRatio": "Aspect Ratio",
+            "prompt": "Prompt"
+        },
+        "buttons": {
+            "generate": "Generate Image",
+            "edit": "Edit Image",
+            "remove": "Remove Image",
+            "another": "Generate Another",
+            "download": "Download",
+            "share": "Share"
+        },
+        "placeholders": {
+            "upload": "Click to upload image",
+            "promptEdit": "Describe what you want to change in the image...",
+            "promptCreate": "Describe the image you want to create..."
+        },
+        "status": {
+            "generating": "Generating...",
+            "editing": "Editing..."
+        },
+        "errors": {
+            "emptyPrompt": "Please enter a prompt",
+            "failed": "Generation failed",
+            "textLength": "Text length exceeds maximum limit"
+        },
+        "models": {
+            "nanobanana-pro": {
+                "desc": "Default Text-to-Image"
+            },
+            "seedream4": {
+                "desc": "High Quality"
+            },
+            "nanobanana": {
+                "desc": "Fast Generation"
+            },
+            "seedream4-5": {
+                "desc": "Edit & Create"
+            }
+        },
+        "ratios": {
+            "square": "Square (1:1)",
+            "landscape": "Landscape (16:9)",
+            "portrait": "Portrait (9:16)"
+        }
+    },
+    "feed": {
+        "participatingInContest": "Participating in contest",
+        "remix": "Remix",
+        "imageUnavailable": "Image unavailable"
+    },
+    "chatOnboarding": {
+        "title": "Chat Mode",
+        "description": "Tap the highlighted <1>Chat</1> button to switch to AI Assistant discussion mode.",
+        "button": "Got it"
+    },
+    "notifications": {
+        "title": "Notifications",
+        "personal": "Personal",
+        "news": "News",
+        "settings": "Telegram Notification Settings",
+        "emptyPersonal": "No notifications",
+        "emptyNews": "No news",
+        "readAll": "Read all",
+        "time": {
+            "m": "m",
+            "h": "h",
+            "d": "d"
+        }
+    },
+    "announcement": {
+        "title": "Meet GPT Image 1.5 🚀",
+        "description": "New model from OpenAI is here! Incredible quality, complex prompt understanding, and text-on-image support. Try it now!",
+        "button": "Try it",
+        "close": "Close"
+    },
+    "editor": {
+        "title": "Editor",
+        "edit": "Edit",
+        "image": "Source Image",
+        "upload": "Upload",
+        "myWorks": "My Works",
+        "fromGenerations": "From Generations",
+        "instruction": "Instruction",
+        "instructionPlaceholder": "Describe what to change...",
+        "hints": {
+            "title": "Tips",
+            "1": "Be specific about the changes",
+            "2": "Specify style or effect if needed",
+            "3": "Fewer words = more accurate result"
+        },
+        "generate": "Edit",
+        "removeBg": "Remove Background",
+        "upscale": "Enhance Quality",
+        "generating": "Processing...",
+        "tokens": "tokens",
+        "result": "Result",
+        "save": "Save",
+        "continue": "Continue",
+        "close": "Close",
+        "insufficientBalance": "Insufficient balance",
+        "needTokens": "You need {{count}} tokens for editing",
+        "error": {
+            "required": "Upload an image and enter instruction"
+        },
+        "mode": {
+            "edit": "Edit",
+            "inpaint": "Inpaint",
+            "angles": "Angles",
+            "removeBg": "Remove BG",
+            "upscale": "Upscale"
+        },
+        "angles": {
+            "rotation": "Rotation",
+            "tilt": "Tilt",
+            "zoom": "Zoom",
+            "reset": "Reset"
+        },
+        "drawMask": "Draw Mask",
+        "maskEditor": {
+            "title": "Draw Mask",
+            "clear": "Clear",
+            "done": "Done",
+            "brushSize": "Brush Size"
+        }
+    },
+    "promo": {
+        "banner": "🎄 New Year Promo! +20% tokens on any purchase until Jan 5! 🎁"
+    },
+    "pending": {
+        "hint": "{{count}} image processing. Tap 🔄 to refresh."
+    },
+    "rewards": {
+        "subscribe": "Subscribe → +10 tokens",
+        "claim": "Claim",
+        "checking": "Checking...",
+        "notSubscribed": "Subscribe to channel first",
+        "success": "+10 tokens claimed!",
+        "modalDescription": "Subscribe to our channel and get bonus tokens!"
+    },
+    "devMode": {
+        "title": "⚠️ Test Environment",
+        "description": "This is a test version of the app. Errors and instability may occur.",
+        "warning": "Tokens are not refunded for errors."
+    },
+    "multiGeneration": {
+        "title": "Multi-Generation",
+        "button": "Multi-Generation",
+        "selectModels": "Select up to 3 models",
+        "generate": "Generate",
+        "generating": "Generating...",
+        "tokens": "tokens",
+        "limitReached": "Maximum 3 models",
+        "noModelsSelected": "Select at least one model",
+        "error": "Generation error",
+        "resultWillAppear": "Result will appear here",
+        "desc": "Create up to 3 variants in different AI models at once"
+    },
+    "activeGenerations": {
+        "title": "Active generations",
+        "noPrompt": "No prompt",
+        "completed": "Done",
+        "error": "Error",
+        "clearCompleted": "Clear",
+        "maxReached": "Maximum 4 parallel generations reached"
+    },
+    "aiChat": {
+        "title": "AI Chat",
+        "placeholder": "Type a message...",
+        "send": "Send",
+        "minimize": "Minimize",
+        "restore": "Open chat",
+        "clear": "Clear chat",
+        "selectModel": "Select model",
+        "welcome": "Hi! I'm the AiVerse AI assistant",
+        "welcomeHint": "Ask me about image generation or prompts",
+        "thinking": "Thinking...",
+        "error": "An error occurred. Please try again.",
+        "modelChangeTitle": "Change model?",
+        "modelChangeMessage": "You are switching to {{model}}. What would you like to do with the current chat history?",
+        "keepHistory": "Keep history",
+        "clearHistory": "Clear history",
+        "cancel": "Cancel",
+        "confirmGeneration": "Generate image?",
+        "tokens": "token(s)",
+        "generate": "Generate",
+        "generating": "Generating...",
+        "cancelGeneration": "Cancel",
+        "generationError": "❌ Generation failed. Please try again.",
+        "generationCancelled": "Generation cancelled.",
+        "selectImageModel": "Image model",
+        "newChat": "New Chat",
+        "continueChat": "Continue in this chat",
+        "requestSent": "Request sent, processing...",
+        "uploadError": "Image upload error",
+        "sendToTelegramError": "Failed to send file to Telegram.",
+        "onlyImages": "Only images are allowed",
+        "imageTooLarge": "Image size must not exceed 5MB"
+    }
+}
