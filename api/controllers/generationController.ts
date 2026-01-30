@@ -190,7 +190,7 @@ function mapQwenImageSize(ratio?: string): string | undefined {
 }
 
 function getPublicBaseUrl(): string | null {
-  const url = process.env.WEBAPP_URL || process.env.VERCEL_URL || process.env.RAILWAY_PUBLIC_DOMAIN || null
+  const url = process.env.WEBAPP_URL || process.env.RAILWAY_PUBLIC_DOMAIN || null
   return url ? (url.startsWith('http') ? url : `https://${url}`) : null
 }
 

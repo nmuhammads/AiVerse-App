@@ -9,7 +9,6 @@ const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
 const APP_URL = (
   process.env.WEBAPP_URL ||
   process.env.APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '') ||
   ''
 )

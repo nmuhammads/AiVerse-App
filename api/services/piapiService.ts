@@ -44,9 +44,8 @@ export interface PiapiTaskStatus {
  * Get public base URL for webhooks
  */
 function getPublicBaseUrl(): string {
-    return process.env.WEBAPP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : '';
+    const url = process.env.WEBAPP_URL || process.env.RAILWAY_PUBLIC_DOMAIN || ''
+    return url.startsWith('http') ? url : (url ? `https://${url}` : '')
 }
 
 /**
