@@ -8,7 +8,6 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
-import path from 'path'
 import dotenv from 'dotenv'
 import authRoutes from './routes/auth.js'
 import generationRoutes from './routes/generation.js'
@@ -41,6 +40,37 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 /**
+ * Request logger middleware (DEBUG)
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`)
+  })
+  next()
+})
+
+/**
+ * Root endpoint - API info
+ */
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    name: 'AiVerse API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      generation: '/api/generation',
+      feed: '/api/feed',
+      user: '/api/user',
+      telegram: '/api/telegram'
+    }
+  })
+})
+
+/**
  * API Routes
  */
 app.use('/api/auth', authRoutes)
@@ -65,9 +95,6 @@ app.use('/api/chat', chatRoutes)
 import { handlePiapiWebhook } from './controllers/generationController.js'
 app.post('/api/webhook/piapi', handlePiapiWebhook)
 
-// Note: Frontend (Telegram Mini App) is deployed separately
-// This is now a pure API server
-
 /**
  * health
  */
@@ -76,9 +103,23 @@ app.use('/api/health', (req: Request, res: Response): void => {
 })
 
 /**
+ * 404 handler - must be after all routes
+ */
+app.use((req: Request, res: Response) => {
+  console.log(`[404] Route not found: ${req.method} ${req.path}`)
+  res.status(404).json({
+    success: false,
+    error: 'Route not found',
+    path: req.path,
+    method: req.method
+  })
+})
+
+/**
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(`[ERROR] ${req.method} ${req.path}:`, error.message)
   void next
   res.status(500).json({
     success: false,
@@ -86,8 +127,5 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   })
 })
 
-/**
- * 404 handler
- */
-
 export default app
+
