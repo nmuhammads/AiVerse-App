@@ -41,7 +41,7 @@ export function ChatFeaturesOnboarding() {
         if (!currentStep) return
 
         let animationFrameId: number
-        let startTime = Date.now()
+        const startTime = Date.now()
 
         const updateRect = () => {
             const element = document.getElementById(currentStep.targetId)

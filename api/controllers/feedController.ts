@@ -88,7 +88,7 @@ export async function getFeed(req: Request, res: Response) {
             baseQuery = `status=neq.deleted&is_published=eq.true&created_at=gte.${startDate}`
         }
 
-        let queryParts = []
+        const queryParts = []
         if (baseQuery) {
             queryParts.push(baseQuery)
         }

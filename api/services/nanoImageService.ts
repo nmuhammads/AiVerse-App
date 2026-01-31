@@ -138,7 +138,7 @@ export async function generateNanoGPTImage(params: NanoImageParams): Promise<Nan
         throw new Error('No image data in response')
     }
 
-    let resultUrl = imageData.url
+    const resultUrl = imageData.url
     const resultB64 = imageData.b64_json
     let totalCost = data.cost || 0
 

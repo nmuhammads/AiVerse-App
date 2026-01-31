@@ -382,7 +382,7 @@ export default function Profile() {
 
     // Parse metadata from prompt
     let cleanPrompt = item.prompt
-    let metadata: Record<string, string> = {}
+    const metadata: Record<string, string> = {}
 
     const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
     if (match) {
@@ -1379,7 +1379,8 @@ export default function Profile() {
                                       prompt: cleanPrompt(preview.prompt),
                                       model: preview.model || '',
                                       username: user.username || null,
-                                      user_id: user.id
+                                      user_id: user.id,
+                                      generation_id: preview.id
                                     })
                                   })
                                   if (r.ok) {
@@ -1415,7 +1416,8 @@ export default function Profile() {
                                       prompt: cleanPrompt(preview.prompt),
                                       model: preview.model || '',
                                       username: user.username || null,
-                                      user_id: user.id
+                                      user_id: user.id,
+                                      generation_id: preview.id
                                     })
                                   })
                                   const data = await r.json()

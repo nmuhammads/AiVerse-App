@@ -27,7 +27,7 @@ export function useRemix() {
         // Parse metadata from prompt - always process prompt for generation to work
         // Format: ... real prompt ... [type=text_photo; ratio=3:4; photos=1]
         let cleanPrompt = item.prompt || ''
-        let metadata: Record<string, string> = {}
+        const metadata: Record<string, string> = {}
 
         // Always parse metadata if prompt exists
         if (item.prompt) {

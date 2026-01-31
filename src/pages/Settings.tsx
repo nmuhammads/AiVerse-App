@@ -116,10 +116,23 @@ export default function Settings() {
         }
     }
 
-    const changeLanguage = (lang: string) => {
+    const changeLanguage = async (lang: string) => {
         i18n.changeLanguage(lang)
         impact('light')
         setLangExpanded(false)
+
+        // Update language in database
+        if (user?.id) {
+            try {
+                await fetch('/api/user/language', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: user.id, language_code: lang })
+                })
+            } catch (e) {
+                console.error('Failed to update language', e)
+            }
+        }
     }
 
     const sections = [

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward, searchUsers } from '../controllers/userController.js'
+import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward, searchUsers, updateLanguage } from '../controllers/userController.js'
 import { updateNotificationSettings } from '../controllers/notificationController.js'
 
 const router = Router()
@@ -14,6 +14,7 @@ router.post('/publish', togglePublish)
 router.get('/leaderboard', getLeaderboard)
 router.get('/accumulations', getRemixRewards)
 router.patch('/notification-settings', updateNotificationSettings)
+router.patch('/language', updateLanguage)
 router.post('/follow', toggleFollow)
 router.get('/follow-status/:userId', checkFollowStatus)
 router.get('/following/:userId', getFollowing)

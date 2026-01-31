@@ -89,7 +89,7 @@ export default function PublicProfile() {
 
         // Parse metadata from prompt
         let cleanPrompt = item.prompt
-        let metadata: Record<string, string> = {}
+        const metadata: Record<string, string> = {}
 
         const match = item.prompt.match(/\s*\[(.*?)\]\s*$/)
         if (match) {

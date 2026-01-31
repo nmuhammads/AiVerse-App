@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
 import { addFingerprint } from '../utils/fingerprint.js'
 import { applyTextWatermark, applyImageWatermark } from '../utils/watermark.js'
+import { getTelegramMessage } from '../utils/telegramMessages.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -848,10 +849,15 @@ export async function sendWithPrompt(req: Request, res: Response) {
     const model = String(req.body?.model || '')
     const username = req.body?.username ? String(req.body.username).replace(/^@/, '') : null
     const userId = Number(req.body?.user_id || 0)
+    const generationId = Number(req.body?.generation_id || 0)
 
     if (!API || !chat_id || (!photo && !video)) {
       return res.status(400).json({ ok: false, error: 'invalid payload' })
     }
+
+    // Get user's language
+    const { data: users } = await supaSelect('users', `?user_id=eq.${userId}&limit=1`)
+    const userLang = users?.[0]?.language_code || null
 
     // Get hashtag for model
     const hashtag = MODEL_HASHTAGS[model] || '#AIVerse'
@@ -859,21 +865,43 @@ export async function sendWithPrompt(req: Request, res: Response) {
     // Get bot for model
     const botName = MODEL_BOTS[model] || 'AiVerseAppBot'
 
+    // Get bot username dynamically for AiVerseAppBot
+    let appBotUsername = 'AiVerseAppBot'
+    try {
+      const me = await tg('getMe', {})
+      if (me?.ok && me.result?.username) {
+        appBotUsername = me.result.username
+      }
+    } catch (e) {
+      console.error('Failed to get bot username', e)
+    }
+
     // Build ref link
     const refParam = username || String(userId)
     const botLink = `https://t.me/${botName}?start=ref_${refParam}`
-    const appLink = `https://t.me/AiVerseAppBot?start=ref_${refParam}`
+
+    // Build remix link for the second reference (ref + remix)
+    const appLink = generationId
+      ? `https://t.me/${appBotUsername}?startapp=ref-${refParam}-remix-${generationId}`
+      : `https://t.me/${appBotUsername}?start=ref_${refParam}`
 
     // Add fingerprint to prompt
     const promptWithFingerprint = prompt ? addFingerprint(prompt, username, userId) : ''
 
+    // Get localized messages
+    const txtCreateSimilar = getTelegramMessage(userLang, 'createSimilar')
+    const txtInBot = getTelegramMessage(userLang, 'inBot')
+    const txtRepeatInApp = getTelegramMessage(userLang, 'repeatInApp')
+    const txtAppName = getTelegramMessage(userLang, 'appName')
+    const txtPrompt = getTelegramMessage(userLang, 'prompt')
+
     // Format parts
-    const headerHtml = `${hashtag}\n\n🎨 Создай похожее:\nВ боте - <a href="${botLink}">@${botName}</a>\nВ приложении - <a href="${appLink}">📱 AiVerse App</a>`
+    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>`
 
     // Build full caption to check length
     // HTML format: <blockquote expandable>text</blockquote>
     const promptHtml = promptWithFingerprint
-      ? `\n\n💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      ? `\n\n${txtPrompt}\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
       : ''
 
     const fullCaption = headerHtml + promptHtml
@@ -979,7 +1007,7 @@ export async function sendWithPrompt(req: Request, res: Response) {
     // If prompt was too long, send it as a reply message
     if (isCaptionTooLong && promptWithFingerprint && msgId) {
       console.info('sendWithPrompt:sending_separate_prompt')
-      const text = `💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      const text = `${txtPrompt}\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
 
       // Split if even text message is too long (4096 limit)
       // But blockquote structure makes splitting hard. Just send what fits or rely on Telegram limits.
@@ -1013,12 +1041,16 @@ export async function sendWithWatermark(req: Request, res: Response) {
     const model = String(req.body?.model || '')
     const username = req.body?.username ? String(req.body.username).replace(/^@/, '') : null
     const userId = Number(req.body?.user_id || 0)
+    const generationId = Number(req.body?.generation_id || 0)
 
     if (!API || !chat_id || !photo) {
       return res.status(400).json({ ok: false, error: 'invalid payload' })
     }
 
-    // Get user's watermark settings
+    // Get user's language and watermark settings
+    const { data: users } = await supaSelect('users', `?user_id=eq.${userId}&limit=1`)
+    const userLang = users?.[0]?.language_code || null
+
     const { data: watermarks } = await supaSelect('user_watermarks', `?user_id=eq.${userId}&is_active=eq.true&limit=1`)
     const watermark = watermarks?.[0]
 
@@ -1069,19 +1101,41 @@ export async function sendWithWatermark(req: Request, res: Response) {
     const hashtag = MODEL_HASHTAGS[model] || '#AIVerse'
     const botName = MODEL_BOTS[model] || 'AiVerseAppBot'
 
+    // Get bot username dynamically for AiVerseAppBot
+    let appBotUsername = 'AiVerseAppBot'
+    try {
+      const me = await tg('getMe', {})
+      if (me?.ok && me.result?.username) {
+        appBotUsername = me.result.username
+      }
+    } catch (e) {
+      console.error('Failed to get bot username', e)
+    }
+
     // Build ref link
     const refParam = username || String(userId)
     const botLink = `https://t.me/${botName}?start=ref_${refParam}`
-    const appLink = `https://t.me/AiVerseAppBot?start=ref_${refParam}`
+
+    // Build remix link for the second reference (ref + remix)
+    const appLink = generationId
+      ? `https://t.me/${appBotUsername}?startapp=ref-${refParam}-remix-${generationId}`
+      : `https://t.me/${appBotUsername}?start=ref_${refParam}`
 
     // Add fingerprint to prompt
     const promptWithFingerprint = prompt ? addFingerprint(prompt, username, userId) : ''
 
+    // Get localized messages
+    const txtCreateSimilar = getTelegramMessage(userLang, 'createSimilar')
+    const txtInBot = getTelegramMessage(userLang, 'inBot')
+    const txtRepeatInApp = getTelegramMessage(userLang, 'repeatInApp')
+    const txtAppName = getTelegramMessage(userLang, 'appName')
+    const txtPrompt = getTelegramMessage(userLang, 'prompt')
+
     // Format caption
-    const headerHtml = `${hashtag}\n\n🎨 Создай похожее:\nВ боте - <a href="${botLink}">@${botName}</a>\nВ приложении - <a href="${appLink}">📱 AiVerse App</a>`
+    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>`
 
     const promptHtml = promptWithFingerprint
-      ? `\n\n💬 Промпт:\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
+      ? `\n\n${txtPrompt}\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
       : ''
 
     const fullCaption = headerHtml + promptHtml

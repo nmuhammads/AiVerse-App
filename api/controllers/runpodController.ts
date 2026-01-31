@@ -12,6 +12,12 @@ const ANGLES_PRICE = 4
 const DEFAULT_TIMEOUT_MS = Number(process.env.RUNPOD_TIMEOUT_MS) || 300000
 
 // Создание задачи Runpod
+
+interface RunpodCreateResponse {
+    id?: string;
+    error?: string;
+}
+
 async function createRunpodTask(modelId: string, input: Record<string, unknown>): Promise<string> {
     const url = `${RUNPOD_BASE_URL}/${modelId}/run`
 
@@ -26,7 +32,7 @@ async function createRunpodTask(modelId: string, input: Record<string, unknown>)
         body: JSON.stringify({ input })
     })
 
-    const json = await resp.json()
+    const json = (await resp.json()) as RunpodCreateResponse
 
     if (!resp.ok || !json.id) {
         console.error(`[Runpod] Task create failed:`, json)
@@ -34,10 +40,20 @@ async function createRunpodTask(modelId: string, input: Record<string, unknown>)
     }
 
     console.log(`[Runpod] Task created, ID:`, json.id)
-    return json.id
+    return json.id as string
 }
 
 // Проверка статуса задачи
+
+interface RunpodCheckResponse {
+    status: string;
+    output?: {
+        image_url?: string;
+        result?: string;
+    };
+    error?: string;
+}
+
 async function checkRunpodTask(modelId: string, jobId: string) {
     const url = `${RUNPOD_BASE_URL}/${modelId}/status/${jobId}`
 
@@ -45,7 +61,7 @@ async function checkRunpodTask(modelId: string, jobId: string) {
         headers: { 'Authorization': `Bearer ${RUNPOD_API_KEY}` }
     })
 
-    const json = await resp.json()
+    const json = (await resp.json()) as RunpodCheckResponse
 
     // Логирование для отладки
     if (json.status !== 'IN_QUEUE' && json.status !== 'IN_PROGRESS') {
@@ -53,8 +69,8 @@ async function checkRunpodTask(modelId: string, jobId: string) {
     }
 
     if (json.status === 'COMPLETED' && (json.output?.image_url || json.output?.result)) {
-        const imageUrl = json.output.image_url || json.output.result
-        return { status: 'success' as const, imageUrl }
+        const imageUrl = json.output!.image_url || json.output!.result
+        return { status: 'success' as const, imageUrl: imageUrl! }
     }
     if (json.status === 'FAILED') {
         return { status: 'failed' as const, error: json.error || 'Task failed' }
@@ -141,8 +157,8 @@ export async function handleImageEdit(req: Request, res: Response) {
 
         // Создание задачи в Runpod
         // Модифицируем промпт для inpaint режима
-        let finalPrompt = prompt
-        let finalImages = [...images]
+        const finalPrompt = prompt
+        const finalImages = [...images]
 
         // Upload any base64 images to R2 (API requires URLs)
         for (let i = 0; i < finalImages.length; i++) {

@@ -284,7 +284,7 @@ export async function listGenerations(req: Request, res: Response) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
     // Enhanced query to get full details
-    let select = `select=id,image_url,video_url,prompt,created_at,is_published,is_prompt_private,model,likes_count,remix_count,input_images,user_id,edit_variants,media_type,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
+    const select = `select=id,image_url,video_url,prompt,created_at,is_published,is_prompt_private,model,likes_count,remix_count,input_images,user_id,edit_variants,media_type,users(username,first_name,last_name,avatar_url),generation_likes(user_id)`
     // Filter: show items that have either image_url OR video_url (both must start with https:// and not be empty)
     // Using stricter filter to exclude empty generations from other bots
     // Exclude specific models that come from other bots (use not.in.() syntax for multiple values)
@@ -720,6 +720,39 @@ export async function searchUsers(req: Request, res: Response) {
   } catch (e) {
     console.error('searchUsers error:', e)
     return res.status(500).json({ error: 'search failed' })
+  }
+}
+
+// Update user language
+export async function updateLanguage(req: Request, res: Response) {
+  try {
+    const userId = Number(req.body?.user_id || 0)
+    const languageCode = String(req.body?.language_code || '')
+
+    if (!userId || !languageCode) {
+      return res.status(400).json({ error: 'invalid payload' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Supabase not configured' })
+    }
+
+    // Update user language in database
+    const update = await supaPatch(
+      'users',
+      `?user_id=eq.${userId}`,
+      { language_code: languageCode, updated_at: new Date().toISOString() }
+    )
+
+    if (!update.ok) {
+      console.error('updateLanguage error:', update.data)
+      return res.status(500).json({ error: 'failed to update language' })
+    }
+
+    return res.json({ ok: true, data: update.data })
+  } catch (e) {
+    console.error('updateLanguage error:', e)
+    return res.status(500).json({ error: 'update failed' })
   }
 }
 
