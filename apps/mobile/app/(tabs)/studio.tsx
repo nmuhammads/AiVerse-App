@@ -18,8 +18,10 @@ import {
     StudioSubHeader,
     VideoSettings,
     ActiveGenerationsPanel,
+    ResultView, // Use the new ResultView
 } from '../../components/studio';
-import { ResultModal } from '../../components/ResultModal';
+// Removed ResultModal import
+
 
 export default function StudioScreen() {
     const insets = useSafeAreaInsets();
@@ -355,17 +357,15 @@ export default function StudioScreen() {
 
             </KeyboardAvoidingView>
 
-            <ResultModal
+            <ResultView
                 visible={resultModalVisible}
-                startIndex={0}
-                items={[{
-                    id: 0,
-                    image_url: resultImage || '',
+                result={resultImage ? {
+                    id: 0, // Mock ID or from response if available
+                    image_url: resultImage,
                     prompt: prompt,
-                    likes_count: 0,
-                    created_at: new Date().toISOString(),
-                    media_type: mediaType
-                }]}
+                    model: selectedModel,
+                    media_type: mediaType,
+                } : null}
                 onClose={() => setResultModalVisible(false)}
             />
         </View>
