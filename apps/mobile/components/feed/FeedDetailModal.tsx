@@ -1,8 +1,8 @@
+import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import {
     View,
     Text,
-    Image,
     TouchableOpacity,
     StyleSheet,
     Modal,
@@ -101,9 +101,10 @@ export function FeedDetailModal({
                         <View style={styles.imageContainer}>
                             {item.image_url ? (
                                 <Image
-                                    source={{ uri: item.image_url }}
+                                    source={{ uri: item.original_url || item.image_url }}
                                     style={styles.image}
-                                    resizeMode="contain"
+                                    contentFit="contain"
+                                    transition={200}
                                 />
                             ) : (
                                 <View style={styles.placeholder}>

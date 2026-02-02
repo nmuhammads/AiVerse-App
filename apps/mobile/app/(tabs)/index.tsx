@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
-import { FeedHeader, FeedFilters, FeedCard, FeedDetailModal, SearchBar, FeedItem } from '../../components/feed';
+import { FeedHeader, FeedFilters, FeedCard, FeedDetailModal, SearchBar, FeedItem, FeedGrid } from '../../components/feed';
 import { FeedSkeletonGrid } from '../../components/ui';
 import { colors, spacing } from '../../theme';
 import { api, getApiUrl } from '../../lib/api';
@@ -61,8 +61,6 @@ export default function FeedScreen() {
 
             if (!response.ok) {
                 console.error(`Feed fetch failed: ${response.status} ${response.statusText}`);
-                const text = await response.text();
-                console.error('Error body:', text);
                 throw new Error(`Failed to fetch feed: ${response.status}`);
             }
 
@@ -70,7 +68,7 @@ export default function FeedScreen() {
                 items: Array<{
                     id: number;
                     image_url?: string;
-                    thumbnail_url?: string;
+                    compressed_url?: string;
                     prompt?: string;
                     model?: string;
                     likes_count?: number;
@@ -94,7 +92,8 @@ export default function FeedScreen() {
             // Transform API response to FeedItem format
             const feedItems: FeedItem[] = feedData.map((item) => ({
                 id: String(item.id),
-                image_url: item.image_url || item.thumbnail_url || '',
+                image_url: item.compressed_url || item.image_url || '',
+                original_url: item.image_url,
                 prompt: item.prompt,
                 model: item.model,
                 likes_count: item.likes_count || 0,
@@ -116,7 +115,6 @@ export default function FeedScreen() {
                     const newItems = feedItems.filter(i => !existingIds.has(i.id));
 
                     if (newItems.length === 0 && feedItems.length > 0) {
-                        console.log('Duplicate items received, stopping pagination');
                         setHasMore(false);
                         return prev;
                     }
@@ -163,6 +161,10 @@ export default function FeedScreen() {
 
     const onRefresh = useCallback(() => {
         fetchFeed(true);
+    }, [fetchFeed]);
+
+    const handleLoadMore = useCallback(() => {
+        fetchFeed(false);
     }, [fetchFeed]);
 
     const handleLike = useCallback(async (item: FeedItem) => {
@@ -255,21 +257,6 @@ export default function FeedScreen() {
         return true;
     });
 
-    const renderItem = useCallback(
-        ({ item }: { item: FeedItem }) => (
-            <FeedCard
-                item={item}
-                variant={viewMode}
-                onPress={() => handleItemPress(item)}
-                onLike={() => handleLike(item)}
-                onRemix={() => handleRemix(item)}
-            />
-        ),
-        [viewMode, handleItemPress, handleLike, handleRemix]
-    );
-
-    const numColumns = viewMode === 'compact' ? 2 : 1;
-
     const ListHeaderComponent = useCallback(() => (
         <View style={styles.header}>
             {isSearchOpen ? (
@@ -296,54 +283,47 @@ export default function FeedScreen() {
         </View>
     ), [isSearchOpen, searchQuery, sort, feedFilter, viewMode, modelFilter, handleSearchClose]);
 
-    const ListEmptyComponent = useCallback(() => {
-        if (loading) {
-            return <FeedSkeletonGrid count={6} />;
+    const ListFooterComponent = useCallback(() => {
+        if (loadingMore) {
+            return (
+                <View style={styles.footer}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+            );
         }
-        return (
-            <View style={styles.empty}>
-                <Text style={styles.emptyText}>No posts found</Text>
-            </View>
-        );
-    }, [loading]);
+        return <View style={styles.footerSpacer} />;
+    }, [loadingMore]);
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <FlatList
-                data={filteredItems}
-                renderItem={renderItem}
-                keyExtractor={(item, index) => item.id ? String(item.id) : String(index)}
-                numColumns={numColumns}
-                key={viewMode}
-                contentContainerStyle={[
-                    styles.list,
-                    viewMode === 'compact' && styles.listCompact,
-                    { paddingBottom: 120, paddingTop: 60 } // Extra padding for custom tab bar
-                ]}
-                columnWrapperStyle={viewMode === 'compact' ? styles.columnWrapper : undefined}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={colors.primary}
-                        colors={[colors.primary]}
-                    />
-                }
-                ListHeaderComponent={ListHeaderComponent}
-                ListFooterComponent={
-                    <View style={styles.footer}>
-                        {loadingMore && <ActivityIndicator size="small" color={colors.primary} />}
+            {loading && items.length === 0 ? (
+                <>
+                    <View style={styles.headerContainer}>
+                        <ListHeaderComponent />
                     </View>
-                }
-                ListEmptyComponent={ListEmptyComponent}
-                showsVerticalScrollIndicator={false}
-                onEndReached={() => {
-                    if (!loadingMore && hasMore) {
-                        fetchFeed(false);
-                    }
-                }}
-                onEndReachedThreshold={0.2}
-            />
+                    <FeedSkeletonGrid count={6} />
+                </>
+            ) : (
+                <FeedGrid
+                    items={filteredItems.length > 0 ? filteredItems : items} // Fallback to items if filtered empty? No, logic below handles empty
+                    viewMode={viewMode}
+                    onItemPress={handleItemPress}
+                    onLike={handleLike}
+                    onRemix={handleRemix}
+                    ListHeaderComponent={<ListHeaderComponent />}
+                    ListFooterComponent={<ListFooterComponent />}
+                    onEndReached={handleLoadMore}
+                    onRefresh={onRefresh}
+                    refreshing={refreshing}
+                />
+            )}
+
+            {/* Show empty state if no items found after filtering */}
+            {!loading && filteredItems.length === 0 && items.length > 0 && (
+                <View style={styles.emptyOverlay}>
+                    <Text style={styles.emptyText}>No posts found matching your criteria</Text>
+                </View>
+            )}
 
             {/* Detail Modal */}
             <FeedDetailModal
@@ -362,24 +342,21 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    list: {
-        padding: spacing.lg,
-        paddingBottom: 100,
-    },
-    listCompact: {
-        padding: spacing.sm,
-    },
-    columnWrapper: {
-        gap: spacing.sm,
+    headerContainer: {
+        paddingTop: spacing.sm,
+        paddingHorizontal: spacing.sm,
     },
     header: {
         marginBottom: spacing.md,
+        paddingTop: spacing.sm,
     },
-    empty: {
-        flex: 1,
+    emptyOverlay: {
+        position: 'absolute',
+        top: '40%',
+        left: 0,
+        right: 0,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 60,
     },
     emptyText: {
         color: colors.textMuted,
@@ -388,5 +365,8 @@ const styles = StyleSheet.create({
     footer: {
         paddingVertical: 20,
         alignItems: 'center',
+    },
+    footerSpacer: {
+        height: 100, // Space for bottom tab bar
     },
 });

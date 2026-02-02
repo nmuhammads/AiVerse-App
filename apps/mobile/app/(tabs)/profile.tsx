@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, FlatList, RefreshControl, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, FlatList, RefreshControl, Dimensions, ImageBackground, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import {
+    Settings,
+    Wallet,
+    RefreshCw,
+    Camera,
+    Edit,
+    Grid,
+    Lock,
+    Globe,
+    Play,
+    ChevronRight,
+    User as UserIcon,
+    Video
+} from 'lucide-react-native';
 import { api } from '../../lib/api';
 import { useUserStore } from '../../store/userStore';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors } from '../../theme';
+import { ResultModal } from '../../components/ResultModal';
 
 interface Generation {
     id: number;
@@ -13,6 +31,8 @@ interface Generation {
     likes_count: number;
     created_at: string;
     media_type: 'image' | 'video';
+    is_published: boolean;
+    is_prompt_private: boolean;
 }
 
 interface UserInfo {
@@ -22,38 +42,95 @@ interface UserInfo {
     last_name?: string;
     avatar_url?: string;
     balance: number;
+    cover_url?: string;
+    likes_count?: number;
+    remix_count?: number;
+    followers_count?: number;
+    following_count?: number;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_COLUMNS = 3;
 const GRID_GAP = 2;
-const ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
+const ITEM_SIZE = Math.floor((SCREEN_WIDTH - 32 - (GRID_GAP * GRID_COLUMNS)) / GRID_COLUMNS); // Safe calculation to prevent wrapping
+
+// Tab constants
+const TAB_ALL = 'all';
+const TAB_PUBLISHED = 'published';
+const TAB_PRIVATE = 'private';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const userId = useUserStore((state) => state.user.id);
-    const setBalance = useUserStore((state) => state.setBalance);
+    const router = useRouter();
+    const { user, setBalance } = useUserStore();
 
+    // Data State
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [generations, setGenerations] = useState<Generation[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    // UI State
+    const [activeTab, setActiveTab] = useState(TAB_ALL);
+    const [selectedModels, setSelectedModels] = useState<string[]>([]); // Future support
+
+    // Stats State
+    const [stats, setStats] = useState({
+        generations: 0,
+        followers: 0,
+        likes: 0,
+        remixes: 0
+    });
+
+    // Modal State
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [startIndex, setStartIndex] = useState(0);
+
+    const openModal = (index: number) => {
+        setStartIndex(index);
+        setIsModalVisible(true);
+    };
+
+    const handleUpdateItem = useCallback((id: number, updates: Partial<Generation>) => {
+        setGenerations(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    }, []);
+
     const fetchUserData = useCallback(async () => {
+        if (!user?.id) return;
+
         try {
-            // Fetch user info
-            const userResponse = await api.get<{ user: UserInfo }>(`/user/info/${userId}`);
-            if (userResponse.user) {
-                setUserInfo(userResponse.user);
-                setBalance(userResponse.user.balance);
+            // Fetch detailed user info
+            const userResponse = await api.get<UserInfo>(`/user/info/${user.id}`);
+            if (userResponse) {
+                setUserInfo(userResponse);
+                setBalance(userResponse.balance);
+
+                // Update stats
+                setStats({
+                    generations: 0, // Will update after fetching gens
+                    followers: userResponse.followers_count || 0,
+                    likes: userResponse.likes_count || 0,
+                    remixes: userResponse.remix_count || 0
+                });
             }
 
-            // Fetch user generations
-            const gensResponse = await api.get<{ items: Generation[] }>(
-                `/feed?user_id=${userId}&include_unpublished=true&limit=50`
+            // Fetch generations
+            // Note: The visibility filter is applied clientside or via query params depending on API design
+            // Mimicking the web app's structure:
+            let visibilityParam = '';
+            if (activeTab === TAB_PUBLISHED) visibilityParam = '&visibility=published';
+            if (activeTab === TAB_PRIVATE) visibilityParam = '&visibility=private';
+
+            const gensResponse = await api.get<{ items: Generation[], total: number }>(
+                `/user/generations?user_id=${user.id}&limit=50&offset=0${visibilityParam}`
             );
-            if (gensResponse.items) {
+
+            if (gensResponse && gensResponse.items) {
                 setGenerations(gensResponse.items);
+                setStats(prev => ({
+                    ...prev,
+                    generations: gensResponse.total || gensResponse.items.length
+                }));
             }
         } catch (error) {
             console.error('Failed to fetch user data:', error);
@@ -61,7 +138,7 @@ export default function ProfileScreen() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [userId, setBalance]);
+    }, [user?.id, activeTab, setBalance]);
 
     useEffect(() => {
         fetchUserData();
@@ -72,315 +149,543 @@ export default function ProfileScreen() {
         fetchUserData();
     }, [fetchUserData]);
 
-    const displayName = userInfo?.first_name || 'User';
-    const username = userInfo?.username ? `@${userInfo.username.replace(/^@/, '')}` : `@user_${userId}`;
-    const avatarUrl = userInfo?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userId}`;
+    const displayName = userInfo?.first_name
+        ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim()
+        : (user?.username || 'Guest');
 
-    const renderGeneration = ({ item }: { item: Generation }) => (
-        <TouchableOpacity style={styles.gridItem}>
-            <Image
-                source={{ uri: item.image_url || item.video_url }}
-                style={styles.gridImage}
-                resizeMode="cover"
-            />
-            {item.media_type === 'video' && (
-                <View style={styles.videoBadge}>
-                    <Text style={styles.videoBadgeText}>▶</Text>
+    const username = userInfo?.username ? `@${userInfo.username.replace(/^@/, '')}` : '—';
+    const avatarUrl = userInfo?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${user?.username || 'guest'}`;
+    const coverUrl = userInfo?.cover_url;
+
+    const renderHeader = () => (
+        <View style={styles.headerContainer}>
+            {/* Cover Section */}
+            <View style={styles.coverWrapper}>
+                {coverUrl ? (
+                    <ImageBackground
+                        source={{ uri: coverUrl }}
+                        style={styles.coverImage}
+                        resizeMode="cover"
+                    >
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    </ImageBackground>
+                ) : (
+                    <View style={styles.defaultCover}>
+                        {/* Abstract blobs/gradients mimicking the web version */}
+                        <View style={[styles.blob, styles.blob1]} />
+                        <View style={[styles.blob, styles.blob2]} />
+                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                    </View>
+                )}
+
+                {/* Cover Content */}
+                <View style={styles.profileInfoContent}>
+                    <TouchableOpacity style={styles.cameraButton}>
+                        <Camera size={14} color="rgba(255,255,255,0.7)" />
+                    </TouchableOpacity>
+
+                    {/* Avatar */}
+                    <TouchableOpacity style={styles.avatarWrapper}>
+                        <LinearGradient
+                            colors={['#8b5cf6', '#d946ef', '#6366f1']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.avatarGradient}
+                        >
+                            <View style={styles.avatarInner}>
+                                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                            </View>
+                        </LinearGradient>
+                        <View style={styles.proBadge}>
+                            <LinearGradient
+                                colors={['#fcd34d', '#f59e0b']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.proBadgeGradient}
+                            >
+                                <Text style={styles.proBadgeText}>PRO</Text>
+                            </LinearGradient>
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* Name */}
+                    <Text style={styles.displayName}>{displayName}</Text>
+                    <Text style={styles.usernameText}>{username}</Text>
+
+                    {/* Stats Grid */}
+                    <View style={styles.statsGrid}>
+                        <StatItem label="GENERATIONS" value={stats.generations} />
+                        <StatItem label="FOLLOWERS" value={stats.followers} />
+                        <StatItem label="LIKES" value={stats.likes} />
+                        <StatItem label="REMIXES" value={stats.remixes} />
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.actionsRow}>
+                        <TouchableOpacity style={[styles.actionButton, styles.walletButton]}>
+                            <LinearGradient
+                                colors={['#7c3aed', '#4f46e5']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={StyleSheet.absoluteFill}
+                            />
+                            <Wallet size={16} color="#fff" />
+                            <Text style={styles.walletText}>{userInfo?.balance || 0}</Text>
+                            <Text style={styles.walletSubText}>tokens</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.actionButton, styles.iconButton]}>
+                            <RefreshCw size={20} color="#fff" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.actionButton, styles.iconButton]}>
+                            <Settings size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            )}
-        </TouchableOpacity>
+            </View>
+        </View>
     );
 
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
-    }
+    const StatItem = ({ label, value }: { label: string, value: number }) => (
+        <View style={styles.statItem}>
+            <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+            <Text style={styles.statValue}>{value}</Text>
+            <Text style={styles.statLabel}>{label}</Text>
+        </View>
+    );
 
     return (
-        <ScrollView
-            style={styles.container}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: 120 }]}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-            }
-        >
-            <View style={styles.header}>
-                <View style={styles.avatarContainer}>
-                    <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-                </View>
-                <Text style={styles.name}>{displayName}</Text>
-                <Text style={styles.username}>{username}</Text>
-            </View>
+        <View style={styles.container}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 10, paddingBottom: 100 }]}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+                }
+            >
+                {renderHeader()}
 
-            <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{generations.length}</Text>
-                    <Text style={styles.statLabel}>Generations</Text>
+                {/* Tabs */}
+                <View style={styles.tabsContainer}>
+                    <TabButton label="All" isActive={activeTab === TAB_ALL} onPress={() => setActiveTab(TAB_ALL)} icon={<Grid size={14} color={activeTab === TAB_ALL ? '#fff' : '#9ca3af'} />} />
+                    <TabButton label="Published" isActive={activeTab === TAB_PUBLISHED} onPress={() => setActiveTab(TAB_PUBLISHED)} icon={<Globe size={14} color={activeTab === TAB_PUBLISHED ? '#fff' : '#9ca3af'} />} />
+                    <TabButton label="Private" isActive={activeTab === TAB_PRIVATE} onPress={() => setActiveTab(TAB_PRIVATE)} icon={<Lock size={14} color={activeTab === TAB_PRIVATE ? '#fff' : '#9ca3af'} />} />
                 </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statValue}>0</Text>
-                    <Text style={styles.statLabel}>Followers</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
-                        {generations.reduce((sum, g) => sum + (g.likes_count || 0), 0)}
-                    </Text>
-                    <Text style={styles.statLabel}>Likes</Text>
-                </View>
-            </View>
 
-            <View style={styles.balanceCard}>
-                <Text style={styles.balanceLabel}>Token Balance</Text>
-                <View style={styles.balanceRow}>
-                    <Text style={styles.balanceValue}>{userInfo?.balance ?? 0}</Text>
-                    <Text style={styles.balanceUnit}>tokens</Text>
+                {/* Grid */}
+                <View style={styles.gridContainer}>
+                    {generations.map((item, index) => (
+                        <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => openModal(index)}>
+                            <Image
+                                source={{ uri: item.image_url || item.video_url }}
+                                style={styles.gridImage}
+                                resizeMode="cover"
+                            />
+                            {(item.media_type === 'video' || !!item.video_url) && (
+                                <View style={styles.mediaTypeBadge}>
+                                    <Video size={10} color="#fff" />
+                                </View>
+                            )}
+                            {item.is_published && (
+                                <View style={styles.statusBadge}>
+                                    <Globe size={8} color="#fff" />
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    ))}
                 </View>
-                <TouchableOpacity style={styles.topUpButton}>
-                    <Text style={styles.topUpButtonText}>+ Top Up</Text>
-                </TouchableOpacity>
-            </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>My Generations</Text>
-                {generations.length === 0 ? (
+                {generations.length === 0 && !loading && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🎨</Text>
                         <Text style={styles.emptyText}>No generations yet</Text>
-                        <Text style={styles.emptyHint}>Create your first masterpiece in Studio!</Text>
-                    </View>
-                ) : (
-                    <View style={styles.gridContainer}>
-                        {generations.map((item) => (
-                            <TouchableOpacity key={item.id} style={styles.gridItem}>
-                                <Image
-                                    source={{ uri: item.image_url || item.video_url }}
-                                    style={styles.gridImage}
-                                    resizeMode="cover"
-                                />
-                                {item.media_type === 'video' && (
-                                    <View style={styles.videoBadge}>
-                                        <Text style={styles.videoBadgeText}>▶</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        ))}
                     </View>
                 )}
-            </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Settings</Text>
-                {['Language', 'Notifications', 'About', 'Support'].map((item) => (
-                    <TouchableOpacity key={item} style={styles.settingItem}>
-                        <Text style={styles.settingText}>{item}</Text>
-                        <Text style={styles.settingArrow}>›</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+                <Text style={styles.version}>AiVerse Mobile v1.0.0</Text>
+            </ScrollView>
 
-            <Text style={styles.version}>AiVerse v1.0.0</Text>
-        </ScrollView>
+            <ResultModal
+                visible={isModalVisible}
+                items={generations}
+                startIndex={startIndex}
+                onClose={() => setIsModalVisible(false)}
+                onUpdateItem={handleUpdateItem}
+                onRemix={(item) => {
+                    setIsModalVisible(false);
+
+                    // Parse metadata from prompt (similar to web)
+                    let cleanPrompt = item.prompt;
+                    let metadata: Record<string, string> = {};
+
+                    const match = item.prompt.match(/\s*\[(.*?)\]\s*$/);
+                    if (match) {
+                        const metaString = match[1];
+                        cleanPrompt = item.prompt.replace(match[0], '').trim();
+
+                        metaString.split(';').forEach((part: string) => {
+                            const [key, val] = part.split('=').map((s: string) => s.trim());
+                            if (key && val) metadata[key] = val;
+                        });
+                    }
+
+                    // Map models
+                    const modelMap: Record<string, string> = {
+                        'nanobanana': 'nanobanana',
+                        'nanobanana-pro': 'nanobanana-pro',
+                        'seedream4': 'seedream4',
+                        'seedream4-5': 'seedream4-5',
+                        'seedream4.5': 'seedream4-5',
+                        'seedance-1.5-pro': 'seedance-1.5-pro',
+                        'gptimage1.5': 'gpt-image-1.5'
+                    };
+
+                    let targetModel = item.model;
+                    if (targetModel && modelMap[targetModel]) {
+                        targetModel = modelMap[targetModel];
+                    }
+
+                    // Determine settings
+                    const params: any = {
+                        prompt: cleanPrompt,
+                        model: targetModel,
+                        media_type: item.media_type === 'video' ? 'video' : 'image',
+                    };
+
+                    // Aspect Ratio from metadata
+                    if (metadata.ratio) {
+                        params.ratio = metadata.ratio;
+                    }
+
+                    // Mode
+                    if (metadata.type) {
+                        if (metadata.type === 'text_photo') {
+                            params.mode = 'image';
+                        } else {
+                            params.mode = 'text';
+                        }
+                    } else if (item.input_images && item.input_images.length > 0) {
+                        params.mode = 'image';
+                        params.input_images = JSON.stringify(item.input_images);
+                    }
+
+                    // Force Navigate to Studio Tab with params
+                    // We need to use router.push to the studio tab
+                    // Expo Router Tabs: accessing sibling tab
+                    // Usually we can just push the path
+                    // @ts-ignore
+                    router.push({
+                        pathname: '/(tabs)/studio',
+                        params: params
+                    });
+                }}
+            />
+        </View>
     );
 }
+
+const TabButton = ({ label, isActive, onPress, icon }: { label: string, isActive: boolean, onPress: () => void, icon?: React.ReactNode }) => (
+    <TouchableOpacity
+        style={[styles.tabButton, isActive && styles.tabButtonActive]}
+        onPress={onPress}
+    >
+        {icon}
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+    </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: '#000',
     },
-    content: {
-        padding: 16,
-        paddingBottom: 40,
+    scrollView: {
+        flex: 1,
     },
-    header: {
-        alignItems: 'center',
+    scrollContent: {
+        paddingHorizontal: 16,
+    },
+    headerContainer: {
         marginBottom: 24,
-        paddingTop: 16,
     },
-    avatarContainer: {
+    coverWrapper: {
+        borderRadius: 32,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: 'rgba(24, 24, 27, 0.9)',
+    },
+    coverImage: {
+        width: '100%',
+        minHeight: 380, // Taller to fit all content comfortably
+    },
+    defaultCover: {
+        width: '100%',
+        minHeight: 380,
+        backgroundColor: '#18181b',
         position: 'relative',
-        marginBottom: 12,
+        overflow: 'hidden',
     },
-    avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#2a2a2a',
-        justifyContent: 'center',
+    blob: {
+        position: 'absolute',
+        width: 250,
+        height: 250,
+        borderRadius: 125,
+        opacity: 0.3,
+    },
+    blob1: {
+        backgroundColor: '#7c3aed',
+        top: -50,
+        right: -50,
+    },
+    blob2: {
+        backgroundColor: '#4f46e5',
+        bottom: -50,
+        left: -50,
+    },
+    profileInfoContent: {
+        padding: 20,
         alignItems: 'center',
+        width: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
     },
-    avatarText: {
-        fontSize: 36,
+    cameraButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        zIndex: 10,
+    },
+    avatarWrapper: {
+        marginBottom: 12,
+        position: 'relative',
+    },
+    avatarGradient: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        padding: 3,
+        shadowColor: '#8b5cf6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    avatarInner: {
+        flex: 1,
+        backgroundColor: '#000',
+        borderRadius: 44,
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
     proBadge: {
         position: 'absolute',
-        bottom: -4,
-        right: -4,
-        backgroundColor: '#a855f7',
+        bottom: -6,
+        left: '50%',
+        transform: [{ translateX: -18 }],
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 2,
+        elevation: 4,
+    },
+    proBadgeGradient: {
         paddingHorizontal: 8,
         paddingVertical: 2,
-        borderRadius: 10,
+        borderRadius: 100,
     },
     proBadgeText: {
-        color: '#fff',
+        color: '#000',
         fontSize: 10,
-        fontWeight: 'bold',
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    name: {
-        fontSize: 24,
+    displayName: {
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#fff',
+        textAlign: 'center',
         marginBottom: 4,
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
-    username: {
+    usernameText: {
         fontSize: 14,
-        color: '#888',
+        color: 'rgba(255,255,255,0.6)',
+        textAlign: 'center',
+        marginBottom: 20,
     },
-    statsContainer: {
+    statsGrid: {
         flexDirection: 'row',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 24,
+        width: '100%',
+        gap: 8,
+        marginBottom: 20,
     },
     statItem: {
         flex: 1,
+        borderRadius: 12,
+        overflow: 'hidden',
+        padding: 8,
         alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        height: 60,
     },
     statValue: {
-        fontSize: 24,
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     statLabel: {
-        fontSize: 12,
-        color: '#888',
-    },
-    balanceCard: {
-        backgroundColor: 'rgba(168, 85, 247, 0.15)',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: 'rgba(168, 85, 247, 0.3)',
-    },
-    balanceLabel: {
-        fontSize: 14,
-        color: '#a855f7',
-        marginBottom: 8,
-    },
-    balanceRow: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        marginBottom: 12,
-    },
-    balanceValue: {
-        fontSize: 36,
+        fontSize: 9,
         fontWeight: 'bold',
-        color: '#fff',
-        marginRight: 8,
+        color: 'rgba(255,255,255,0.7)',
+        textTransform: 'uppercase',
     },
-    balanceUnit: {
-        fontSize: 16,
-        color: '#888',
-    },
-    topUpButton: {
-        backgroundColor: '#a855f7',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-    },
-    topUpButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#fff',
-        marginBottom: 12,
-    },
-    emptyState: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 16,
-        padding: 32,
-        alignItems: 'center',
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: 12,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#fff',
-        marginBottom: 4,
-    },
-    emptyHint: {
-        fontSize: 13,
-        color: '#666',
-        textAlign: 'center',
-    },
-    settingItem: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 12,
-        padding: 16,
+    actionsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+        width: '100%',
+        gap: 10,
     },
-    settingText: {
+    actionButton: {
+        height: 44,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    walletButton: {
+        flex: 1,
+        overflow: 'hidden',
+        gap: 6,
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    walletText: {
         color: '#fff',
+        fontWeight: 'bold',
         fontSize: 16,
     },
-    settingArrow: {
-        color: '#666',
-        fontSize: 20,
+    walletSubText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 11,
     },
-    version: {
-        textAlign: 'center',
-        color: '#444',
-        fontSize: 12,
-        marginTop: 20,
+    iconButton: {
+        width: 44,
+        backgroundColor: '#27272a',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
-    loadingContainer: {
-        justifyContent: 'center',
+    tabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#18181b',
+        padding: 4,
+        borderRadius: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#27272a',
+    },
+    tabButton: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 10,
+        gap: 6,
+    },
+    tabButtonActive: {
+        backgroundColor: '#27272a',
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#9ca3af',
+    },
+    tabTextActive: {
+        color: '#fff',
     },
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 2,
+        marginHorizontal: -1, // Compensate for gap
     },
     gridItem: {
         width: ITEM_SIZE,
         height: ITEM_SIZE,
-        position: 'relative',
+        marginBottom: 2,
+        marginHorizontal: 1,
+        borderRadius: 6,
+        overflow: 'hidden',
+        backgroundColor: '#27272a',
     },
     gridImage: {
         width: '100%',
         height: '100%',
-        borderRadius: 4,
     },
-    videoBadge: {
+    mediaTypeBadge: {
         position: 'absolute',
-        top: 4,
-        right: 4,
+        top: 6,
+        right: 6,
         backgroundColor: 'rgba(0,0,0,0.6)',
         borderRadius: 4,
         paddingHorizontal: 4,
-        paddingVertical: 2,
+        paddingVertical: 3,
     },
-    videoBadgeText: {
-        color: '#fff',
-        fontSize: 10,
+    statusBadge: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        borderRadius: 4,
+        padding: 4,
+    },
+    emptyState: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyIcon: {
+        fontSize: 40,
+        marginBottom: 16,
+    },
+    emptyText: {
+        color: '#52525b',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    version: {
+        textAlign: 'center',
+        color: '#3f3f46',
+        fontSize: 12,
+        marginTop: 20,
+        marginBottom: 20,
     },
 });

@@ -19,6 +19,7 @@ import {
     VideoSettings,
     ActiveGenerationsPanel,
 } from '../../components/studio';
+import { ResultModal } from '../../components/ResultModal';
 
 export default function StudioScreen() {
     const insets = useSafeAreaInsets();
@@ -49,6 +50,10 @@ export default function StudioScreen() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isOptimizing, setIsOptimizing] = useState(false);
 
+    // Result Modal State
+    const [resultModalVisible, setResultModalVisible] = useState(false);
+    const [resultImage, setResultImage] = useState<string | null>(null);
+
     // Video State
     const [videoDuration, setVideoDuration] = useState<'4' | '8' | '12'>('4');
     const [videoResolution, setVideoResolution] = useState('480p');
@@ -69,6 +74,32 @@ export default function StudioScreen() {
         if (params.prompt) {
             setPrompt(params.prompt as string);
         }
+        if (params.model) {
+            setSelectedModel(params.model as string);
+        }
+        if (params.ratio) {
+            setAspectRatio(params.ratio as string);
+        }
+        if (params.mode) {
+            setGenerationMode(params.mode as 'text' | 'image');
+        }
+        if (params.media_type) {
+            setMediaType(params.media_type as 'image' | 'video');
+        }
+        // Handle input images if passed as JSON string or array
+        if (params.input_images) {
+            try {
+                const images = typeof params.input_images === 'string'
+                    ? JSON.parse(params.input_images)
+                    : params.input_images;
+                if (Array.isArray(images)) {
+                    setUploadedImages(images);
+                    setGenerationMode('image');
+                }
+            } catch (e) {
+                console.error('Failed to parse input parameters', e);
+            }
+        }
     }, [params]);
 
     const userId = useUserStore((state) => state.user.id);
@@ -85,7 +116,10 @@ export default function StudioScreen() {
                 generationId?: number;
                 generation_id?: number;
                 id?: number;
+
                 error?: string;
+                image?: string;
+                images?: string[];
             }>('/generation/generate', {
                 prompt: prompt.trim(),
                 model: selectedModel,
@@ -104,12 +138,22 @@ export default function StudioScreen() {
 
             const genId = response.generationId || response.generation_id || response.id;
 
-            if (response.success && genId) {
-                Alert.alert(
-                    'Generation Started',
-                    `Your ${mediaType} is being generated. You'll be notified when it's ready.`,
-                    [{ text: 'OK' }]
-                );
+            const hasResult = (response.success && !!genId) || !!response.image || (!!response.images && response.images.length > 0);
+
+            if (hasResult) {
+                // Show Result Modal
+                const imageUrl = response.image || (response.images && response.images[0]);
+                if (imageUrl) {
+                    setResultImage(imageUrl);
+                    setResultModalVisible(true);
+                } else {
+                    Alert.alert(
+                        'Generation Started',
+                        `Your ${mediaType} is being generated. You'll be notified when it's ready.`,
+                        [{ text: 'OK' }]
+                    );
+                }
+
                 // Clear prompt after successful start
                 setPrompt('');
             } else {
@@ -316,6 +360,20 @@ export default function StudioScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            <ResultModal
+                visible={resultModalVisible}
+                startIndex={0}
+                items={[{
+                    id: 0, // Mock ID for preview
+                    image_url: resultImage || '',
+                    prompt: prompt,
+                    likes_count: 0,
+                    created_at: new Date().toISOString(),
+                    media_type: mediaType
+                }]}
+                onClose={() => setResultModalVisible(false)}
+            />
         </View>
     );
 }

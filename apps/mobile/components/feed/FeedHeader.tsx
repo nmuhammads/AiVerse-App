@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import * as Haptics from 'expo-haptics';
 
 interface FeedHeaderProps {
     sort: 'new' | 'popular';
@@ -18,117 +19,105 @@ export function FeedHeader({
     onFeedFilterChange,
     onSearchOpen,
 }: FeedHeaderProps) {
+    const handlePress = (action: () => void) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        action();
+    };
+
     return (
         <View style={styles.container}>
-            <View style={styles.row}>
-                {/* Sort Tabs */}
-                <View style={styles.tabs}>
-                    <TouchableOpacity
-                        style={[styles.tab, sort === 'new' && styles.tabActive]}
-                        onPress={() => onSortChange('new')}
-                    >
-                        <Text style={[styles.tabText, sort === 'new' && styles.tabTextActive]}>
-                            ✨ New
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, sort === 'popular' && styles.tabActive]}
-                        onPress={() => onSortChange('popular')}
-                    >
-                        <Text style={[styles.tabText, sort === 'popular' && styles.tabTextActive]}>
-                            🔥 Popular
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={onSearchOpen}>
-                    <Ionicons name="search" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Feed Filter */}
-            <View style={styles.filterRow}>
+            <View style={styles.leftContainer}>
                 <TouchableOpacity
-                    style={[styles.filterChip, feedFilter === 'all' && styles.filterChipActive]}
-                    onPress={() => onFeedFilterChange('all')}
+                    onPress={() => handlePress(() => { onSortChange('new'); onFeedFilterChange('all'); })}
+                    style={styles.tabButton}
                 >
-                    <Text style={[styles.filterText, feedFilter === 'all' && styles.filterTextActive]}>
-                        All
+                    <Text style={[
+                        styles.tabText,
+                        sort === 'new' && feedFilter === 'all' ? styles.tabTextActive : styles.tabTextInactive
+                    ]}>
+                        New
                     </Text>
                 </TouchableOpacity>
+
+                <View style={styles.divider} />
+
                 <TouchableOpacity
-                    style={[styles.filterChip, feedFilter === 'following' && styles.filterChipActive]}
-                    onPress={() => onFeedFilterChange('following')}
+                    onPress={() => handlePress(() => { onSortChange('popular'); onFeedFilterChange('all'); })}
+                    style={styles.tabButton}
                 >
-                    <Text style={[styles.filterText, feedFilter === 'following' && styles.filterTextActive]}>
+                    <Text style={[
+                        styles.tabText,
+                        sort === 'popular' && feedFilter === 'all' ? styles.tabTextActive : styles.tabTextInactive
+                    ]}>
+                        Popular
+                    </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <TouchableOpacity
+                    onPress={() => handlePress(() => onFeedFilterChange('following'))}
+                    style={styles.tabButton}
+                >
+                    <Text style={[
+                        styles.tabText,
+                        feedFilter === 'following' ? styles.tabTextActive : styles.tabTextInactive
+                    ]}>
                         Following
                     </Text>
                 </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+                style={styles.searchButton}
+                onPress={() => handlePress(onSearchOpen)}
+            >
+                <Ionicons name="search" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: spacing.lg,
-    },
-    row: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        height: 44,
         marginBottom: spacing.md,
+        paddingHorizontal: spacing.sm,
     },
-    tabs: {
+    leftContainer: {
         flexDirection: 'row',
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: 4,
+        alignItems: 'center',
+        gap: spacing.md,
     },
-    tab: {
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.lg,
-        borderRadius: borderRadius.md,
-    },
-    tabActive: {
-        backgroundColor: colors.primary,
+    tabButton: {
+        paddingVertical: spacing.xs,
     },
     tabText: {
-        color: colors.textSecondary,
-        fontSize: typography.bodySmall.fontSize,
+        fontSize: 17,
         fontWeight: '600',
     },
     tabTextActive: {
         color: colors.text,
     },
+    tabTextInactive: {
+        color: colors.textSecondary,
+    },
+    divider: {
+        width: 1,
+        height: 16,
+        backgroundColor: colors.surfaceLight, // Using surfaceLight as a subtle divider
+    },
     searchButton: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
+        borderRadius: borderRadius.full, // Circle as per Mini App CSS 'rounded-full'
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    filterRow: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-    filterChip: {
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.full,
-    },
-    filterChipActive: {
-        backgroundColor: colors.primary,
-    },
-    filterText: {
-        color: colors.textSecondary,
-        fontSize: typography.label.fontSize,
-        fontWeight: '500',
-    },
-    filterTextActive: {
-        color: colors.text,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
 });
