@@ -1,22 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, FlatList, RefreshControl, Dimensions, ImageBackground, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ImageBackground, Platform, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { FlashList } from '@shopify/flash-list';
+import { Image } from 'expo-image';
 import {
     Settings,
     Wallet,
-    RefreshCw,
     Camera,
-    Edit,
-    Grid,
-    Lock,
+    Video,
+    Share2,
+    Clock,
+    Filter,
+    Image as ImageIcon,
+    Pencil,
     Globe,
-    Play,
+    Lock,
+    Unlock,
+    ChevronLeft,
     ChevronRight,
-    User as UserIcon,
-    Video
+    Copy,
+    Check,
+    Trash2
 } from 'lucide-react-native';
 import { api } from '../../lib/api';
 import { useUserStore } from '../../store/userStore';
@@ -26,6 +33,7 @@ import { ResultModal } from '../../components/ResultModal';
 interface Generation {
     id: number;
     image_url: string;
+    compressed_url?: string; // Optimized thumbnail
     video_url?: string;
     prompt: string;
     likes_count: number;
@@ -33,6 +41,9 @@ interface Generation {
     media_type: 'image' | 'video';
     is_published: boolean;
     is_prompt_private: boolean;
+    model?: string;
+    edit_variants?: string[];
+    input_images?: string[];
 }
 
 interface UserInfo {
@@ -52,12 +63,35 @@ interface UserInfo {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_COLUMNS = 3;
 const GRID_GAP = 2;
-const ITEM_SIZE = Math.floor((SCREEN_WIDTH - 32 - (GRID_GAP * GRID_COLUMNS)) / GRID_COLUMNS); // Safe calculation to prevent wrapping
+const ITEM_SIZE = Math.floor((SCREEN_WIDTH - 32 - (GRID_GAP * (GRID_COLUMNS - 1))) / GRID_COLUMNS);
 
-// Tab constants
-const TAB_ALL = 'all';
-const TAB_PUBLISHED = 'published';
-const TAB_PRIVATE = 'private';
+// Memoized Grid Item Component
+const GridItem = React.memo(({ item, index, onPress }: { item: Generation, index: number, onPress: () => void }) => {
+    // Use compressed_url if available, falling back to image_url or video_url
+    const sourceUrl = item.compressed_url || item.image_url || item.video_url;
+
+    return (
+        <TouchableOpacity style={styles.gridItem} onPress={onPress}>
+            <Image
+                source={sourceUrl}
+                style={styles.gridImage}
+                contentFit="cover"
+                transition={200}
+                cachePolicy="memory-disk"
+            />
+            {(item.media_type === 'video' || !!item.video_url) && (
+                <View style={styles.mediaTypeBadge}>
+                    <Video size={10} color="#fff" />
+                </View>
+            )}
+            {item.is_published && (
+                <View style={styles.statusBadge}>
+                    <Globe size={8} color="#fff" />
+                </View>
+            )}
+        </TouchableOpacity>
+    );
+});
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
@@ -69,10 +103,18 @@ export default function ProfileScreen() {
     const [generations, setGenerations] = useState<Generation[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Pagination State
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const PAGE_SIZE = 6;
 
-    // UI State
-    const [activeTab, setActiveTab] = useState(TAB_ALL);
-    const [selectedModels, setSelectedModels] = useState<string[]>([]); // Future support
+    // Filters State
+    const [selectedModels, setSelectedModels] = useState<string[]>([]);
+    const [visibility, setVisibility] = useState<'all' | 'published' | 'private'>('all');
+    const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all');
+    const [showEditedOnly, setShowEditedOnly] = useState(false);
 
     // Stats State
     const [stats, setStats] = useState({
@@ -86,68 +128,115 @@ export default function ProfileScreen() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [startIndex, setStartIndex] = useState(0);
 
-    const openModal = (index: number) => {
+    const openModal = useCallback((index: number) => {
         setStartIndex(index);
         setIsModalVisible(true);
-    };
+    }, []);
 
     const handleUpdateItem = useCallback((id: number, updates: Partial<Generation>) => {
         setGenerations(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     }, []);
 
-    const fetchUserData = useCallback(async () => {
+    const fetchUserInfo = useCallback(async () => {
         if (!user?.id) return;
-
         try {
-            // Fetch detailed user info
             const userResponse = await api.get<UserInfo>(`/user/info/${user.id}`);
             if (userResponse) {
                 setUserInfo(userResponse);
                 setBalance(userResponse.balance);
-
-                // Update stats
-                setStats({
-                    generations: 0, // Will update after fetching gens
+                setStats(prev => ({
+                    ...prev,
                     followers: userResponse.followers_count || 0,
                     likes: userResponse.likes_count || 0,
                     remixes: userResponse.remix_count || 0
-                });
-            }
-
-            // Fetch generations
-            // Note: The visibility filter is applied clientside or via query params depending on API design
-            // Mimicking the web app's structure:
-            let visibilityParam = '';
-            if (activeTab === TAB_PUBLISHED) visibilityParam = '&visibility=published';
-            if (activeTab === TAB_PRIVATE) visibilityParam = '&visibility=private';
-
-            const gensResponse = await api.get<{ items: Generation[], total: number }>(
-                `/user/generations?user_id=${user.id}&limit=50&offset=0${visibilityParam}`
-            );
-
-            if (gensResponse && gensResponse.items) {
-                setGenerations(gensResponse.items);
-                setStats(prev => ({
-                    ...prev,
-                    generations: gensResponse.total || gensResponse.items.length
                 }));
             }
         } catch (error) {
-            console.error('Failed to fetch user data:', error);
+            console.error('Failed to fetch user info:', error);
+        }
+    }, [user?.id, setBalance]);
+
+    const fetchGenerations = useCallback(async (isLoadMore = false) => {
+        if (!user?.id) return;
+        if (isLoadMore && (!hasMore || isLoadingMore)) return;
+
+        try {
+            if (isLoadMore) {
+                setIsLoadingMore(true);
+            } else {
+                setLoading(true);
+            }
+
+            const currentOffset = isLoadMore ? offset : 0;
+            
+            // Build params
+            let visibilityParam = '';
+            if (visibility !== 'all') visibilityParam = `&visibility=${visibility}`;
+            const modelParam = selectedModels.length > 0 ? `&model=${selectedModels.join(',')}` : '';
+
+            const endpoint = `/user/generations?user_id=${user.id}&limit=${PAGE_SIZE}&offset=${currentOffset}${visibilityParam}${modelParam}`;
+            
+            const gensResponse = await api.get<{ items: Generation[], total: number }>(endpoint);
+
+            if (gensResponse && gensResponse.items) {
+                let newItems = gensResponse.items;
+
+                // Client-side filtering (Note: this interacts poorly with server-side pagination if many items are filtered out, 
+                // ideally move all filtering to backend. keeping simple for now as requested)
+                if (showEditedOnly) {
+                    // @ts-ignore
+                    newItems = newItems.filter(item => item.edit_variants && item.edit_variants.length > 0);
+                }
+                
+                if (mediaTypeFilter !== 'all') {
+                    newItems = newItems.filter(item => {
+                         const itemMediaType = item.media_type || 'image';
+                         return itemMediaType === mediaTypeFilter;
+                    });
+                }
+
+                if (isLoadMore) {
+                    setGenerations(prev => [...prev, ...newItems]);
+                } else {
+                    setGenerations(newItems);
+                }
+
+                if (gensResponse.items.length < PAGE_SIZE) {
+                    setHasMore(false);
+                } else {
+                    setHasMore(true);
+                    setOffset(currentOffset + PAGE_SIZE);
+                }
+
+                // Update total count stats
+                setStats(prev => ({ ...prev, generations: gensResponse.total }));
+            }
+        } catch (error) {
+            console.error('Failed to fetch generations:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
+            setIsLoadingMore(false);
         }
-    }, [user?.id, activeTab, setBalance]);
+    }, [user?.id, offset, hasMore, isLoadingMore, visibility, selectedModels, mediaTypeFilter, showEditedOnly]);
 
+    // Initial load
     useEffect(() => {
-        fetchUserData();
-    }, [fetchUserData]);
+        fetchUserInfo();
+        fetchGenerations(false);
+    }, [user?.id, visibility, selectedModels, mediaTypeFilter, showEditedOnly]); 
+    // removed fetchGenerations dependency to avoid loops, explicit dependencies above
 
-    const onRefresh = useCallback(() => {
+    const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        fetchUserData();
-    }, [fetchUserData]);
+        setOffset(0);
+        setHasMore(true);
+        await Promise.all([fetchUserInfo(), fetchGenerations(false)]);
+    }, [fetchUserInfo, fetchGenerations]);
+
+    const loadMore = useCallback(() => {
+        fetchGenerations(true);
+    }, [fetchGenerations]);
 
     const displayName = userInfo?.first_name
         ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim()
@@ -157,161 +246,273 @@ export default function ProfileScreen() {
     const avatarUrl = userInfo?.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${user?.username || 'guest'}`;
     const coverUrl = userInfo?.cover_url;
 
-    const renderHeader = () => (
-        <View style={styles.headerContainer}>
-            {/* Cover Section */}
-            <View style={styles.coverWrapper}>
-                {coverUrl ? (
-                    <ImageBackground
-                        source={{ uri: coverUrl }}
-                        style={styles.coverImage}
-                        resizeMode="cover"
-                    >
-                        <LinearGradient
-                            colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
-                            style={StyleSheet.absoluteFill}
-                        />
-                    </ImageBackground>
-                ) : (
-                    <View style={styles.defaultCover}>
-                        {/* Abstract blobs/gradients mimicking the web version */}
-                        <View style={[styles.blob, styles.blob1]} />
-                        <View style={[styles.blob, styles.blob2]} />
-                        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-                    </View>
-                )}
-
-                {/* Cover Content */}
-                <View style={styles.profileInfoContent}>
-                    <TouchableOpacity style={styles.cameraButton}>
-                        <Camera size={14} color="rgba(255,255,255,0.7)" />
-                    </TouchableOpacity>
-
-                    {/* Avatar */}
-                    <TouchableOpacity style={styles.avatarWrapper}>
-                        <LinearGradient
-                            colors={['#8b5cf6', '#d946ef', '#6366f1']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.avatarGradient}
-                        >
-                            <View style={styles.avatarInner}>
-                                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                            </View>
-                        </LinearGradient>
-                        <View style={styles.proBadge}>
-                            <LinearGradient
-                                colors={['#fcd34d', '#f59e0b']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.proBadgeGradient}
-                            >
-                                <Text style={styles.proBadgeText}>PRO</Text>
-                            </LinearGradient>
-                        </View>
-                    </TouchableOpacity>
-
-                    {/* Name */}
-                    <Text style={styles.displayName}>{displayName}</Text>
-                    <Text style={styles.usernameText}>{username}</Text>
-
-                    {/* Stats Grid */}
-                    <View style={styles.statsGrid}>
-                        <StatItem label="GENERATIONS" value={stats.generations} />
-                        <StatItem label="FOLLOWERS" value={stats.followers} />
-                        <StatItem label="LIKES" value={stats.likes} />
-                        <StatItem label="REMIXES" value={stats.remixes} />
-                    </View>
-
-                    {/* Actions */}
-                    <View style={styles.actionsRow}>
-                        <TouchableOpacity style={[styles.actionButton, styles.walletButton]}>
-                            <LinearGradient
-                                colors={['#7c3aed', '#4f46e5']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={StyleSheet.absoluteFill}
-                            />
-                            <Wallet size={16} color="#fff" />
-                            <Text style={styles.walletText}>{userInfo?.balance || 0}</Text>
-                            <Text style={styles.walletSubText}>tokens</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.actionButton, styles.iconButton]}>
-                            <RefreshCw size={20} color="#fff" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.iconButton]}
-                            onPress={() => router.push('/settings')}
-                        >
-                            <Settings size={20} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
-        </View>
-    );
-
-    const StatItem = ({ label, value }: { label: string, value: number }) => (
+    // Stat Item Component
+    const StatItem = useCallback(({ label, value }: { label: string, value: number }) => (
         <View style={styles.statItem}>
             <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
             <Text style={styles.statValue}>{value}</Text>
             <Text style={styles.statLabel}>{label}</Text>
         </View>
-    );
+    ), []);
 
-    return (
-        <View style={styles.container}>
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60, paddingBottom: 100 }]}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-                }
-            >
-                {renderHeader()}
-
-                {/* Tabs */}
-                <View style={styles.tabsContainer}>
-                    <TabButton label="All" isActive={activeTab === TAB_ALL} onPress={() => setActiveTab(TAB_ALL)} icon={<Grid size={14} color={activeTab === TAB_ALL ? '#fff' : '#9ca3af'} />} />
-                    <TabButton label="Published" isActive={activeTab === TAB_PUBLISHED} onPress={() => setActiveTab(TAB_PUBLISHED)} icon={<Globe size={14} color={activeTab === TAB_PUBLISHED ? '#fff' : '#9ca3af'} />} />
-                    <TabButton label="Private" isActive={activeTab === TAB_PRIVATE} onPress={() => setActiveTab(TAB_PRIVATE)} icon={<Lock size={14} color={activeTab === TAB_PRIVATE ? '#fff' : '#9ca3af'} />} />
-                </View>
-
-                {/* Grid */}
-                <View style={styles.gridContainer}>
-                    {generations.map((item, index) => (
-                        <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => openModal(index)}>
-                            <Image
-                                source={{ uri: item.image_url || item.video_url }}
-                                style={styles.gridImage}
+    // Helper to render the header
+    const renderHeader = useMemo(() => {
+        return (
+            <View>
+                <View style={styles.headerContainer}>
+                    {/* Cover Section */}
+                    <View style={styles.coverWrapper}>
+                        {coverUrl ? (
+                            <ImageBackground
+                                source={{ uri: coverUrl }}
+                                style={styles.coverImage}
                                 resizeMode="cover"
-                            />
-                            {(item.media_type === 'video' || !!item.video_url) && (
-                                <View style={styles.mediaTypeBadge}>
-                                    <Video size={10} color="#fff" />
+                            >
+                                <LinearGradient
+                                    colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            </ImageBackground>
+                        ) : (
+                            <View style={styles.defaultCover}>
+                                {/* Abstract blobs/gradients mimicking the web version */}
+                                <View style={[styles.blob, styles.blob1]} />
+                                <View style={[styles.blob, styles.blob2]} />
+                                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                            </View>
+                        )}
+
+                        {/* Cover Content */}
+                        <View style={styles.profileInfoContent}>
+                            <TouchableOpacity style={styles.cameraButton}>
+                                <Camera size={14} color="rgba(255,255,255,0.7)" />
+                            </TouchableOpacity>
+
+                            {/* Avatar */}
+                            <TouchableOpacity style={styles.avatarWrapper}>
+                                <LinearGradient
+                                    colors={['#8b5cf6', '#d946ef', '#6366f1']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.avatarGradient}
+                                >
+                                    <View style={styles.avatarInner}>
+                                        <Image 
+                                            source={avatarUrl} 
+                                            style={styles.avatarImage} 
+                                            contentFit="cover"
+                                            transition={200}
+                                        />
+                                    </View>
+                                </LinearGradient>
+                                <View style={styles.proBadge}>
+                                    <LinearGradient
+                                        colors={['#fcd34d', '#f59e0b']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.proBadgeGradient}
+                                    >
+                                        <Text style={styles.proBadgeText}>PRO</Text>
+                                    </LinearGradient>
                                 </View>
-                            )}
-                            {item.is_published && (
-                                <View style={styles.statusBadge}>
-                                    <Globe size={8} color="#fff" />
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    ))}
+                            </TouchableOpacity>
+
+                            {/* Name */}
+                            <Text style={styles.displayName}>{displayName}</Text>
+                            <Text style={styles.usernameText}>{username}</Text>
+
+                            {/* Stats Grid */}
+                            <View style={styles.statsGrid}>
+                                <StatItem label="GENERATIONS" value={stats.generations} />
+                                <StatItem label="FOLLOWERS" value={stats.followers} />
+                                <StatItem label="LIKES" value={stats.likes} />
+                                <StatItem label="REMIXES" value={stats.remixes} />
+                            </View>
+
+                            {/* Actions */}
+                            <View style={styles.actionsRow}>
+                                <TouchableOpacity style={[styles.actionButton, styles.walletButton]}>
+                                    <LinearGradient
+                                        colors={['#7c3aed', '#4f46e5']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={StyleSheet.absoluteFill}
+                                    />
+                                    <Wallet size={16} color="#fff" />
+                                    <Text style={styles.walletText}>{userInfo?.balance || 0}</Text>
+                                    <Text style={styles.walletSubText}>tokens</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    style={[styles.actionButton, styles.iconButton]}
+                                    onPress={async () => {
+                                        try {
+                                            if (!user?.id) return;
+                                            const deepLink = `https://t.me/AiVerseAppBot?startapp=profile-${user.id}`;
+                                            await Share.share({
+                                                message: `Check out my profile on AiVerse!\n${deepLink}`,
+                                                url: deepLink, // iOS
+                                                title: 'AiVerse Profile'
+                                            });
+                                        } catch (error) {
+                                            console.error(error);
+                                        }
+                                    }}
+                                >
+                                    <Share2 size={20} color="#fff" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.actionButton, styles.iconButton]}
+                                    onPress={() => router.push('/settings')}
+                                >
+                                    <Settings size={20} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
                 </View>
 
+                {/* Storage Banner */}
+                <View style={styles.storageBanner}>
+                    <View style={styles.storageContent}>
+                        <Clock size={14} color="#71717a" style={{ marginTop: 2 }} />
+                        <Text style={styles.storageText}>
+                            Cloud media is stored for <Text style={styles.storageHighlight}>14 days</Text>. Local copies remain in cache. You can enable sending originals to Telegram or save to device.
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Filters Section */}
+                <View style={styles.filtersContainer}>
+                    {/* Models Filter */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                        <Filter size={14} color="#71717a" style={{ marginRight: 8 }} />
+                        {[
+                            { value: '', label: 'All Models' },
+                            { value: 'nanobanana', label: 'NanoBanana' },
+                            { value: 'nanobanana-pro', label: 'NanoBanana Pro' },
+                            { value: 'seedream4', label: 'Seedream 4' },
+                            { value: 'seedream4-5', label: 'Seedream 4.5' },
+                            { value: 'gptimage1.5', label: 'GPT Image 1.5' },
+                        ].map(m => {
+                            const isActive = m.value === '' ? selectedModels.length === 0 : selectedModels.includes(m.value);
+                            return (
+                                <TouchableOpacity
+                                    key={m.value}
+                                    onPress={() => {
+                                        if (m.value === '') {
+                                            setSelectedModels([]);
+                                        } else {
+                                            if (selectedModels.includes(m.value)) {
+                                                setSelectedModels(selectedModels.filter(x => x !== m.value));
+                                            } else {
+                                                setSelectedModels([...selectedModels, m.value]);
+                                            }
+                                        }
+                                    }}
+                                    style={[styles.filterChip, isActive && styles.filterChipActive]}
+                                >
+                                    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>{m.label}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+
+                    {/* Visibility Filter */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                        <Globe size={14} color="#71717a" style={{ marginRight: 8 }} />
+                        <View style={styles.pillGroup}>
+                            {[
+                                { value: 'all', label: 'All' },
+                                { value: 'published', label: 'Published' },
+                                { value: 'private', label: 'Private' },
+                            ].map(v => (
+                                <TouchableOpacity
+                                    key={v.value}
+                                    onPress={() => setVisibility(v.value as any)}
+                                    style={[styles.pillButton, visibility === v.value && styles.pillButtonActive]}
+                                >
+                                    <Text style={[styles.pillText, visibility === v.value && styles.pillTextActive]}>{v.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
+
+                    {/* Media Type Filter */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                        <View style={styles.pillGroup}>
+                             {[
+                                { value: 'all', label: 'All', icon: null },
+                                { value: 'image', label: 'Photo', icon: ImageIcon },
+                                { value: 'video', label: 'Video', icon: Video },
+                             ].map(m => (
+                                <TouchableOpacity
+                                    key={m.value}
+                                    onPress={() => setMediaTypeFilter(m.value as any)}
+                                    style={[styles.pillButton, mediaTypeFilter === m.value && styles.pillButtonActive]}
+                                >
+                                    {m.icon && <m.icon size={12} color={mediaTypeFilter === m.value ? '#fff' : '#a1a1aa'} style={{ marginRight: 4 }} />}
+                                    <Text style={[styles.pillText, mediaTypeFilter === m.value && styles.pillTextActive]}>{m.label}</Text>
+                                </TouchableOpacity>
+                             ))}
+                        </View>
+
+                        {/* Edited Filter */}
+                        <TouchableOpacity
+                            onPress={() => setShowEditedOnly(!showEditedOnly)}
+                            style={[styles.iconFilterBtn, showEditedOnly && styles.iconFilterBtnActive]}
+                        >
+                            <Pencil size={14} color={showEditedOnly ? '#fff' : '#a1a1aa'} />
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
                 {generations.length === 0 && !loading && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🎨</Text>
                         <Text style={styles.emptyText}>No generations yet</Text>
                     </View>
                 )}
+            </View>
+        );
+    }, [
+        coverUrl, avatarUrl, displayName, username, stats, userInfo, user, selectedModels, visibility, mediaTypeFilter, showEditedOnly, generations.length, loading, router
+    ]);
 
-                <Text style={styles.version}>AiVerse Mobile v1.0.0</Text>
-            </ScrollView>
+    const renderItem = useCallback(({ item, index }: { item: Generation, index: number }) => (
+        <GridItem item={item} index={index} onPress={() => openModal(index)} />
+    ), [openModal]);
+
+    return (
+        <View style={styles.container}>
+            <FlashList
+                data={generations}
+                renderItem={renderItem}
+                // @ts-ignore
+                estimatedItemSize={ITEM_SIZE} // Important for performance
+                numColumns={GRID_COLUMNS}
+                ListHeaderComponent={renderHeader}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={() => (
+                    isLoadingMore ? (
+                        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                           {/* Using ActivityIndicator directly via View since we don't have it imported explicitly but React Native exports it. 
+                               Actually we only imported standard components. Let's make sure ActivityIndicator is imported or use a simple Text */}
+                            <Text style={{ color: '#71717a', fontSize: 12 }}>Loading more...</Text>
+                        </View>
+                    ) : null
+                )}
+                contentContainerStyle={{ 
+                    paddingTop: insets.top + 60, 
+                    paddingBottom: 100, 
+                    paddingHorizontal: 16 
+                }}
+                showsVerticalScrollIndicator={false}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                keyExtractor={(item) => item.id.toString()}
+            />
 
             <ResultModal
                 visible={isModalVisible}
@@ -378,9 +579,6 @@ export default function ProfileScreen() {
                     }
 
                     // Force Navigate to Studio Tab with params
-                    // We need to use router.push to the studio tab
-                    // Expo Router Tabs: accessing sibling tab
-                    // Usually we can just push the path
                     // @ts-ignore
                     router.push({
                         pathname: '/(tabs)/studio',
@@ -392,26 +590,10 @@ export default function ProfileScreen() {
     );
 }
 
-const TabButton = ({ label, isActive, onPress, icon }: { label: string, isActive: boolean, onPress: () => void, icon?: React.ReactNode }) => (
-    <TouchableOpacity
-        style={[styles.tabButton, isActive && styles.tabButtonActive]}
-        onPress={onPress}
-    >
-        {icon}
-        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
-    </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
     },
     headerContainer: {
         marginBottom: 24,
@@ -607,48 +789,107 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
-    tabsContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#18181b',
-        padding: 4,
-        borderRadius: 14,
+    storageBanner: {
         marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#27272a',
+        paddingHorizontal: 4,
     },
-    tabButton: {
-        flex: 1,
+    storageContent: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: 12,
+        backgroundColor: 'rgba(24, 24, 27, 0.5)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        gap: 8,
+    },
+    storageText: {
+        flex: 1,
+        fontSize: 11,
+        color: '#71717a',
+        lineHeight: 16,
+    },
+    storageHighlight: {
+        color: '#d4d4d8',
+        fontWeight: '500',
+    },
+    filtersContainer: {
+        marginBottom: 16,
+        gap: 12,
+    },
+    filterRow: {
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-        borderRadius: 10,
-        gap: 6,
+        paddingHorizontal: 4,
     },
-    tabButtonActive: {
-        backgroundColor: '#27272a',
+    filterChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 100,
+        backgroundColor: 'rgba(39, 39, 42, 0.5)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        marginRight: 8,
     },
-    tabText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#9ca3af',
+    filterChipActive: {
+        backgroundColor: '#7c3aed',
+        borderColor: '#7c3aed',
     },
-    tabTextActive: {
+    filterChipText: {
+        fontSize: 11,
+        fontWeight: '500',
+        color: '#a1a1aa',
+    },
+    filterChipTextActive: {
         color: '#fff',
     },
-    gridContainer: {
+    pillGroup: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -1, // Compensate for gap
+        backgroundColor: 'rgba(39, 39, 42, 0.5)',
+        borderRadius: 100,
+        padding: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        marginRight: 8,
+    },
+    pillButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+    },
+    pillButtonActive: {
+        backgroundColor: '#27272a',
+    },
+    pillText: {
+        fontSize: 11,
+        color: '#a1a1aa',
+        fontWeight: '500',
+    },
+    pillTextActive: {
+        color: '#fff',
+    },
+    iconFilterBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(39, 39, 42, 0.5)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    iconFilterBtnActive: {
+        backgroundColor: '#7c3aed',
+        borderColor: '#7c3aed',
     },
     gridItem: {
-        width: ITEM_SIZE,
-        height: ITEM_SIZE,
-        marginBottom: 2,
-        marginHorizontal: 1,
-        borderRadius: 6,
-        overflow: 'hidden',
-        backgroundColor: '#27272a',
+        flex: 1,
+        margin: 1,
+        aspectRatio: 1,
+        position: 'relative',
+        backgroundColor: '#18181b',
+        maxWidth: ITEM_SIZE,
     },
     gridImage: {
         width: '100%',
@@ -656,39 +897,31 @@ const styles = StyleSheet.create({
     },
     mediaTypeBadge: {
         position: 'absolute',
-        top: 6,
-        right: 6,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 4,
-        paddingHorizontal: 4,
-        paddingVertical: 3,
+        padding: 2,
     },
     statusBadge: {
         position: 'absolute',
-        bottom: 6,
-        right: 6,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        bottom: 4,
+        left: 4,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 4,
-        padding: 4,
+        padding: 2,
     },
     emptyState: {
-        padding: 40,
         alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
     },
     emptyIcon: {
         fontSize: 40,
         marginBottom: 16,
     },
     emptyText: {
-        color: '#52525b',
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    version: {
-        textAlign: 'center',
-        color: '#3f3f46',
-        fontSize: 12,
-        marginTop: 20,
-        marginBottom: 20,
+        color: '#a1a1aa',
+        fontSize: 14,
     },
 });

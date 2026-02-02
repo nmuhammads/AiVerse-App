@@ -29,7 +29,7 @@ export function FeedFilters({
 }: FeedFiltersProps) {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0, width: 0 });
-    const buttonRef = useRef<TouchableOpacity>(null);
+    const buttonRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
 
     const handlePress = (action: () => void) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -41,7 +41,7 @@ export function FeedFilters({
 
     const openDropdown = () => {
         handlePress(() => {
-            buttonRef.current?.measureInWindow((x, y, width, height) => {
+            buttonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
                 setDropdownPosition({
                     top: y + height + 4,
                     right: Dimensions.get('window').width - (x + width),
