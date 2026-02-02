@@ -7,16 +7,45 @@ import { Link, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
+import { useUserStore } from '../../store/userStore';
+import { api } from '../../lib/api';
+
 export function Header() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { user, setUser } = useUserStore();
 
-    // TODO: Connect to real user store
-    const user = {
-        displayName: 'Guest',
-        avatarUrl: `https://api.dicebear.com/9.x/avataaars/svg?seed=guest`,
-        id: 'guest'
-    };
+    useEffect(() => {
+        const fetchUser = async () => {
+            if (!user?.id) return;
+            try {
+                const userData = await api.get<{
+                    user_id: number;
+                    username: string;
+                    first_name: string;
+                    last_name?: string;
+                    avatar_url?: string;
+                }>(`/user/info/${user.id}`);
+
+                if (userData) {
+                    setUser({
+                        ...user,
+                        firstName: userData.first_name,
+                        lastName: userData.last_name,
+                        avatarUrl: userData.avatar_url,
+                        username: userData.username
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to fetch user in Header', e);
+            }
+        };
+
+        fetchUser();
+    }, [user?.id]);
+
+    const displayName = user.firstName || user.username || 'Guest';
+    const avatarUrl = user.avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${user.username || 'guest'}`;
 
     const handlePress = (action: () => void) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -44,12 +73,12 @@ export function Header() {
                 <View style={styles.pillContent}>
                     {/* Centered Content Group */}
                     <View style={styles.centerGroup}>
-                        <Text style={styles.displayName}>{user.displayName}</Text>
+                        <Text style={styles.displayName}>{displayName}</Text>
 
                         <Link href="/profile" asChild>
                             <TouchableOpacity style={styles.avatarButton}>
                                 <Image
-                                    source={{ uri: user.avatarUrl }}
+                                    source={{ uri: avatarUrl }}
                                     style={styles.avatar}
                                 />
                             </TouchableOpacity>
