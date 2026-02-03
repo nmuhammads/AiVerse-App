@@ -17,7 +17,7 @@ export function ChannelSubscriptionModal() {
 
         const checkStatus = async () => {
             try {
-                const res = await fetch(`/api/user/${user.id}/channel-subscription`)
+                const res = await fetch(`/api/user/channel-subscription/${user.id}`)
                 const data = await res.json()
 
                 console.log('Channel Subscription Check:', data)
