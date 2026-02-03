@@ -70,6 +70,7 @@ import { useGenerationStore } from '@/store/generationStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ProfileSkeletonGrid } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/UserAvatar'
+import { ChannelSubscriptionModal } from '@/components/ChannelSubscriptionModal'
 
 function getModelDisplayName(model: string | null): string {
   if (!model) return ''
@@ -1859,6 +1860,7 @@ export default function Profile() {
         onClose={() => setShowCoverSelector(false)}
         onSelect={handleCoverSelect}
       />
+      <ChannelSubscriptionModal />
     </div >
   )
 }

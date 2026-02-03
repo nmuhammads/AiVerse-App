@@ -27,7 +27,6 @@ import { CloudflareProxyProvider } from "@/contexts/CloudflareProxyContext";
 import { DebugOverlay } from "@/components/DebugOverlay";
 import { AIChatOverlay } from "@/components/AIChatOverlay";
 import { AIFloatingButton } from "@/components/AIFloatingButton";
-import { ChannelSubscriptionModal } from "@/components/ChannelSubscriptionModal";
 
 function StartParamRouter() {
   const navigate = useNavigate();
@@ -195,7 +194,6 @@ export default function App() {
           <TabBar />
           <PendingIndicator />
           <AnnouncementModal />
-          <ChannelSubscriptionModal />
           <DebugOverlay />
           <AIChatOverlay />
           <AIFloatingButton />
