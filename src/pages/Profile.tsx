@@ -230,7 +230,7 @@ export default function Profile() {
             // Check pending status first
             await fetch('/api/generation/check-status', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
               body: JSON.stringify({ user_id: user.id })
             }).catch(() => { })
 
@@ -332,7 +332,7 @@ export default function Profile() {
       // Check pending status first
       await fetch('/api/generation/check-status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ user_id: user.id })
       }).catch(() => { })
 

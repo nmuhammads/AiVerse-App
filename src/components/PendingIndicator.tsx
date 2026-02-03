@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useTelegram } from '@/hooks/useTelegram'
+import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTranslation } from 'react-i18next'
 import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
@@ -47,7 +47,7 @@ export function PendingIndicator() {
             // First, trigger status check to update any completed generations
             await fetch('/api/generation/check-status', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
                 body: JSON.stringify({ user_id: user.id })
             }).catch(() => { })
 
