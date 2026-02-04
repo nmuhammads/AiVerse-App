@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
+    "@supabase/supabase-js": "^2.94.1",
     "@telegram-apps/sdk": "^3.11.8",
     "@twa-dev/sdk": "^8.0.2",
     "@types/sharp": "^0.31.1",

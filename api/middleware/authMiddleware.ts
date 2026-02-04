@@ -2,7 +2,7 @@
  * Auth Middleware for AiVerse API
  * Supports multiple authentication methods:
  * - Telegram Mini App (initData validation)
- * - JWT Bearer token (for future Web/Mobile apps)
+ * - JWT Bearer token (Supabase or simple Telegram token)
  */
 
 import { Request, Response, NextFunction } from 'express'
@@ -103,10 +103,71 @@ export function validateTelegramInitData(initData: string): AuthenticatedRequest
 }
 
 /**
+ * Validate simple Telegram token (base64url encoded JSON)
+ */
+function validateSimpleTelegramToken(token: string): AuthenticatedRequest['user'] | null {
+    try {
+        const payload = JSON.parse(Buffer.from(token, 'base64url').toString())
+
+        // Check expiration
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.warn('[Auth] Simple token expired')
+            return null
+        }
+
+        if (!payload.user_id) {
+            return null
+        }
+
+        return {
+            id: payload.user_id,
+            username: payload.username,
+            first_name: payload.first_name,
+            auth_method: 'jwt'
+        }
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Validate Supabase JWT token
+ */
+async function validateSupabaseToken(token: string): Promise<AuthenticatedRequest['user'] | null> {
+    try {
+        // Dynamic import to avoid circular dependency
+        const { verifySupabaseToken } = await import('../services/authService.js')
+        const result = await verifySupabaseToken(token)
+
+        if (!result.ok || !result.data) {
+            return null
+        }
+
+        const authUser = result.data
+
+        // Get user_id from public.users via auth_id
+        const { supaSelect } = await import('../services/supabaseService.js')
+        const publicUser = await supaSelect('users', `?auth_id=eq.${authUser.id}&select=user_id,username,first_name,last_name`)
+        const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || {}
+
+        return {
+            id: userData.user_id || 0,
+            username: userData.username,
+            first_name: userData.first_name || authUser.user_metadata?.first_name,
+            last_name: userData.last_name || authUser.user_metadata?.last_name,
+            auth_method: 'jwt'
+        }
+    } catch (error) {
+        console.error('[Auth] Supabase token validation error:', error)
+        return null
+    }
+}
+
+/**
  * Middleware that requires authentication
  * Checks for Telegram initData or JWT Bearer token
  */
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     // Check for Telegram initData header
     const telegramInitData = req.header('X-Telegram-Init-Data')
 
@@ -118,14 +179,24 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
         }
     }
 
-    // Check for JWT Bearer token (placeholder for future Web/Mobile apps)
+    // Check for JWT Bearer token
     const authHeader = req.header('Authorization')
     if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7)
-        // TODO: Implement JWT validation when Web/Mobile apps are ready
-        // const user = validateJWT(token)
-        // if (user) { req.user = user; return next() }
-        console.info('[Auth] JWT auth attempted but not yet implemented:', token.slice(0, 10) + '...')
+
+        // Try simple Telegram token first (faster, no network call)
+        const simpleUser = validateSimpleTelegramToken(token)
+        if (simpleUser) {
+            req.user = simpleUser
+            return next()
+        }
+
+        // Try Supabase JWT token
+        const supabaseUser = await validateSupabaseToken(token)
+        if (supabaseUser) {
+            req.user = supabaseUser
+            return next()
+        }
     }
 
     // No valid authentication found
@@ -139,20 +210,31 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
  * Optional auth middleware - sets req.user if authenticated, but doesn't block
  * Useful for public endpoints that behave differently for authenticated users
  */
-export function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const telegramInitData = req.header('X-Telegram-Init-Data')
 
     if (telegramInitData) {
         const user = validateTelegramInitData(telegramInitData)
         if (user) {
             req.user = user
+            return next()
         }
     }
 
-    // JWT check for future
+    // Check for JWT Bearer token
     const authHeader = req.header('Authorization')
     if (!req.user && authHeader?.startsWith('Bearer ')) {
-        // TODO: JWT validation
+        const token = authHeader.slice(7)
+
+        const simpleUser = validateSimpleTelegramToken(token)
+        if (simpleUser) {
+            req.user = simpleUser
+        } else {
+            const supabaseUser = await validateSupabaseToken(token)
+            if (supabaseUser) {
+                req.user = supabaseUser
+            }
+        }
     }
 
     next()
