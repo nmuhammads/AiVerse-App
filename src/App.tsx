@@ -27,6 +27,47 @@ import { CloudflareProxyProvider } from "@/contexts/CloudflareProxyContext";
 import { DebugOverlay } from "@/components/DebugOverlay";
 import { AIChatOverlay } from "@/components/AIChatOverlay";
 import { AIFloatingButton } from "@/components/AIFloatingButton";
+import { useAuthStore } from "@/store/authStore";
+
+// Check if running inside Telegram WebApp
+function isInTelegramWebApp(): boolean {
+  return !!(WebApp.initData && WebApp.initDataUnsafe?.user);
+}
+
+// Protected route component - redirects to login if not authenticated
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const { isAuthenticated } = useAuthStore();
+
+  // In Telegram Mini App - always allow
+  if (isInTelegramWebApp()) {
+    return <>{children}</>;
+  }
+
+  // Not authenticated - redirect to login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Auth redirect - redirects authenticated users away from login
+function GuestOnly({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuthStore();
+
+  // In Telegram - skip login page
+  if (isInTelegramWebApp()) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Already authenticated - redirect to home
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 function StartParamRouter() {
   const navigate = useNavigate();
@@ -144,17 +185,45 @@ function StartParamRouter() {
 // Main App Layout with Header and TabBar
 function AppLayout() {
   const location = useLocation();
+  const { isAuthenticated, setLoading } = useAuthStore();
   const isLoginPage = location.pathname === '/login';
+  const inTelegram = isInTelegramWebApp();
 
-  // Don't show header/tabbar on login page
+  // Initialize auth state
+  useEffect(() => {
+    // If in Telegram, mark as authenticated via Telegram
+    if (inTelegram) {
+      useAuthStore.getState().setAuthMethod('telegram');
+      useAuthStore.getState().setLoading(false);
+    } else {
+      // Check if we have stored auth
+      const stored = useAuthStore.getState();
+      if (stored.accessToken && !stored.isTokenExpired()) {
+        // Token is valid
+        useAuthStore.getState().setLoading(false);
+      } else if (stored.refreshToken) {
+        // Try to refresh - in real implementation would call refreshTokens()
+        useAuthStore.getState().setLoading(false);
+      } else {
+        useAuthStore.getState().setLoading(false);
+      }
+    }
+  }, [inTelegram]);
+
+  // Login page - no header/tabbar
   if (isLoginPage) {
     return (
       <div className="min-h-screen">
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
         </Routes>
       </div>
     );
+  }
+
+  // For web users: redirect to login on root if not authenticated
+  if (!inTelegram && !isAuthenticated && location.pathname === '/') {
+    return <Navigate to="/login" replace />;
   }
 
   return (
@@ -163,23 +232,30 @@ function AppLayout() {
       <StartParamRouter />
       <div className="flex-1">
         <Routes>
+          {/* Public routes (viewable without auth, but need auth for actions) */}
           <Route path="/" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
+          <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
+          <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
+          <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
+          <Route path="/events" element={<PageErrorBoundary pageName="События"><EventsPage /></PageErrorBoundary>} />
+
+          {/* Protected routes - require authentication */}
           <Route path="/chat" element={<Navigate to="/studio?mode=chat" replace />} />
           <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
-          <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
-          <Route path="/profile" element={<PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary>} />
-          <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
-          <Route path="/settings" element={<PageErrorBoundary pageName="Настройки"><Settings /></PageErrorBoundary>} />
-          <Route path="/contests/propose" element={<PageErrorBoundary pageName="Создание конкурса"><ProposeContest /></PageErrorBoundary>} />
-          <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
-          <Route path="/accumulations" element={<PageErrorBoundary pageName="Накопления"><Accumulations /></PageErrorBoundary>} />
-          <Route path="/events" element={<PageErrorBoundary pageName="События"><EventsPage /></PageErrorBoundary>} />
-          <Route path="/spin" element={<PageErrorBoundary pageName="Рулетка"><SpinPage /></PageErrorBoundary>} />
-          <Route path="/editor" element={<PageErrorBoundary pageName="Редактор"><ImageEditorPage /></PageErrorBoundary>} />
-          <Route path="/multi-generation" element={<PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary>} />
-          <Route path="/subscriptions" element={<PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary>} />
-          <Route path="/watermark" element={<PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary>} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/profile" element={<RequireAuth><PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><PageErrorBoundary pageName="Настройки"><Settings /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/contests/propose" element={<RequireAuth><PageErrorBoundary pageName="Создание конкурса"><ProposeContest /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/accumulations" element={<RequireAuth><PageErrorBoundary pageName="Накопления"><Accumulations /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/spin" element={<RequireAuth><PageErrorBoundary pageName="Рулетка"><SpinPage /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/editor" element={<RequireAuth><PageErrorBoundary pageName="Редактор"><ImageEditorPage /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/multi-generation" element={<RequireAuth><PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/subscriptions" element={<RequireAuth><PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/watermark" element={<RequireAuth><PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary></RequireAuth>} />
+
+          {/* Login route */}
+          <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
+
+          {/* Catch all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

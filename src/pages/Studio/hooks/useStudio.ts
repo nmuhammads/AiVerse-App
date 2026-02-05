@@ -7,6 +7,8 @@ import { useActiveGenerationsStore, MAX_ACTIVE_IMAGES } from '@/store/activeGene
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
 import { compressImage } from '@/utils/imageCompression'
+import { useAuthStore } from '@/store/authStore'
+import WebApp from '@twa-dev/sdk'
 import {
     GPT_IMAGE_PRICES,
     VIDEO_PRICES,
@@ -400,6 +402,16 @@ export function useStudio() {
     }
 
     const handleGenerate = async () => {
+        // Check if user is authenticated (skip for Telegram users)
+        const isInTelegram = !!(WebApp.initData && WebApp.initDataUnsafe?.user)
+        const { isAuthenticated } = useAuthStore.getState()
+
+        if (!isInTelegram && !isAuthenticated) {
+            // Redirect to login
+            navigate('/login', { state: { from: '/studio' } })
+            return
+        }
+
         const { addGeneration, updateGeneration, removeGeneration, getAvailableSlots } = useActiveGenerationsStore.getState()
         const requestImageCount = mediaType === 'video' ? 1 : imageCount
         const availableSlots = getAvailableSlots()
