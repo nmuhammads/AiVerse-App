@@ -803,7 +803,7 @@
         },
         "terms": "By continuing, you agree to our Terms of Service",
         "success": {
-            "checkEmail": "Check your email to confirm your account"
+            "checkEmail": "Please check your email to confirm your account"
         },
         "error": {
             "telegramFailed": "Telegram login failed",

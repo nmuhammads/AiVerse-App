@@ -62,6 +62,9 @@ export default function Login() {
         script.setAttribute('data-radius', '12')
         script.setAttribute('data-onauth', 'onTelegramAuth(user)')
         script.setAttribute('data-request-access', 'write')
+        script.setAttribute('data-userpic', 'false')
+        // Set widget language based on current i18n language
+        script.setAttribute('data-lang', i18n.language === 'ru' ? 'ru' : 'en')
         script.async = true
 
         container.appendChild(script)
@@ -88,7 +91,7 @@ export default function Login() {
         return () => {
             delete window.onTelegramAuth
         }
-    }, [navigate, t])
+    }, [navigate, t, i18n.language])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

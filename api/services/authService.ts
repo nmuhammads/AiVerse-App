@@ -31,15 +31,19 @@ export function getSupabaseAdmin(): SupabaseClient {
 
 /**
  * Sign up a new user with email and password
+ * Uses auth.signUp to trigger confirmation email
  */
 export async function signUpWithEmail(email: string, password: string, metadata?: Record<string, unknown>) {
     const admin = getSupabaseAdmin()
 
-    const { data, error } = await admin.auth.admin.createUser({
+    // Use signUp (not admin.createUser) to send confirmation email
+    const { data, error } = await admin.auth.signUp({
         email,
         password,
-        email_confirm: false, // Will send confirmation email
-        user_metadata: metadata
+        options: {
+            data: metadata,
+            emailRedirectTo: process.env.VITE_SITE_URL || 'https://aiverse-telegram-app-stage.up.railway.app'
+        }
     })
 
     if (error) {
