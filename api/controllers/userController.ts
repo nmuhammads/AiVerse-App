@@ -28,6 +28,12 @@ export async function syncAvatar(req: Request, res: Response) {
     const { userId } = req.body
     if (!userId) return res.status(400).json({ error: 'userId required' })
 
+    // Skip for web (JWT) users — sync-avatar uses Telegram Bot API
+    const authUser = (req as any).user
+    if (authUser?.auth_method === 'jwt') {
+      return res.json({ ok: true, message: 'skipped for web user' })
+    }
+
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
 
     // 1. Check if user already has an avatar_url in users table

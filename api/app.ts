@@ -45,9 +45,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use((req: Request, _res: Response, next: NextFunction) => {
   const isProtectedRoute = ['/api/user/', '/api/payment/', '/api/generation/'].some(p => req.path.startsWith(p))
   if (isProtectedRoute && req.method !== 'GET') {
-    const authHeader = req.headers['x-telegram-init-data']
+    const telegramHeader = req.headers['x-telegram-init-data']
+    const bearerHeader = req.headers['authorization']
     console.log(`\n🔐 [AUTH DEBUG] ${req.method} ${req.path}`)
-    console.log(`   Auth Header: ${authHeader ? '✅ Present (' + String(authHeader).slice(0, 40) + '...)' : '❌ Missing'}`)
+    if (telegramHeader) {
+      console.log(`   Auth: ✅ Telegram initData (${String(telegramHeader).slice(0, 40)}...)`)
+    } else if (bearerHeader) {
+      console.log(`   Auth: ✅ Bearer JWT (${String(bearerHeader).slice(7, 47)}...)`)
+    } else {
+      console.log(`   Auth: ❌ No auth header`)
+    }
   }
   next()
 })

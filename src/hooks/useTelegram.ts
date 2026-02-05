@@ -244,16 +244,18 @@ export function useTelegram() {
         is_premium: true
       } : undefined)
 
+  const isInTelegram = !!(WebApp.initData && WebApp.initDataUnsafe?.user)
+
   useEffect(() => {
-    if (user?.id) {
-      // Sync avatar on launch
+    // Only sync avatar for Telegram users (uses Telegram Bot API)
+    if (user?.id && isInTelegram) {
       fetch('/api/user/sync-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ userId: user.id })
       }).catch(e => console.error('Avatar sync failed', e))
     }
-  }, [user?.id])
+  }, [user?.id, isInTelegram])
 
   return {
     showMainButton,
@@ -272,6 +274,6 @@ export function useTelegram() {
     tg: WebApp,
     user,
     platform: WebApp.platform,
-    isInTelegram: !!(WebApp.initData && WebApp.initDataUnsafe?.user)
+    isInTelegram
   }
 }
