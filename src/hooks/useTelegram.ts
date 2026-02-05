@@ -1,15 +1,24 @@
 import { useEffect } from 'react'
 import WebApp from '@twa-dev/sdk'
+import { useAuthStore } from '@/store/authStore'
 
 /**
  * Get auth headers for API requests
- * Sends Telegram initData for server-side validation
+ * Sends Telegram initData for Telegram users, JWT for web users
  */
 export function getAuthHeaders(): Record<string, string> {
+  // Check for Telegram initData first
   const initData = WebApp.initData
-  if (initData) {
+  if (initData && WebApp.initDataUnsafe?.user) {
     return { 'X-Telegram-Init-Data': initData }
   }
+
+  // For web users, use JWT from auth store
+  const { accessToken } = useAuthStore.getState()
+  if (accessToken) {
+    return { 'Authorization': `Bearer ${accessToken}` }
+  }
+
   return {}
 }
 
@@ -177,14 +186,29 @@ export function useTelegram() {
     }
   }
 
-  const user = (import.meta.env.DEV && !WebApp.initDataUnsafe.user) ? {
-    id: 817308975,
-    first_name: 'Muhammad',
-    last_name: 'Nuriddinov',
-    username: 'mortymn',
-    language_code: 'en',
-    is_premium: true
-  } : WebApp.initDataUnsafe.user
+  // Get user - prefer Telegram user, fallback to web auth, then dev mock
+  const authStoreUser = useAuthStore((state) => state.user)
+  const isWebAuthenticated = useAuthStore((state) => state.isAuthenticated && state.authMethod === 'web')
+
+  const user = WebApp.initDataUnsafe?.user
+    ? WebApp.initDataUnsafe.user
+    : isWebAuthenticated && authStoreUser
+      ? {
+        id: authStoreUser.id,
+        first_name: authStoreUser.first_name || 'User',
+        last_name: authStoreUser.last_name,
+        username: authStoreUser.username,
+        language_code: 'en',
+        is_premium: false
+      }
+      : (import.meta.env.DEV ? {
+        id: 817308975,
+        first_name: 'Muhammad',
+        last_name: 'Nuriddinov',
+        username: 'mortymn',
+        language_code: 'en',
+        is_premium: true
+      } : undefined)
 
   useEffect(() => {
     if (user?.id) {

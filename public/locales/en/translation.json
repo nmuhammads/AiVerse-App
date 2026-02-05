@@ -20,7 +20,8 @@
             "support": "Support",
             "storage": "Data Storage",
             "storageValue": "60 days",
-            "version": "Version"
+            "version": "Version",
+            "logout": "Log out"
         },
         "messages": {
             "themeToast": "Oops, only dark mode is available for now",

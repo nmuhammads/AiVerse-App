@@ -1,7 +1,8 @@
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets, LogOut } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
+import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
@@ -170,12 +171,22 @@ export default function Settings() {
         }
     ]
 
+    const { isAuthenticated, authMethod, logout } = useAuthStore()
+    const isWebAuth = isAuthenticated && authMethod === 'web'
+
+    const handleLogout = () => {
+        impact('medium')
+        logout()
+        navigate('/login')
+    }
+
     const aboutSection = {
         title: t('settings.sections.about'),
         items: [
             { icon: MessageCircle, label: t('settings.items.support'), onClick: () => platform === 'ios' ? window.open('https://t.me/aiversebots?direct', '_blank') : tg.openTelegramLink('https://t.me/aiversebots?direct') },
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
             { icon: Info, label: t('settings.items.version'), value: 'v3.3.2', onClick: () => { } },
+            ...(isWebAuth ? [{ icon: LogOut, label: t('settings.items.logout'), onClick: handleLogout, className: 'text-red-400' }] : [])
         ]
     }
 

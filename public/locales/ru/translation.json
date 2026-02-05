@@ -20,7 +20,8 @@
             "support": "Поддержка",
             "storage": "Хранение данных",
             "storageValue": "60 дней",
-            "version": "Версия"
+            "version": "Версия",
+            "logout": "Выйти"
         },
         "messages": {
             "themeToast": "Упс пока доступна только темная тема",
