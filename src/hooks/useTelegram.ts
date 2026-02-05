@@ -213,6 +213,7 @@ export function useTelegram() {
     onToggleButton: WebApp.MainButton.isVisible ? hideMainButton : () => showMainButton('Generate', () => { }),
     tg: WebApp,
     user,
-    platform: WebApp.platform
+    platform: WebApp.platform,
+    isInTelegram: !!(WebApp.initData && WebApp.initDataUnsafe?.user)
   }
 }

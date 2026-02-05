@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 import Home from "@/pages/Home";
 import Studio from "@/pages/Studio";
 import Leaderboard from "@/pages/Leaderboard";
@@ -7,7 +7,6 @@ import Profile from "@/pages/Profile";
 import PublicProfile from '@/pages/PublicProfile';
 import Settings from "@/pages/Settings";
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
-// Contests page is now integrated into EventsPage
 import ProposeContest from "@/pages/ProposeContest";
 import ContestDetail from "@/pages/ContestDetail";
 import Accumulations from "@/pages/Accumulations";
@@ -16,6 +15,7 @@ import SpinPage from "@/pages/SpinPage";
 import ImageEditorPage from "@/pages/ImageEditorPage";
 import MultiGeneration from "@/pages/MultiGeneration";
 import WatermarkEditor from "@/pages/WatermarkEditor";
+import Login from "@/pages/Login";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { PendingIndicator } from "@/components/PendingIndicator";
@@ -46,7 +46,6 @@ function StartParamRouter() {
     processedRef.current = true;
 
     const timer = setTimeout(() => {
-      // Handle legacy/simple params
       if (p === "generate" || p === "studio") {
         navigate("/studio", { replace: true, state: { fromDeepLink: true } });
         return;
@@ -83,29 +82,21 @@ function StartParamRouter() {
         navigate("/spin", { replace: true, state: { fromDeepLink: true } });
         return;
       }
-
-      // Handle studio with model selection: studio-{modelId}
       if (p.startsWith("studio-")) {
         const modelId = p.replace("studio-", "");
         navigate(`/studio?model=${modelId}`, { replace: true, state: { fromDeepLink: true } });
         return;
       }
-
-      // Handle photo mode: photo-{modelId}
       if (p.startsWith("photo-")) {
         const modelId = p.replace("photo-", "");
         navigate(`/studio?model=${modelId}&media=image`, { replace: true, state: { fromDeepLink: true } });
         return;
       }
-
-      // Handle video mode: video-{modelId}
       if (p.startsWith("video-")) {
         const modelId = p.replace("video-", "");
         navigate(`/studio?model=${modelId}&media=video`, { replace: true, state: { fromDeepLink: true } });
         return;
       }
-
-      // Handle dynamic params
       if (p.startsWith("contest-")) {
         const id = p.replace("contest-", "");
         if (id) {
@@ -113,7 +104,6 @@ function StartParamRouter() {
         }
         return;
       }
-
       if (p.startsWith("profile-")) {
         const id = p.replace("profile-", "");
         if (id) {
@@ -121,14 +111,11 @@ function StartParamRouter() {
         }
         return;
       }
-
-      // Handle ref with optional remix: ref-{username} or ref-{username}-remix-{id}
       if (p.startsWith("ref-")) {
         const match = p.match(/^ref-([^-]+)(?:-remix-(\d+))?$/);
         if (match) {
           const refValue = match[1];
           const generationId = match[2];
-          // Store ref in sessionStorage for subscribe call
           if (refValue) {
             sessionStorage.setItem('aiverse_ref', refValue);
           }
@@ -140,8 +127,6 @@ function StartParamRouter() {
         }
         return;
       }
-
-      // Handle remix without ref: remix-{id}
       if (p.startsWith("remix-")) {
         const generationId = p.replace("remix-", "");
         if (generationId) {
@@ -156,6 +141,57 @@ function StartParamRouter() {
   return null;
 }
 
+// Main App Layout with Header and TabBar
+function AppLayout() {
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
+
+  // Don't show header/tabbar on login page
+  if (isLoginPage) {
+    return (
+      <div className="min-h-screen">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${WebApp.platform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : 'pt-[env(safe-area-inset-top)]'} min-h-screen flex flex-col`}>
+      <Header />
+      <StartParamRouter />
+      <div className="flex-1">
+        <Routes>
+          <Route path="/" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
+          <Route path="/chat" element={<Navigate to="/studio?mode=chat" replace />} />
+          <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
+          <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
+          <Route path="/profile" element={<PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary>} />
+          <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
+          <Route path="/settings" element={<PageErrorBoundary pageName="Настройки"><Settings /></PageErrorBoundary>} />
+          <Route path="/contests/propose" element={<PageErrorBoundary pageName="Создание конкурса"><ProposeContest /></PageErrorBoundary>} />
+          <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
+          <Route path="/accumulations" element={<PageErrorBoundary pageName="Накопления"><Accumulations /></PageErrorBoundary>} />
+          <Route path="/events" element={<PageErrorBoundary pageName="События"><EventsPage /></PageErrorBoundary>} />
+          <Route path="/spin" element={<PageErrorBoundary pageName="Рулетка"><SpinPage /></PageErrorBoundary>} />
+          <Route path="/editor" element={<PageErrorBoundary pageName="Редактор"><ImageEditorPage /></PageErrorBoundary>} />
+          <Route path="/multi-generation" element={<PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary>} />
+          <Route path="/subscriptions" element={<PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary>} />
+          <Route path="/watermark" element={<PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+      <TabBar />
+      <PendingIndicator />
+      <AnnouncementModal />
+      <DebugOverlay />
+      <AIChatOverlay />
+      <AIFloatingButton />
+    </div>
+  );
+}
 
 export default function App() {
   useEffect(() => {
@@ -167,10 +203,8 @@ export default function App() {
       WebApp.onEvent("activated", ensureExpand)
       WebApp.onEvent("viewportChanged", ensureExpand)
 
-      // Remove preloader
       const loader = document.getElementById('app-loader')
       if (loader) {
-        // Add fade out effect
         loader.style.opacity = '0'
         setTimeout(() => {
           loader.remove()
@@ -184,41 +218,11 @@ export default function App() {
       } catch { void 0 }
     }
   }, []);
+
   return (
     <CloudflareProxyProvider>
       <Router>
-        <div className={`${WebApp.platform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : 'pt-[env(safe-area-inset-top)]'} min-h-screen flex flex-col`}>
-          <Header />
-          <StartParamRouter />
-          <div className="flex-1">
-            <Routes>
-              <Route path="/" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
-              <Route path="/chat" element={<Navigate to="/studio?mode=chat" replace />} />
-              <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
-              <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
-              <Route path="/profile" element={<PageErrorBoundary pageName="Профиль"><Profile /></PageErrorBoundary>} />
-              <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
-              <Route path="/settings" element={<PageErrorBoundary pageName="Настройки"><Settings /></PageErrorBoundary>} />
-              {/* Contests are now part of EventsPage */}
-              <Route path="/contests/propose" element={<PageErrorBoundary pageName="Создание конкурса"><ProposeContest /></PageErrorBoundary>} />
-              <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
-              <Route path="/accumulations" element={<PageErrorBoundary pageName="Накопления"><Accumulations /></PageErrorBoundary>} />
-              <Route path="/events" element={<PageErrorBoundary pageName="События"><EventsPage /></PageErrorBoundary>} />
-              <Route path="/spin" element={<PageErrorBoundary pageName="Рулетка"><SpinPage /></PageErrorBoundary>} />
-              <Route path="/editor" element={<PageErrorBoundary pageName="Редактор"><ImageEditorPage /></PageErrorBoundary>} />
-              <Route path="/multi-generation" element={<PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary>} />
-              <Route path="/subscriptions" element={<PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary>} />
-              <Route path="/watermark" element={<PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
-          <TabBar />
-          <PendingIndicator />
-          <AnnouncementModal />
-          <DebugOverlay />
-          <AIChatOverlay />
-          <AIFloatingButton />
-        </div>
+        <AppLayout />
       </Router>
       <Toaster />
     </CloudflareProxyProvider>

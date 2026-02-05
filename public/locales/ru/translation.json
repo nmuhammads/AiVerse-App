@@ -814,5 +814,40 @@
         "sendToTelegramError": "Не удалось отправить файл в Telegram.",
         "onlyImages": "Можно прикреплять только изображения",
         "imageTooLarge": "Размер изображения не должен превышать 5МБ"
+    },
+    "login": {
+        "subtitle": {
+            "signup": "Создайте аккаунт",
+            "welcome": "С возвращением"
+        },
+        "field": {
+            "name": "Имя",
+            "email": "Email",
+            "password": "Пароль"
+        },
+        "placeholder": {
+            "name": "Ваше имя",
+            "email": "your@email.com"
+        },
+        "button": {
+            "signup": "Создать аккаунт",
+            "signin": "Войти"
+        },
+        "divider": "или продолжить через",
+        "telegramLoading": "Загрузка Telegram...",
+        "toggle": {
+            "hasAccount": "Уже есть аккаунт? Войти",
+            "noAccount": "Нет аккаунта? Зарегистрироваться"
+        },
+        "terms": "Продолжая, вы соглашаетесь с условиями использования",
+        "success": {
+            "checkEmail": "Проверьте почту для подтверждения аккаунта"
+        },
+        "error": {
+            "telegramFailed": "Ошибка входа через Telegram",
+            "connection": "Ошибка соединения",
+            "signupFailed": "Ошибка регистрации",
+            "invalidCredentials": "Неверные данные"
+        }
     }
 }

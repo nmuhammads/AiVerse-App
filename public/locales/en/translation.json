@@ -776,5 +776,40 @@
         "sendToTelegramError": "Failed to send file to Telegram.",
         "onlyImages": "Only images are allowed",
         "imageTooLarge": "Image size must not exceed 5MB"
+    },
+    "login": {
+        "subtitle": {
+            "signup": "Create your account",
+            "welcome": "Welcome back"
+        },
+        "field": {
+            "name": "Name",
+            "email": "Email",
+            "password": "Password"
+        },
+        "placeholder": {
+            "name": "Your name",
+            "email": "your@email.com"
+        },
+        "button": {
+            "signup": "Create Account",
+            "signin": "Sign In"
+        },
+        "divider": "or continue with",
+        "telegramLoading": "Loading Telegram...",
+        "toggle": {
+            "hasAccount": "Already have an account? Sign in",
+            "noAccount": "Don't have an account? Sign up"
+        },
+        "terms": "By continuing, you agree to our Terms of Service",
+        "success": {
+            "checkEmail": "Check your email to confirm your account"
+        },
+        "error": {
+            "telegramFailed": "Telegram login failed",
+            "connection": "Connection error",
+            "signupFailed": "Signup failed",
+            "invalidCredentials": "Invalid credentials"
+        }
     }
 }
