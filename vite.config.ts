@@ -10,7 +10,7 @@ export default defineConfig({
     tsconfigPaths(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.png'],
+      injectRegister: false,
       manifest: {
         name: 'AiVerse',
         short_name: 'AiVerse',
@@ -37,26 +37,14 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\.aiverse\.app\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+        globIgnores: ['**/announcements/**', '**/assets/wheel_*.png', '**/assets/pointer_*.png'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB
+        navigateFallback: null,
+        runtimeCaching: []
       },
       devOptions: {
-        enabled: true
+        enabled: false
       }
     })
   ],
