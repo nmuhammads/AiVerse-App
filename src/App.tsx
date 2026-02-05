@@ -16,6 +16,7 @@ import ImageEditorPage from "@/pages/ImageEditorPage";
 import MultiGeneration from "@/pages/MultiGeneration";
 import WatermarkEditor from "@/pages/WatermarkEditor";
 import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
 import { PendingIndicator } from "@/components/PendingIndicator";
@@ -186,7 +187,7 @@ function StartParamRouter() {
 function AppLayout() {
   const location = useLocation();
   const { isAuthenticated, setLoading } = useAuthStore();
-  const isLoginPage = location.pathname === '/login';
+  const isLoginPage = location.pathname === '/login' || location.pathname.startsWith('/auth/');
   const inTelegram = isInTelegramWebApp();
 
   // Initialize auth state
@@ -216,6 +217,8 @@ function AppLayout() {
       <div className="min-h-screen">
         <Routes>
           <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/confirm" element={<AuthCallback />} />
         </Routes>
       </div>
     );
