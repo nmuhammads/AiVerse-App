@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift, Lock, Unlock, MessageSquare, Droplets } from 'lucide-react'
+import { Sparkles, Share2, Edit, History as HistoryIcon, X, Download as DownloadIcon, Send, Wallet, Settings as SettingsIcon, Globe, EyeOff, Maximize2, Copy, Check, Crown, Grid, Info, List as ListIcon, Loader2, User, RefreshCw, Clipboard, Camera, Clock, Repeat, Trash2, Filter, Pencil, ChevronLeft, ChevronRight, Video, Image as ImageIcon, VolumeX, Volume2, Gift, Lock, Unlock, MessageSquare, Droplets, LogOut } from 'lucide-react'
 
 // Custom GridImage component for handling load states
 const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: string, originalUrl: string, alt: string, className?: string, onImageError?: () => void }) => {
@@ -67,6 +67,7 @@ import { useNavigate } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useGenerationStore } from '@/store/generationStore'
+import { useAuthStore } from '@/store/authStore'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ProfileSkeletonGrid } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/UserAvatar'
@@ -723,12 +724,27 @@ export default function Profile() {
             backgroundPosition: 'center'
           } : {}}
         >
-          {/* Cover Edit Button */}
+          {/* Cover Edit Button - moved to left */}
           <button
             onClick={() => setShowCoverSelector(true)}
-            className="absolute top-4 right-4 z-20 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
+            className="absolute top-4 left-4 z-20 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-md transition-colors border border-white/10"
           >
             <Camera size={16} />
+          </button>
+
+          {/* Logout Button - in the right corner */}
+          <button
+            onClick={() => {
+              if (window.confirm(t('profile.logoutConfirm', 'Вы уверены, что хотите выйти?'))) {
+                // Clear auth store
+                useAuthStore.getState().logout()
+                // Redirect to login
+                window.location.href = '/login'
+              }
+            }}
+            className="absolute top-4 right-4 z-20 w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 flex items-center justify-center backdrop-blur-md transition-colors border border-red-500/30"
+          >
+            <LogOut size={16} />
           </button>
 
           {/* Background Effects (only show if no cover) */}
