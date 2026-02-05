@@ -175,32 +175,51 @@ export function useTelegram() {
 
   const addToHomeScreen = () => {
     const wa = WebApp as any
-    // For Telegram Mini App
-    if (wa.addToHomeScreen) {
-      wa.addToHomeScreen()
-    }
-    // For Web version - show instructions or trigger browser's install prompt
-    else if ('BeforeInstallPromptEvent' in window || (navigator as any).standalone !== undefined) {
-      // Check if PWA install is available
-      const deferredPrompt = (window as any).deferredPrompt
-      if (deferredPrompt) {
-        deferredPrompt.prompt()
-        deferredPrompt.userChoice.then((choiceResult: any) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('User accepted the install prompt')
-          }
-          (window as any).deferredPrompt = null
-        })
-      } else {
-        // Show instructions based on platform
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    const isInTelegramApp = !!(WebApp.initData && WebApp.initDataUnsafe?.user)
 
-        if (isIOS && isSafari) {
+    // For Telegram Mini App - check API version
+    if (isInTelegramApp && wa.addToHomeScreen) {
+      const version = Number(((WebApp as unknown as { version?: string }).version) || '0')
+      if (version >= 6.9) {
+        wa.addToHomeScreen()
+        return
+      }
+    }
+
+    // For Web version or old Telegram versions - use PWA
+    // Check if PWA install is available
+    const deferredPrompt = (window as any).deferredPrompt
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt')
+        }
+        (window as any).deferredPrompt = null
+      })
+    } else {
+      // Show instructions based on platform using native alert for web version
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+      const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge/.test(navigator.userAgent)
+
+      if (isIOS && isSafari) {
+        if (isInTelegramApp) {
           wa.showAlert?.('Нажмите кнопку "Поделиться" внизу и выберите "На экран Домой"')
         } else {
-          // For Chrome and other browsers that support PWA
-          wa.showAlert?.('Нажмите меню браузера (⋮) и выберите "Установить приложение" или "Добавить на главный экран"')
+          alert('Нажмите кнопку "Поделиться" (внизу) и выберите "На экран Домой"')
+        }
+      } else if (isChrome) {
+        if (isInTelegramApp) {
+          wa.showAlert?.('Нажмите меню браузера (⋮) и выберите "Установить приложение"')
+        } else {
+          alert('Нажмите меню браузера (⋮) в правом верхнем углу и выберите "Установить приложение" или "Добавить на главный экран"')
+        }
+      } else {
+        if (isInTelegramApp) {
+          wa.showAlert?.('Нажмите меню браузера и выберите "Добавить на главный экран"')
+        } else {
+          alert('Нажмите меню браузера и выберите "Добавить на главный экран" или "Установить приложение"')
         }
       }
     }

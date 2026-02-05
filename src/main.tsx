@@ -4,8 +4,19 @@ import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
 import './i18n'
+import { registerSW } from 'virtual:pwa-register'
 
 import WebApp from '@twa-dev/sdk'
+
+// Register PWA service worker
+const updateSW = registerSW({
+  onNeedRefresh() {
+    console.log('New content available, please refresh.')
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline')
+  },
+})
 
 // Initialize Telegram WebApp
 try {
