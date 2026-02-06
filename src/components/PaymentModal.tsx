@@ -202,7 +202,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{ height: '100dvh' }}>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -210,7 +210,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             />
 
             {/* Modal */}
-            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col" style={{ maxHeight: 'min(90vh, 800px)' }}>
                 {/* Header */}
                 <div className="p-5 pb-3 flex justify-between items-start shrink-0">
                     <div>
@@ -281,56 +281,6 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                 )}
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {/* Custom Token Input (card only) */}
-                {activeMethod === 'card' && (
-                    <div className="px-5 pb-3 shrink-0">
-                        <div className="relative">
-                            <input
-                                type="number"
-                                min={MIN_CUSTOM_TOKENS}
-                                max={MAX_CUSTOM_TOKENS}
-                                placeholder={t('payment.customInput.placeholder', 'Enter token amount...')}
-                                value={customTokens}
-                                onFocus={() => setIsCustomMode(true)}
-                                onChange={(e) => {
-                                    setCustomTokens(e.target.value)
-                                    setIsCustomMode(true)
-                                }}
-                                className="w-full h-9 px-3 pr-16 rounded-xl bg-zinc-800/50 border border-white/5 text-white text-xs font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold">tokens</span>
-                        </div>
-                        {isCustomMode && customTokens && (() => {
-                            const count = parseInt(customTokens)
-                            if (!count || count < MIN_CUSTOM_TOKENS) {
-                                return (
-                                    <div className="text-[10px] text-red-400 mt-1.5 text-center">
-                                        {t('payment.customInput.min', { min: MIN_CUSTOM_TOKENS })}
-                                    </div>
-                                )
-                            }
-                            if (count > MAX_CUSTOM_TOKENS) {
-                                return (
-                                    <div className="text-[10px] text-red-400 mt-1.5 text-center">
-                                        {t('payment.customInput.max', { max: MAX_CUSTOM_TOKENS.toLocaleString() })}
-                                    </div>
-                                )
-                            }
-                            const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
-                            return (
-                                <div className="flex items-center justify-center gap-2 mt-1.5">
-                                    <span className="text-[10px] text-zinc-300 font-bold">{priceLabel}</span>
-                                    {discount > 0 && (
-                                        <span className="text-[10px] text-emerald-400 font-bold">
-                                            {getDiscountTier(count).label}
-                                        </span>
-                                    )}
-                                </div>
-                            )
-                        })()}
                     </div>
                 )}
 
@@ -414,6 +364,60 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             )
                         })}
                     </div>
+
+                    {/* Custom Token Input (card only) */}
+                    {activeMethod === 'card' && (
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                            <div className="text-[11px] text-zinc-400 mb-2 text-center font-medium">
+                                {t('payment.customInput.label', 'Или введите своё количество')}
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min={MIN_CUSTOM_TOKENS}
+                                    max={MAX_CUSTOM_TOKENS}
+                                    placeholder={t('payment.customInput.placeholder', 'Введите количество токенов...')}
+                                    value={customTokens}
+                                    inputMode="numeric"
+                                    onFocus={() => setIsCustomMode(true)}
+                                    onChange={(e) => {
+                                        setCustomTokens(e.target.value)
+                                        setIsCustomMode(true)
+                                    }}
+                                    className="w-full h-12 px-4 pr-20 rounded-xl bg-zinc-800/70 border border-white/10 text-white text-sm font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">tokens</span>
+                            </div>
+                            {isCustomMode && customTokens && (() => {
+                                const count = parseInt(customTokens)
+                                if (!count || count < MIN_CUSTOM_TOKENS) {
+                                    return (
+                                        <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                            {t('payment.customInput.min', { min: MIN_CUSTOM_TOKENS })}
+                                        </div>
+                                    )
+                                }
+                                if (count > MAX_CUSTOM_TOKENS) {
+                                    return (
+                                        <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                            {t('payment.customInput.max', { max: MAX_CUSTOM_TOKENS.toLocaleString() })}
+                                        </div>
+                                    )
+                                }
+                                const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
+                                return (
+                                    <div className="flex items-center justify-center gap-2 mt-2">
+                                        <span className="text-sm text-white font-bold">{priceLabel}</span>
+                                        {discount > 0 && (
+                                            <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                                {getDiscountTier(count).label}
+                                            </span>
+                                        )}
+                                    </div>
+                                )
+                            })()}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer Action */}
