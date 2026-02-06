@@ -173,7 +173,7 @@ export function useTelegram() {
     return param
   }
 
-  const addToHomeScreen = () => {
+  const addToHomeScreen = (onShowIOSPrompt?: () => void) => {
     const wa = WebApp as any
     const isInTelegramApp = !!(WebApp.initData && WebApp.initDataUnsafe?.user)
 
@@ -198,13 +198,16 @@ export function useTelegram() {
         (window as any).deferredPrompt = null
       })
     } else {
-      // Show instructions based on platform using native alert for web version
+      // Show instructions based on platform
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
       const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge/.test(navigator.userAgent)
 
       if (isIOS && isSafari) {
-        if (isInTelegramApp) {
+        // For iOS Safari in web version, show custom UI if callback provided
+        if (!isInTelegramApp && onShowIOSPrompt) {
+          onShowIOSPrompt()
+        } else if (isInTelegramApp) {
           wa.showAlert?.('Нажмите кнопку "Поделиться" внизу и выберите "На экран Домой"')
         } else {
           alert('Нажмите кнопку "Поделиться" (внизу) и выберите "На экран Домой"')

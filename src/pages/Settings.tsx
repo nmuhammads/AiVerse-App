@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { DevModeBanner } from '@/components/DevModeBanner'
 import { extractFingerprint } from '@/utils/fingerprint'
+import { IOSInstallPrompt } from '@/components/IOSInstallPrompt'
 
 interface NotificationSettings {
     telegram_news: boolean
@@ -39,6 +40,9 @@ export default function Settings() {
     const [fingerprintExpanded, setFingerprintExpanded] = useState(false)
     const [fingerprintInput, setFingerprintInput] = useState('')
     const [decodedAuthor, setDecodedAuthor] = useState<string | null>(null)
+
+    // iOS install prompt state
+    const [showIOSPrompt, setShowIOSPrompt] = useState(false)
 
     const isMobile = platform === 'ios' || platform === 'android'
 
@@ -187,7 +191,7 @@ export default function Settings() {
                     ]
                 },
                 { icon: Moon, label: t('settings.items.theme'), value: t('settings.items.themeValue'), onClick: () => toast.error(t('settings.messages.themeToast')) },
-                ...(canAddToHome ? [{ icon: Zap, label: t('settings.items.addToHome'), onClick: addToHomeScreen }] : [])
+                ...(canAddToHome ? [{ icon: Zap, label: t('settings.items.addToHome'), onClick: () => addToHomeScreen(() => setShowIOSPrompt(true)) }] : [])
             ]
         },
         {
@@ -451,6 +455,9 @@ export default function Settings() {
                     </div>
                 </div>
             </div>
+
+            {/* iOS Install Prompt Modal */}
+            {showIOSPrompt && <IOSInstallPrompt onClose={() => setShowIOSPrompt(false)} />}
         </div>
     )
 }
