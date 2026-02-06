@@ -13,6 +13,7 @@ import {
 import { ChatFeaturesOnboarding } from '@/components/ChatFeaturesOnboarding'
 import WebApp from '@twa-dev/sdk'
 import { getAuthHeaders } from '@/hooks/useTelegram'
+import { resolvedPlatform } from '@/utils/platform'
 
 const MODELS: { id: ChatModel; name: string; shortName: string }[] = [
     { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek v3.2', shortName: 'DeepSeek' },
@@ -533,7 +534,7 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
         }
     }
 
-    const platform = WebApp.platform
+    const platform = resolvedPlatform
     const headerOffset = isInline ? '0px' : (platform === 'ios' ? 'calc(env(safe-area-inset-top) + 65px)' : 'calc(env(safe-area-inset-top) + 90px)')
     const bottomPadding = isInline ? '' : (platform === 'ios' ? 'pb-[env(safe-area-inset-bottom)]' : 'pb-4')
 

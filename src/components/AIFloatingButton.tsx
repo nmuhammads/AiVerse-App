@@ -6,7 +6,7 @@
 import { useTranslation } from 'react-i18next'
 import { Bot } from 'lucide-react'
 import { useAIChatStore } from '@/store/aiChatStore'
-import WebApp from '@twa-dev/sdk'
+import { resolvedPlatform } from '@/utils/platform'
 
 export function AIFloatingButton() {
     const { t } = useTranslation()
@@ -14,7 +14,7 @@ export function AIFloatingButton() {
 
     if (!isMinimized) return null
 
-    const platform = WebApp.platform
+    const platform = resolvedPlatform
     // Позиционирование над TabBar и кнопкой Generate
     const bottomOffset = platform === 'android' ? 'bottom-52' : 'bottom-48'
 

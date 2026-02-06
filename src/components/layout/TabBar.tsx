@@ -1,10 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import { Home, Trophy, Settings2, User, Star, Clock, MessageCircle } from 'lucide-react'
-import WebApp from '@twa-dev/sdk'
 import './TabBar.css'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useGenerationStore } from '@/store/generationStore'
+import { resolvedPlatform } from '@/utils/platform'
 
 const StarSVG = ({ className }: { className: string }) => (
   <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -14,7 +14,7 @@ const StarSVG = ({ className }: { className: string }) => (
 
 export function TabBar() {
   const { t } = useTranslation()
-  const isAndroid = WebApp.platform === 'android'
+  const isAndroid = resolvedPlatform === 'android'
   const [eventCount, setEventCount] = useState(0)
   const { studioMode } = useGenerationStore()
 

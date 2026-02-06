@@ -317,6 +317,21 @@ export function useTelegram() {
     }
   }, [user?.id, isInTelegramApp])
 
+  // Detect real device platform (for web/PWA where WebApp.platform is 'unknown')
+  const resolvedPlatform = (() => {
+    // In Telegram, trust the SDK
+    if (isInTelegramApp) return WebApp.platform
+    // For web/PWA, detect from user agent
+    const ua = navigator.userAgent
+    if (/iPad|iPhone|iPod/.test(ua)) return 'ios'
+    if (/Android/.test(ua)) return 'android'
+    return 'desktop'
+  })()
+
+  // Detect PWA standalone mode (saved to home screen)
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+    || (window.navigator as any).standalone === true
+
   return {
     showMainButton,
     hideMainButton,
@@ -333,7 +348,8 @@ export function useTelegram() {
     onToggleButton: WebApp.MainButton.isVisible ? hideMainButton : () => showMainButton('Generate', () => { }),
     tg: WebApp,
     user,
-    platform: WebApp.platform,
-    isInTelegram: isInTelegramApp
+    platform: resolvedPlatform,
+    isInTelegram: isInTelegramApp,
+    isPWA
   }
 }
