@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express'
 import { createOrder, getOrderStatus, type TributeCurrency } from '../services/tributeService.js'
-import { findPackage, getPackageTitle, getPackageDescription } from '../config/tokenPackages.js'
+import { findPackage, getPackageTitle, getPackageDescription, calculateCustomPrice } from '../config/tokenPackages.js'
 import { supaPost, supaSelect, supaPatch } from '../services/supabaseService.js'
 import { logBalanceChange } from '../services/balanceAuditService.js'
 import { tg } from './telegramController.js'
@@ -15,7 +15,8 @@ import type { AuthenticatedRequest } from '../middleware/authMiddleware.js'
 const APP_URL = process.env.APP_URL || 'https://aiverse.app'
 
 interface CreateOrderBody {
-    packageId: string
+    packageId?: string
+    customTokens?: number
     currency: TributeCurrency
     email?: string
 }
@@ -26,7 +27,7 @@ interface CreateOrderBody {
  */
 export async function createTributeOrder(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-        const { packageId, currency, email } = req.body as CreateOrderBody
+        const { packageId, customTokens, currency, email } = req.body as CreateOrderBody
         const userId = req.user?.id
 
         if (!userId) {
@@ -34,29 +35,51 @@ export async function createTributeOrder(req: AuthenticatedRequest, res: Respons
             return
         }
 
-        if (!packageId || !currency) {
-            res.status(400).json({ success: false, error: 'Missing packageId or currency' })
-            return
-        }
-
-        if (currency !== 'eur' && currency !== 'rub') {
+        if (!currency || (currency !== 'eur' && currency !== 'rub')) {
             res.status(400).json({ success: false, error: 'Invalid currency. Must be "eur" or "rub"' })
             return
         }
 
-        // Find package
-        const pkg = findPackage(packageId, currency)
-        if (!pkg) {
-            res.status(400).json({ success: false, error: 'Package not found' })
+        if (!packageId && !customTokens) {
+            res.status(400).json({ success: false, error: 'Missing packageId or customTokens' })
             return
         }
 
-        // Create Tribute order (uuid not known yet, will update successUrl after)
+        let orderAmount: number
+        let orderTokens: number
+        let orderTitle: string
+        let orderDescription: string
+
+        if (customTokens) {
+            // Custom token amount
+            if (customTokens < 50 || customTokens > 10000 || !Number.isInteger(customTokens)) {
+                res.status(400).json({ success: false, error: 'customTokens must be an integer between 50 and 10000' })
+                return
+            }
+            const calc = calculateCustomPrice(customTokens, currency)
+            orderAmount = calc.amount
+            orderTokens = calc.tokens
+            orderTitle = `${calc.tokens} AiVerse Tokens`
+            orderDescription = `Purchase ${calc.tokens} tokens for AI image generation`
+        } else {
+            // Predefined package
+            const pkg = findPackage(packageId!, currency)
+            if (!pkg) {
+                res.status(400).json({ success: false, error: 'Package not found' })
+                return
+            }
+            orderAmount = pkg.amount
+            orderTokens = pkg.tokens
+            orderTitle = getPackageTitle(pkg)
+            orderDescription = getPackageDescription(pkg)
+        }
+
+        // Create Tribute order
         const tributeOrder = await createOrder({
-            amount: pkg.amount,
+            amount: orderAmount,
             currency: currency,
-            title: getPackageTitle(pkg),
-            description: getPackageDescription(pkg),
+            title: orderTitle,
+            description: orderDescription,
             successUrl: `${APP_URL}/payment/success`,
             failUrl: `${APP_URL}/payment/fail`,
             email: email,
@@ -67,9 +90,9 @@ export async function createTributeOrder(req: AuthenticatedRequest, res: Respons
         const orderData = {
             uuid: tributeOrder.uuid,
             user_id: userId,
-            amount: pkg.amount,
+            amount: orderAmount,
             currency: currency,
-            tokens: pkg.tokens,
+            tokens: orderTokens,
             status: 'pending',
             payment_url: tributeOrder.paymentUrl,
         }
@@ -80,7 +103,7 @@ export async function createTributeOrder(req: AuthenticatedRequest, res: Respons
             // Still return payment URL even if save failed - webhook will handle the payment
         }
 
-        console.log(`[TributeController] Order created: ${tributeOrder.uuid} for user ${userId} (${pkg.tokens} tokens, ${pkg.amount} ${currency})`)
+        console.log(`[TributeController] Order created: ${tributeOrder.uuid} for user ${userId} (${orderTokens} tokens, ${orderAmount} ${currency})`)
 
         res.json({
             success: true,

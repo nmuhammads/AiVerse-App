@@ -5,6 +5,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '@/utils/promo'
 import { isDevMode } from '@/components/DevModeBanner'
+import { VisaIcon, MastercardIcon, AmexIcon, UnionPayIcon, MirIcon } from '@/components/CardBrandIcons'
 
 interface PaymentModalProps {
     isOpen: boolean
@@ -24,12 +25,12 @@ const PACKAGES_STARS = [
     { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true, spins: 2 },
 ]
 
-// EUR packages via Tribute Shop API
+// EUR packages via Tribute Shop API (1 EUR ≈ 90 RUB)
 const PACKAGES_EUR = [
-    { id: 'eur_50', tokens: 50, price: 100, priceLabel: '€1.00' },
-    { id: 'eur_120', tokens: 120, price: 230, bonus: '+4%', priceLabel: '€2.30' },
-    { id: 'eur_300', tokens: 300, price: 540, bonus: '+11%', priceLabel: '€5.40' },
-    { id: 'eur_800', tokens: 800, price: 1440, bonus: '+11%', priceLabel: '€14.40' },
+    { id: 'eur_50', tokens: 50, price: 110, priceLabel: '€1.10' },
+    { id: 'eur_120', tokens: 120, price: 255, bonus: '+4%', priceLabel: '€2.55' },
+    { id: 'eur_300', tokens: 300, price: 600, bonus: '+11%', priceLabel: '€6.00' },
+    { id: 'eur_800', tokens: 800, price: 1600, bonus: '+11%', priceLabel: '€16.00' },
 ]
 
 // RUB packages via Tribute Shop API
@@ -40,6 +41,27 @@ const PACKAGES_RUB = [
     { id: 'rub_800', tokens: 800, price: 144000, bonus: '+11%', priceLabel: '₽1,440' },
 ]
 
+// Custom token pricing
+const BASE_RATE_RUB = 200   // kopecks per token (2 RUB)
+const BASE_RATE_EUR = 2.2   // cents per token (€0.022)
+const MIN_CUSTOM_TOKENS = 50
+const MAX_CUSTOM_TOKENS = 10000
+
+function getDiscountTier(tokens: number): { discount: number; label: string } {
+    if (tokens >= 300) return { discount: 0.10, label: '-10%' }
+    if (tokens >= 100) return { discount: 0.05, label: '-5%' }
+    return { discount: 0, label: '' }
+}
+
+function calculateCustomTokenPrice(tokens: number, currency: WebCurrency): { amount: number; priceLabel: string; discount: number } {
+    const { discount } = getDiscountTier(tokens)
+    const baseRate = currency === 'eur' ? BASE_RATE_EUR : BASE_RATE_RUB
+    const amount = Math.round(tokens * baseRate * (1 - discount))
+    const priceLabel = currency === 'eur'
+        ? `€${(amount / 100).toFixed(2)}`
+        : `₽${Math.round(amount / 100).toLocaleString('ru-RU')}`
+    return { amount, priceLabel, discount }
+}
 
 export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const { t } = useTranslation()
@@ -53,6 +75,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const [webCurrency, setWebCurrency] = useState<WebCurrency>('eur')
     const [selectedPackage, setSelectedPackage] = useState<any>(isWebMode ? PACKAGES_EUR[0] : PACKAGES_STARS[3])
     const [loading, setLoading] = useState(false)
+    const [customTokens, setCustomTokens] = useState('')
+    const [isCustomMode, setIsCustomMode] = useState(false)
 
     // Get packages based on method and currency
     const getPackages = () => {
@@ -65,6 +89,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
         const packages = getPackages()
         const match = packages.find(p => p.tokens === selectedPackage.tokens) || packages.find((p: any) => p.popular) || packages[0]
         setSelectedPackage(match)
+        setIsCustomMode(false)
+        setCustomTokens('')
     }, [activeMethod, webCurrency, isWebMode])
 
     if (!isOpen) return null
@@ -132,15 +158,21 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             }
         } else {
             // Card Payment via Tribute Shop API
+            const customCount = isCustomMode ? parseInt(customTokens) : 0
+            if (isCustomMode && (!customCount || customCount < MIN_CUSTOM_TOKENS || customCount > MAX_CUSTOM_TOKENS)) {
+                return
+            }
+
             setLoading(true)
             try {
+                const body = isCustomMode
+                    ? { customTokens: customCount, currency: webCurrency }
+                    : { packageId: selectedPackage.id, currency: webCurrency }
+
                 const response = await fetch('/api/tribute/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                    body: JSON.stringify({
-                        packageId: selectedPackage.id,
-                        currency: webCurrency,
-                    })
+                    body: JSON.stringify(body)
                 })
                 const data = await response.json()
 
@@ -230,6 +262,75 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                 <Globe size={12} /> RUB (₽)
                             </button>
                         </div>
+                        {/* Card Brand Icons */}
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                            <span className="text-[10px] text-zinc-500">{t('payment.acceptedCards', 'Accepted:')}</span>
+                            <div className="flex items-center gap-1.5 text-zinc-400">
+                                {webCurrency === 'eur' ? (
+                                    <>
+                                        <VisaIcon size={20} />
+                                        <MastercardIcon size={16} />
+                                        <AmexIcon size={16} />
+                                        <UnionPayIcon size={16} />
+                                    </>
+                                ) : (
+                                    <>
+                                        <MirIcon size={20} />
+                                        <VisaIcon size={20} />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Custom Token Input (card only) */}
+                {activeMethod === 'card' && (
+                    <div className="px-5 pb-3 shrink-0">
+                        <div className="relative">
+                            <input
+                                type="number"
+                                min={MIN_CUSTOM_TOKENS}
+                                max={MAX_CUSTOM_TOKENS}
+                                placeholder={t('payment.customInput.placeholder', 'Enter token amount...')}
+                                value={customTokens}
+                                onFocus={() => setIsCustomMode(true)}
+                                onChange={(e) => {
+                                    setCustomTokens(e.target.value)
+                                    setIsCustomMode(true)
+                                }}
+                                className="w-full h-9 px-3 pr-16 rounded-xl bg-zinc-800/50 border border-white/5 text-white text-xs font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold">tokens</span>
+                        </div>
+                        {isCustomMode && customTokens && (() => {
+                            const count = parseInt(customTokens)
+                            if (!count || count < MIN_CUSTOM_TOKENS) {
+                                return (
+                                    <div className="text-[10px] text-red-400 mt-1.5 text-center">
+                                        {t('payment.customInput.min', { min: MIN_CUSTOM_TOKENS })}
+                                    </div>
+                                )
+                            }
+                            if (count > MAX_CUSTOM_TOKENS) {
+                                return (
+                                    <div className="text-[10px] text-red-400 mt-1.5 text-center">
+                                        {t('payment.customInput.max', { max: MAX_CUSTOM_TOKENS.toLocaleString() })}
+                                    </div>
+                                )
+                            }
+                            const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
+                            return (
+                                <div className="flex items-center justify-center gap-2 mt-1.5">
+                                    <span className="text-[10px] text-zinc-300 font-bold">{priceLabel}</span>
+                                    {discount > 0 && (
+                                        <span className="text-[10px] text-emerald-400 font-bold">
+                                            {getDiscountTier(count).label}
+                                        </span>
+                                    )}
+                                </div>
+                            )
+                        })()}
                     </div>
                 )}
 
@@ -267,7 +368,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             return (
                                 <button
                                     key={pkg.id}
-                                    onClick={() => { impact('light'); setSelectedPackage(pkg) }}
+                                    onClick={() => { impact('light'); setSelectedPackage(pkg); setIsCustomMode(false); setCustomTokens('') }}
                                     className={`relative p-2 rounded-xl border transition-all flex flex-col items-start gap-1.5 ${isLast ? 'col-span-2 flex-row items-center' : ''
                                         } ${pkg.price === 1000
                                             ? (isSelected ? 'bg-gradient-to-br from-amber-500/20 to-yellow-600/20 border-amber-500 ring-1 ring-amber-500' : 'bg-gradient-to-br from-amber-500/10 to-yellow-600/10 border-amber-500/50 hover:from-amber-500/20 hover:to-yellow-600/20')
@@ -326,13 +427,15 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             }`}
                     >
                         {loading ? t('payment.button.processing') : (
-                            selectedPackage.priceLabel
-                                ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
-                                : t('payment.button.pay', {
-                                    amount: selectedPackage.price,
-                                    symbol: currencySymbol,
-                                    method: activeMethod === 'stars' ? t('payment.methods.stars') : t('payment.methods.card')
-                                })
+                            isCustomMode && customTokens && parseInt(customTokens) >= MIN_CUSTOM_TOKENS
+                                ? `${t('payment.button.paySimple')} ${calculateCustomTokenPrice(parseInt(customTokens), webCurrency).priceLabel}`
+                                : selectedPackage.priceLabel
+                                    ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
+                                    : t('payment.button.pay', {
+                                        amount: selectedPackage.price,
+                                        symbol: currencySymbol,
+                                        method: activeMethod === 'stars' ? t('payment.methods.stars') : t('payment.methods.card')
+                                    })
                         )}
                     </button>
 
