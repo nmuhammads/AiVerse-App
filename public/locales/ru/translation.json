@@ -851,5 +851,15 @@
             "signupFailed": "Ошибка регистрации",
             "invalidCredentials": "Неверные данные"
         }
+    },
+    "paymentResult": {
+        "checking": "Проверка статуса платежа...",
+        "successTitle": "Оплата прошла успешно!",
+        "successMessage": "Ваши токены будут начислены в ближайшее время.",
+        "successMessageWithTokens": "{{tokens}} токенов зачислено на ваш счёт.",
+        "goHome": "На главную",
+        "failTitle": "Оплата не прошла",
+        "failMessage": "Что-то пошло не так с оплатой. Попробуйте ещё раз.",
+        "tryAgain": "Попробовать снова"
     }
 }

@@ -813,5 +813,15 @@
             "signupFailed": "Signup failed",
             "invalidCredentials": "Invalid credentials"
         }
+    },
+    "paymentResult": {
+        "checking": "Checking payment status...",
+        "successTitle": "Payment Successful!",
+        "successMessage": "Your tokens will be credited shortly.",
+        "successMessageWithTokens": "Your {{tokens}} tokens have been credited to your account.",
+        "goHome": "Go to Home",
+        "failTitle": "Payment Failed",
+        "failMessage": "Something went wrong with your payment. Please try again.",
+        "tryAgain": "Try Again"
     }
 }

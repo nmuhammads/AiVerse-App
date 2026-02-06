@@ -550,7 +550,7 @@ export default function Profile() {
     { label: t('profile.stats.likes'), value: likes },
     { label: t('profile.stats.remixes'), value: remixCount },
   ]
-  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
+  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 60px)' : 'calc(env(safe-area-inset-top) + 50px)'
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)

@@ -303,7 +303,7 @@ export default function MultiGeneration() {
     }
 
     const totalCost = calculateTotalCost()
-    const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 5px)' : 'calc(env(safe-area-inset-top) + 50px)'
+    const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 60px)' : 'calc(env(safe-area-inset-top) + 50px)'
     const maxImages = 8
 
     return (
