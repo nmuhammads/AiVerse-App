@@ -12,7 +12,18 @@ import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/pr
 
 const TRIBUTE_API_KEY = process.env.TRIBUTE_API_KEY || ''
 
-interface TributeWebhookPayload {
+/**
+ * Tribute webhook envelope format:
+ * { name: "event_name", created_at: "...", sent_at: "...", payload: { ... } }
+ */
+interface TributeWebhookEnvelope {
+    name: string
+    created_at: string
+    sent_at: string
+    payload: TributeWebhookOrderPayload
+}
+
+interface TributeWebhookOrderPayload {
     uuid: string
     status: 'pending' | 'paid' | 'failed'
     amount: number
@@ -55,8 +66,8 @@ function verifySignature(body: string, signature: string): boolean {
  */
 export async function handleTributeWebhook(req: Request, res: Response): Promise<void> {
     try {
-        // Get raw body for signature verification
-        const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
+        // With express.raw() middleware, req.body is a Buffer
+        const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf-8') : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body))
         const signature = req.headers['trbt-signature'] as string
 
         // Verify signature
@@ -66,21 +77,33 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
             return
         }
 
-        // Parse payload
-        const payload: TributeWebhookPayload = typeof req.body === 'string'
-            ? JSON.parse(req.body)
-            : req.body
+        // Parse the webhook body
+        const body = JSON.parse(rawBody)
 
-        console.log(`[TributeWebhook] Received webhook: uuid=${payload.uuid}, status=${payload.status}`)
+        console.log(`[TributeWebhook] Received webhook body:`, JSON.stringify(body))
+
+        // Tribute uses envelope format: { name, created_at, sent_at, payload: { ... } }
+        // Extract order data from the nested payload, or fall back to top-level fields
+        const orderData: TributeWebhookOrderPayload = body.payload
+            ? body.payload
+            : body
+
+        console.log(`[TributeWebhook] Parsed order data: uuid=${orderData.uuid}, status=${orderData.status}, event=${body.name || 'unknown'}`)
+
+        if (!orderData.uuid) {
+            console.warn(`[TributeWebhook] No uuid found in webhook payload`)
+            res.status(200).json({ ok: true, message: 'No uuid in payload' })
+            return
+        }
 
         // Find order in database
         const orderResult = await supaSelect(
             'tribute_orders',
-            `?uuid=eq.${payload.uuid}&select=*`
+            `?uuid=eq.${orderData.uuid}&select=*`
         )
 
         if (!orderResult.ok || !Array.isArray(orderResult.data) || orderResult.data.length === 0) {
-            console.warn(`[TributeWebhook] Order not found: ${payload.uuid}`)
+            console.warn(`[TributeWebhook] Order not found: ${orderData.uuid}`)
             // Return 200 to prevent retries for unknown orders
             res.status(200).json({ ok: true, message: 'Order not found' })
             return
@@ -90,16 +113,16 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
 
         // Skip if already processed (idempotency)
         if (order.status === 'paid') {
-            console.log(`[TributeWebhook] Order already paid: ${payload.uuid}`)
+            console.log(`[TributeWebhook] Order already paid: ${orderData.uuid}`)
             res.status(200).json({ ok: true, message: 'Already processed' })
             return
         }
 
         // Process based on status
-        if (payload.status === 'paid') {
-            await processSuccessfulPayment(order, payload)
-        } else if (payload.status === 'failed') {
-            await processFailedPayment(order, payload)
+        if (orderData.status === 'paid') {
+            await processSuccessfulPayment(order, orderData)
+        } else if (orderData.status === 'failed') {
+            await processFailedPayment(order, orderData)
         }
 
         res.status(200).json({ ok: true })
@@ -113,7 +136,7 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
 /**
  * Process successful payment
  */
-async function processSuccessfulPayment(order: any, payload: TributeWebhookPayload): Promise<void> {
+async function processSuccessfulPayment(order: any, payload: TributeWebhookOrderPayload): Promise<void> {
     const userId = order.user_id
     const baseTokens = order.tokens
 
@@ -190,7 +213,7 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookPaylo
 /**
  * Process failed payment
  */
-async function processFailedPayment(order: any, payload: TributeWebhookPayload): Promise<void> {
+async function processFailedPayment(order: any, payload: TributeWebhookOrderPayload): Promise<void> {
     console.log(`[TributeWebhook] Payment failed for order ${order.uuid}`)
     await updateOrderStatus(order.uuid, 'failed')
 }

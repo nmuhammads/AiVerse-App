@@ -24,9 +24,10 @@ export function PaymentResult() {
         }
 
         if (isSuccess) {
-            // Check if we have order UUID to verify
-            const orderUuid = searchParams.get('order')
+            // Check if we have order UUID to verify (from URL params or localStorage)
+            const orderUuid = searchParams.get('order') || localStorage.getItem('tribute_order_uuid')
             if (orderUuid) {
+                localStorage.removeItem('tribute_order_uuid')
                 checkOrderStatus(orderUuid)
             } else {
                 // Assume success if no UUID provided

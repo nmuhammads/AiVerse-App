@@ -5,13 +5,14 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '@/utils/promo'
 import { isDevMode } from '@/components/DevModeBanner'
+import { VisaIcon, MastercardIcon, AmexIcon, UnionPayIcon, MirIcon } from '@/components/CardBrandIcons'
 
 interface PaymentModalProps {
     isOpen: boolean
     onClose: () => void
 }
 
-type PaymentMethod = 'stars' | 'card' | 'sbp'
+type PaymentMethod = 'stars' | 'card'
 type WebCurrency = 'eur' | 'rub'
 
 const PACKAGES_STARS = [
@@ -24,15 +25,15 @@ const PACKAGES_STARS = [
     { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true, spins: 2 },
 ]
 
-// EUR packages for web payments via Tribute Shop API
+// EUR packages via Tribute Shop API (1 EUR ≈ 90 RUB)
 const PACKAGES_EUR = [
-    { id: 'eur_50', tokens: 50, price: 100, priceLabel: '€1.00' },
-    { id: 'eur_120', tokens: 120, price: 230, bonus: '+4%', priceLabel: '€2.30' },
-    { id: 'eur_300', tokens: 300, price: 540, bonus: '+11%', priceLabel: '€5.40' },
-    { id: 'eur_800', tokens: 800, price: 1440, bonus: '+11%', priceLabel: '€14.40' },
+    { id: 'eur_50', tokens: 50, price: 110, priceLabel: '€1.10' },
+    { id: 'eur_120', tokens: 120, price: 255, bonus: '+4%', priceLabel: '€2.55' },
+    { id: 'eur_300', tokens: 300, price: 600, bonus: '+11%', priceLabel: '€6.00' },
+    { id: 'eur_800', tokens: 800, price: 1600, bonus: '+11%', priceLabel: '€16.00' },
 ]
 
-// RUB packages for web payments via Tribute Shop API
+// RUB packages via Tribute Shop API
 const PACKAGES_RUB = [
     { id: 'rub_50', tokens: 50, price: 10000, priceLabel: '₽100' },
     { id: 'rub_120', tokens: 120, price: 23000, bonus: '+4%', priceLabel: '₽230' },
@@ -40,40 +41,27 @@ const PACKAGES_RUB = [
     { id: 'rub_800', tokens: 800, price: 144000, bonus: '+11%', priceLabel: '₽1,440' },
 ]
 
-// Legacy fiat packages (for Telegram deep links)
-const PACKAGES_FIAT = [
-    {
-        id: 'fiat_50',
-        tokens: 50,
-        price: 100,
-        webLink: 'https://web.tribute.tg/p/m04',
-        link: 'https://t.me/tribute/app?startapp=pm04'
-    },
-    {
-        id: 'fiat_120',
-        tokens: 120,
-        price: 230,
-        bonus: '+4%',
-        webLink: 'https://web.tribute.tg/p/m05',
-        link: 'https://t.me/tribute/app?startapp=pm05'
-    },
-    {
-        id: 'fiat_300',
-        tokens: 300,
-        price: 540,
-        bonus: '+11%',
-        webLink: 'https://web.tribute.tg/p/m06',
-        link: 'https://t.me/tribute/app?startapp=pm06'
-    },
-    {
-        id: 'fiat_800',
-        tokens: 800,
-        price: 1440,
-        bonus: '+11%',
-        webLink: 'https://web.tribute.tg/p/m07',
-        link: 'https://t.me/tribute/app?startapp=pm07'
-    },
-]
+// Custom token pricing
+const BASE_RATE_RUB = 200   // kopecks per token (2 RUB)
+const BASE_RATE_EUR = 2.2   // cents per token (€0.022)
+const MIN_CUSTOM_TOKENS = 50
+const MAX_CUSTOM_TOKENS = 10000
+
+function getDiscountTier(tokens: number): { discount: number; label: string } {
+    if (tokens >= 300) return { discount: 0.10, label: '-10%' }
+    if (tokens >= 100) return { discount: 0.05, label: '-5%' }
+    return { discount: 0, label: '' }
+}
+
+function calculateCustomTokenPrice(tokens: number, currency: WebCurrency): { amount: number; priceLabel: string; discount: number } {
+    const { discount } = getDiscountTier(tokens)
+    const baseRate = currency === 'eur' ? BASE_RATE_EUR : BASE_RATE_RUB
+    const amount = Math.round(tokens * baseRate * (1 - discount))
+    const priceLabel = currency === 'eur'
+        ? `€${(amount / 100).toFixed(2)}`
+        : `₽${Math.round(amount / 100).toLocaleString('ru-RU')}`
+    return { amount, priceLabel, discount }
+}
 
 export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const { t } = useTranslation()
@@ -87,14 +75,13 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const [webCurrency, setWebCurrency] = useState<WebCurrency>('eur')
     const [selectedPackage, setSelectedPackage] = useState<any>(isWebMode ? PACKAGES_EUR[0] : PACKAGES_STARS[3])
     const [loading, setLoading] = useState(false)
+    const [customTokens, setCustomTokens] = useState('')
+    const [isCustomMode, setIsCustomMode] = useState(false)
 
-    // Get packages based on mode and currency
+    // Get packages based on method and currency
     const getPackages = () => {
         if (activeMethod === 'stars') return PACKAGES_STARS
-        if (isWebMode) {
-            return webCurrency === 'eur' ? PACKAGES_EUR : PACKAGES_RUB
-        }
-        return PACKAGES_FIAT
+        return webCurrency === 'eur' ? PACKAGES_EUR : PACKAGES_RUB
     }
 
     // Update selected package when method or currency changes
@@ -102,12 +89,14 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
         const packages = getPackages()
         const match = packages.find(p => p.tokens === selectedPackage.tokens) || packages.find((p: any) => p.popular) || packages[0]
         setSelectedPackage(match)
+        setIsCustomMode(false)
+        setCustomTokens('')
     }, [activeMethod, webCurrency, isWebMode])
 
     if (!isOpen) return null
 
     const packages = getPackages()
-    const currencySymbol = activeMethod === 'stars' ? '⭐' : (isWebMode ? (webCurrency === 'eur' ? '€' : '₽') : '₽')
+    const currencySymbol = activeMethod === 'stars' ? '⭐' : (webCurrency === 'eur' ? '€' : '₽')
 
     const handlePayment = async () => {
         impact('medium')
@@ -168,51 +157,52 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 setLoading(false)
             }
         } else {
-            // Fiat Payment (Card or SBP)
-            if (isWebMode) {
-                // Web mode: Use Tribute Shop API
-                setLoading(true)
-                try {
-                    const response = await fetch('/api/tribute/create-order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                        body: JSON.stringify({
-                            packageId: selectedPackage.id,
-                            currency: webCurrency,
-                        })
-                    })
-                    const data = await response.json()
+            // Card Payment via Tribute Shop API
+            const customCount = isCustomMode ? parseInt(customTokens) : 0
+            if (isCustomMode && (!customCount || customCount < MIN_CUSTOM_TOKENS || customCount > MAX_CUSTOM_TOKENS)) {
+                return
+            }
 
-                    if (data.success && data.paymentUrl) {
-                        // Redirect to Tribute payment page
-                        window.location.href = data.paymentUrl
-                    } else {
-                        alert(t('payment.messages.errorInvoice', { error: data.error || 'Unknown error' }))
+            setLoading(true)
+            try {
+                const body = isCustomMode
+                    ? { customTokens: customCount, currency: webCurrency }
+                    : { packageId: selectedPackage.id, currency: webCurrency }
+
+                const response = await fetch('/api/tribute/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                    body: JSON.stringify(body)
+                })
+                const data = await response.json()
+
+                if (data.success && data.paymentUrl) {
+                    // Save order UUID for status verification after redirect
+                    if (data.orderUuid) {
+                        localStorage.setItem('tribute_order_uuid', data.orderUuid)
                     }
-                } catch (e) {
-                    console.error(e)
-                    alert(t('payment.messages.errorNetwork'))
-                } finally {
-                    setLoading(false)
-                }
-            } else {
-                // Telegram mode: Use Bot Hub Deep Link
-                const wa = (window as any).Telegram?.WebApp
-                const method = activeMethod === 'card' ? 'card' : 'sbp'
-                const link = `https://t.me/aiverse_hub_bot?start=pay-${method}-${selectedPackage.tokens}`
-
-                if (wa) {
-                    wa.openTelegramLink(link)
-                    onClose()
+                    // Open Tribute payment page
+                    const wa = (window as any).Telegram?.WebApp
+                    if (wa && isInTelegram) {
+                        wa.openLink(data.paymentUrl)
+                        onClose()
+                    } else {
+                        window.location.href = data.paymentUrl
+                    }
                 } else {
-                    window.open(link, '_blank')
+                    alert(t('payment.messages.errorInvoice', { error: data.error || 'Unknown error' }))
                 }
+            } catch (e) {
+                console.error(e)
+                alert(t('payment.messages.errorNetwork'))
+            } finally {
+                setLoading(false)
             }
         }
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{ height: '100dvh' }}>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -220,7 +210,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             />
 
             {/* Modal */}
-            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col" style={{ maxHeight: 'min(90vh, 800px)' }}>
                 {/* Header */}
                 <div className="p-5 pb-3 flex justify-between items-start shrink-0">
                     <div>
@@ -252,19 +242,11 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                         >
                             <CreditCard size={12} /> {t('payment.methods.card')}
                         </button>
-                        {!isWebMode && (
-                            <button
-                                onClick={() => { impact('light'); setActiveMethod('sbp') }}
-                                className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all ${activeMethod === 'sbp' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-300'}`}
-                            >
-                                <div className="w-2.5 h-2.5 bg-gradient-to-tr from-blue-500 via-green-500 to-yellow-500 rounded-sm" /> {t('payment.methods.sbp')}
-                            </button>
-                        )}
                     </div>
                 </div>
 
-                {/* Currency Selector for Web Mode */}
-                {isWebMode && activeMethod === 'card' && (
+                {/* Currency Selector */}
+                {activeMethod === 'card' && (
                     <div className="px-5 pb-3 shrink-0">
                         <div className="flex p-1 bg-zinc-800/50 rounded-xl border border-white/5">
                             <button
@@ -279,6 +261,25 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             >
                                 <Globe size={12} /> RUB (₽)
                             </button>
+                        </div>
+                        {/* Card Brand Icons */}
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                            <span className="text-[10px] text-zinc-500">{t('payment.acceptedCards', 'Accepted:')}</span>
+                            <div className="flex items-center gap-1.5 text-zinc-400">
+                                {webCurrency === 'eur' ? (
+                                    <>
+                                        <VisaIcon size={20} />
+                                        <MastercardIcon size={16} />
+                                        <AmexIcon size={16} />
+                                        <UnionPayIcon size={16} />
+                                    </>
+                                ) : (
+                                    <>
+                                        <MirIcon size={20} />
+                                        <VisaIcon size={20} />
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -317,7 +318,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             return (
                                 <button
                                     key={pkg.id}
-                                    onClick={() => { impact('light'); setSelectedPackage(pkg) }}
+                                    onClick={() => { impact('light'); setSelectedPackage(pkg); setIsCustomMode(false); setCustomTokens('') }}
                                     className={`relative p-2 rounded-xl border transition-all flex flex-col items-start gap-1.5 ${isLast ? 'col-span-2 flex-row items-center' : ''
                                         } ${pkg.price === 1000
                                             ? (isSelected ? 'bg-gradient-to-br from-amber-500/20 to-yellow-600/20 border-amber-500 ring-1 ring-amber-500' : 'bg-gradient-to-br from-amber-500/10 to-yellow-600/10 border-amber-500/50 hover:from-amber-500/20 hover:to-yellow-600/20')
@@ -363,15 +364,64 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             )
                         })}
                     </div>
+
+                    {/* Custom Token Input (card only) */}
+                    {activeMethod === 'card' && (
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                            <div className="text-[11px] text-zinc-400 mb-2 text-center font-medium">
+                                {t('payment.customInput.label', 'Или введите своё количество')}
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min={MIN_CUSTOM_TOKENS}
+                                    max={MAX_CUSTOM_TOKENS}
+                                    placeholder={t('payment.customInput.placeholder', 'Введите количество токенов...')}
+                                    value={customTokens}
+                                    inputMode="numeric"
+                                    onFocus={() => setIsCustomMode(true)}
+                                    onChange={(e) => {
+                                        setCustomTokens(e.target.value)
+                                        setIsCustomMode(true)
+                                    }}
+                                    className="w-full h-12 px-4 pr-20 rounded-xl bg-zinc-800/70 border border-white/10 text-white text-sm font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">tokens</span>
+                            </div>
+                            {isCustomMode && customTokens && (() => {
+                                const count = parseInt(customTokens)
+                                if (!count || count < MIN_CUSTOM_TOKENS) {
+                                    return (
+                                        <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                            {t('payment.customInput.min', { min: MIN_CUSTOM_TOKENS })}
+                                        </div>
+                                    )
+                                }
+                                if (count > MAX_CUSTOM_TOKENS) {
+                                    return (
+                                        <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                            {t('payment.customInput.max', { max: MAX_CUSTOM_TOKENS.toLocaleString() })}
+                                        </div>
+                                    )
+                                }
+                                const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
+                                return (
+                                    <div className="flex items-center justify-center gap-2 mt-2">
+                                        <span className="text-sm text-white font-bold">{priceLabel}</span>
+                                        {discount > 0 && (
+                                            <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                                {getDiscountTier(count).label}
+                                            </span>
+                                        )}
+                                    </div>
+                                )
+                            })()}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer Action */}
                 <div className="p-5 pt-0 mt-auto shrink-0 space-y-3">
-                    {activeMethod === 'sbp' && (
-                        <div className="text-[10px] text-zinc-500 text-center">
-                            {t('payment.messages.sbpCommission')}
-                        </div>
-                    )}
                     <button
                         onClick={handlePayment}
                         disabled={loading}
@@ -381,13 +431,15 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             }`}
                     >
                         {loading ? t('payment.button.processing') : (
-                            selectedPackage.priceLabel
-                                ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
-                                : t('payment.button.pay', {
-                                    amount: selectedPackage.price,
-                                    symbol: currencySymbol,
-                                    method: activeMethod === 'stars' ? t('payment.methods.stars') : activeMethod === 'card' ? t('payment.methods.card') : t('payment.methods.sbp')
-                                })
+                            isCustomMode && customTokens && parseInt(customTokens) >= MIN_CUSTOM_TOKENS
+                                ? `${t('payment.button.paySimple')} ${calculateCustomTokenPrice(parseInt(customTokens), webCurrency).priceLabel}`
+                                : selectedPackage.priceLabel
+                                    ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
+                                    : t('payment.button.pay', {
+                                        amount: selectedPackage.price,
+                                        symbol: currencySymbol,
+                                        method: activeMethod === 'stars' ? t('payment.methods.stars') : t('payment.methods.card')
+                                    })
                         )}
                     </button>
 
