@@ -352,7 +352,10 @@
             "confirm": "Publish",
             "publishOpen": "Publish with Open Prompt",
             "publishPrivate": "Publish with Private Prompt"
-        }
+        },
+        "copyRemix": "Remix",
+        "copyRemixFull": "Copy Remix Link",
+        "remixLinkCopied": "Remix link copied!"
     },
     "spin": {
         "title": "Fortune",
