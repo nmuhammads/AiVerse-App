@@ -235,7 +235,7 @@ function AppLayout() {
     : /Android/.test(navigator.userAgent) ? 'android' : 'ios-or-desktop'
 
   return (
-    <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : 'pt-[env(safe-area-inset-top)]'} min-h-screen flex flex-col`}>
+    <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : ''} min-h-screen flex flex-col`}>
       <Header />
       <StartParamRouter />
       <div className="flex-1">
