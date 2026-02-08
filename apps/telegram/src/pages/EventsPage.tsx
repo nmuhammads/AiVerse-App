@@ -52,9 +52,9 @@ export default function EventsPage() {
 
     // Custom padding for different platforms
     const getPaddingTop = () => {
-        if (platform === 'ios') return 'calc(env(safe-area-inset-top) + 10px)';
-        if (platform === 'android') return 'calc(env(safe-area-inset-top) + 20px)';
-        return '20px';
+        if (platform === 'ios') return 'calc(env(safe-area-inset-top) + 60px)';
+        if (platform === 'android') return 'calc(env(safe-area-inset-top) + 50px)';
+        return '60px';
     };
 
     // Fetch contests when tab or filter changes
