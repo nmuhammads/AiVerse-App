@@ -58,6 +58,8 @@
             "storage": "Data Storage",
             "storageValue": "60 days",
             "version": "Version",
+            "privacy": "Privacy Policy",
+            "terms": "Terms of Service",
             "logout": "Logout"
         },
         "messages": {

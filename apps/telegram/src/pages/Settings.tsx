@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets, LogOut } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets, LogOut, FileText } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useAuthStore } from '@/store/authStore'
@@ -220,13 +220,17 @@ export default function Settings() {
     const aboutSection = {
         title: t('settings.sections.about'),
         items: [
-            { icon: MessageCircle, label: t('settings.items.support'), onClick: () => {
-                if (isInTelegram && platform !== 'ios') {
-                    try { tg.openTelegramLink('https://t.me/aiversebots?direct'); return } catch { /* fallback */ }
+            {
+                icon: MessageCircle, label: t('settings.items.support'), onClick: () => {
+                    if (isInTelegram && platform !== 'ios') {
+                        try { tg.openTelegramLink('https://t.me/aiversebots?direct'); return } catch { /* fallback */ }
+                    }
+                    window.open('https://t.me/aiversebots?direct', '_blank')
                 }
-                window.open('https://t.me/aiversebots?direct', '_blank')
-            } },
+            },
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
+            { icon: FileText, label: t('settings.items.privacy'), onClick: () => navigate('/privacy') },
+            { icon: FileText, label: t('settings.items.terms'), onClick: () => navigate('/terms') },
             { icon: Info, label: t('settings.items.version'), value: 'v3.3.2', onClick: () => { } },
             ...(isWebAuth ? [{ icon: LogOut, label: t('settings.items.logout'), onClick: handleLogout, className: 'text-red-400' }] : [])
         ]
