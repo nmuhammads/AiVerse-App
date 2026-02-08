@@ -40,3 +40,4 @@ user_692574150_logs.json
 docs/Private/*
 bd/authscheme.sql
 bd/publicscheme.sql
+.agent/*

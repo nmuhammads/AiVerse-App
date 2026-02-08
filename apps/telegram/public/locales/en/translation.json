@@ -2,6 +2,48 @@
     "header": {
         "privacy": "Privacy Policy"
     },
+    "landing": {
+        "signIn": "Sign In",
+        "badge": "AI-Powered Creative Platform",
+        "headline": {
+            "part1": "Create Amazing",
+            "part2": "AI Art & Videos"
+        },
+        "subheadline": "Generate stunning images and videos with cutting-edge AI models. Join thousands of creators bringing their imagination to life.",
+        "cta": {
+            "getStarted": "Get Started Free",
+            "tryDemo": "Try Demo"
+        },
+        "features": {
+            "title": "Everything You Need",
+            "subtitle": "Powerful AI tools to unleash your creativity",
+            "images": {
+                "title": "AI Images",
+                "desc": "Create stunning images from text with multiple AI models including GPT, Seedream, and more"
+            },
+            "videos": {
+                "title": "AI Videos",
+                "desc": "Generate videos from text or images with Kling AI, Seedance, and other advanced models"
+            },
+            "chat": {
+                "title": "AI Chat",
+                "desc": "Chat with AI assistant to refine your prompts and get creative suggestions"
+            },
+            "community": {
+                "title": "Community",
+                "desc": "Share your work, participate in contests, and get inspired by other creators"
+            }
+        },
+        "bottomCta": {
+            "title": "Ready to Create?",
+            "subtitle": "Start generating amazing AI art in seconds"
+        },
+        "footer": {
+            "privacy": "Privacy Policy",
+            "terms": "Terms of Service",
+            "contact": "Contact"
+        }
+    },
     "login": {
         "subtitle": {
             "welcome": "Welcome",

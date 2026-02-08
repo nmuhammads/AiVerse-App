@@ -16,6 +16,7 @@ import ImageEditorPage from "@/pages/ImageEditorPage";
 import MultiGeneration from "@/pages/MultiGeneration";
 import WatermarkEditor from "@/pages/WatermarkEditor";
 import Login from "@/pages/Login";
+import Landing from "@/pages/Landing";
 import AuthCallback from "@/pages/AuthCallback";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
@@ -48,9 +49,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // Not authenticated - redirect to login
+  // Not authenticated - redirect to landing
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/landing" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
@@ -189,7 +190,7 @@ function StartParamRouter() {
 // Main App Layout with Header and TabBar
 function AppLayout() {
   const location = useLocation();
-  const isLoginPage = location.pathname === '/login' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms';
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/landing' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms';
   const inTelegram = isInTelegramWebApp();
 
   // Initialize auth state
@@ -221,6 +222,7 @@ function AppLayout() {
     return (
       <div className="min-h-screen">
         <Routes>
+          <Route path="/landing" element={<GuestOnly><Landing /></GuestOnly>} />
           <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth/confirm" element={<AuthCallback />} />
