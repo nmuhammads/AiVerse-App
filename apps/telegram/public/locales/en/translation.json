@@ -352,7 +352,10 @@
             "confirm": "Publish",
             "publishOpen": "Publish with Open Prompt",
             "publishPrivate": "Publish with Private Prompt"
-        }
+        },
+        "copyRemix": "Remix",
+        "copyRemixFull": "Copy Remix Link",
+        "remixLinkCopied": "Remix link copied!"
     },
     "spin": {
         "title": "Fortune",
@@ -419,8 +422,16 @@
             "spins_other": "+{{count}} 🎰 spins",
             "popular": "POPULAR"
         },
+        "customInput": {
+            "label": "Or enter your own amount",
+            "placeholder": "Enter token amount...",
+            "min": "Minimum {{min}} tokens",
+            "max": "Maximum {{max}} tokens",
+            "tokens": "tokens"
+        },
         "button": {
             "pay": "Pay {{amount}} {{symbol}} via {{method}}",
+            "paySimple": "Pay",
             "processing": "Processing...",
             "bonus": "Buy with +15% bonus tokens"
         },

@@ -1,5 +1,5 @@
 import { X, CreditCard, Star, Zap, Gift, Globe } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
@@ -77,6 +77,18 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const [loading, setLoading] = useState(false)
     const [customTokens, setCustomTokens] = useState('')
     const [isCustomMode, setIsCustomMode] = useState(false)
+    const inputRef = useRef<HTMLInputElement>(null)
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [modalMaxHeight, setModalMaxHeight] = useState<string>('min(90vh, 800px)')
+
+    // Capture modal height on open so keyboard resize doesn't shrink it (iOS Telegram)
+    useEffect(() => {
+        if (isOpen && isInTelegram) {
+            setModalMaxHeight(`min(${window.innerHeight * 0.9}px, 800px)`)
+        } else {
+            setModalMaxHeight('min(90vh, 800px)')
+        }
+    }, [isOpen, isInTelegram])
 
     // Get packages based on method and currency
     const getPackages = () => {
@@ -202,7 +214,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" style={{ height: '100dvh' }}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -210,7 +222,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             />
 
             {/* Modal */}
-            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col" style={{ maxHeight: 'min(90vh, 800px)' }}>
+            <div className="relative w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col" style={{ maxHeight: modalMaxHeight }}>
                 {/* Header */}
                 <div className="p-5 pb-3 flex justify-between items-start shrink-0">
                     <div>
@@ -310,7 +322,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 )}
 
                 {/* Packages Grid */}
-                <div className="px-5 pb-5 overflow-y-auto">
+                <div ref={scrollRef} className="px-5 pb-5 overflow-y-auto">
                     <div className="grid grid-cols-2 gap-2">
                         {packages.map((pkg: any, index: number) => {
                             const isLast = index === packages.length - 1 && packages.length % 2 !== 0
@@ -373,20 +385,23 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                             </div>
                             <div className="relative">
                                 <input
+                                    ref={inputRef}
                                     type="number"
                                     min={MIN_CUSTOM_TOKENS}
                                     max={MAX_CUSTOM_TOKENS}
                                     placeholder={t('payment.customInput.placeholder', 'Введите количество токенов...')}
                                     value={customTokens}
                                     inputMode="numeric"
-                                    onFocus={() => setIsCustomMode(true)}
+                                    onFocus={() => {
+                                        setIsCustomMode(true)
+                                    }}
                                     onChange={(e) => {
                                         setCustomTokens(e.target.value)
                                         setIsCustomMode(true)
                                     }}
                                     className="w-full h-12 px-4 pr-20 rounded-xl bg-zinc-800/70 border border-white/10 text-white text-sm font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
                                 />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">tokens</span>
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">{t('payment.customInput.tokens', 'tokens')}</span>
                             </div>
                             {isCustomMode && customTokens && (() => {
                                 const count = parseInt(customTokens)
