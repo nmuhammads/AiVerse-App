@@ -1,4 +1,39 @@
 {
+    "login": {
+        "subtitle": {
+            "welcome": "Welcome",
+            "signup": "Create an account"
+        },
+        "field": {
+            "name": "Name",
+            "email": "Email",
+            "password": "Password"
+        },
+        "placeholder": {
+            "name": "Enter your name",
+            "email": "example@mail.com"
+        },
+        "button": {
+            "signin": "Sign In",
+            "signup": "Sign Up"
+        },
+        "divider": "or",
+        "telegramLoading": "Loading Telegram...",
+        "toggle": {
+            "noAccount": "Don't have an account? Sign up",
+            "hasAccount": "Already have an account? Sign in"
+        },
+        "terms": "By continuing, you agree to our terms of service",
+        "error": {
+            "telegramFailed": "Failed to login with Telegram",
+            "connection": "Connection error",
+            "signupFailed": "Failed to sign up",
+            "invalidCredentials": "Invalid email or password"
+        },
+        "success": {
+            "checkEmail": "Check your email for confirmation"
+        }
+    },
     "settings": {
         "title": "Settings",
         "sections": {
@@ -20,7 +55,8 @@
             "support": "Support",
             "storage": "Data Storage",
             "storageValue": "60 days",
-            "version": "Version"
+            "version": "Version",
+            "logout": "Logout"
         },
         "messages": {
             "themeToast": "Oops, only dark mode is available for now",

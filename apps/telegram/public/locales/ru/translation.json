@@ -1,4 +1,39 @@
 {
+    "login": {
+        "subtitle": {
+            "welcome": "Добро пожаловать",
+            "signup": "Создайте аккаунт"
+        },
+        "field": {
+            "name": "Имя",
+            "email": "Email",
+            "password": "Пароль"
+        },
+        "placeholder": {
+            "name": "Введите ваше имя",
+            "email": "example@mail.com"
+        },
+        "button": {
+            "signin": "Войти",
+            "signup": "Зарегистрироваться"
+        },
+        "divider": "или",
+        "telegramLoading": "Загрузка Telegram...",
+        "toggle": {
+            "noAccount": "Нет аккаунта? Зарегистрироваться",
+            "hasAccount": "Уже есть аккаунт? Войти"
+        },
+        "terms": "Продолжая, вы соглашаетесь с условиями использования",
+        "error": {
+            "telegramFailed": "Не удалось войти через Telegram",
+            "connection": "Ошибка подключения",
+            "signupFailed": "Не удалось зарегистрироваться",
+            "invalidCredentials": "Неверный email или пароль"
+        },
+        "success": {
+            "checkEmail": "Проверьте почту для подтверждения"
+        }
+    },
     "settings": {
         "title": "Настройки",
         "sections": {
@@ -20,7 +55,8 @@
             "support": "Поддержка",
             "storage": "Хранение данных",
             "storageValue": "60 дней",
-            "version": "Версия"
+            "version": "Версия",
+            "logout": "Выйти"
         },
         "messages": {
             "themeToast": "Упс пока доступна только темная тема",
