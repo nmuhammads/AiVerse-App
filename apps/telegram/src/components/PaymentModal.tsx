@@ -64,16 +64,25 @@ function calculateCustomTokenPrice(tokens: number, currency: WebCurrency): { amo
 }
 
 export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { impact } = useHaptics()
     const { user, isInTelegram } = useTelegram()
 
     // Check if we're in web mode (not in Telegram)
     const isWebMode = !isInTelegram
 
+    // Determine default currency based on user's language
+    const getDefaultCurrency = (): WebCurrency => {
+        return i18n.language === 'ru' ? 'rub' : 'eur'
+    }
+
     const [activeMethod, setActiveMethod] = useState<PaymentMethod>(isWebMode ? 'card' : 'stars')
-    const [webCurrency, setWebCurrency] = useState<WebCurrency>('eur')
-    const [selectedPackage, setSelectedPackage] = useState<any>(isWebMode ? PACKAGES_EUR[0] : PACKAGES_STARS[3])
+    const [webCurrency, setWebCurrency] = useState<WebCurrency>(getDefaultCurrency())
+    const [selectedPackage, setSelectedPackage] = useState<any>(
+        isWebMode
+            ? (getDefaultCurrency() === 'eur' ? PACKAGES_EUR[0] : PACKAGES_RUB[0])
+            : PACKAGES_STARS[3]
+    )
     const [loading, setLoading] = useState(false)
     const [customTokens, setCustomTokens] = useState('')
     const [isCustomMode, setIsCustomMode] = useState(false)
