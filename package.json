@@ -25,6 +25,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "expo-blur": "~15.0.8",
     "lucide-react-native": "^0.563.0",
     "react-native-svg": "15.12.1"
