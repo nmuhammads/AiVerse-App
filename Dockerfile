@@ -39,7 +39,11 @@ COPY . .
 
 # Build arguments для Vite переменных
 ARG VITE_DEV_MODE
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
 ENV VITE_DEV_MODE=$VITE_DEV_MODE
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Собираем frontend (apps/telegram -> dist в корне)
 RUN pnpm --filter telegram build

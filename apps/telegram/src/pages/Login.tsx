@@ -305,7 +305,7 @@ export default function Login() {
                     </button>
 
                     {/* Telegram Login */}
-                    <div id="telegram-login-container" className="w-full min-h-[52px] mt-3">
+                    <div id="telegram-login-container" className="w-full min-h-[52px] mt-3 [&_iframe]:!w-full [&_iframe]:!rounded-xl">
                         <button
                             disabled
                             className="w-full py-3.5 px-4 rounded-xl bg-[#0088cc] text-white font-medium flex items-center justify-center gap-3 opacity-70"

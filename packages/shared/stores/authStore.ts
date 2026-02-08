@@ -181,7 +181,7 @@ export async function loginWithGoogle() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const env = (import.meta as any).env || {}
     const supabaseUrl = env.VITE_SUPABASE_URL || 'https://coilacklqaljatlvhujl.supabase.co'
-    const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || ''
+    const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY
 
     if (!supabaseAnonKey) {
         console.error('[Auth] VITE_SUPABASE_ANON_KEY not configured')
