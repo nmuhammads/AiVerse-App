@@ -197,7 +197,7 @@ async function reconcilePayment(order: any): Promise<void> {
     const bonusTokens = promoActive ? getBonusAmount(baseTokens) : 0
 
     // Get current user balance
-    const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id`)
+    const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id,username,first_name,last_name`)
     if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
         console.error(`[TributeController] Reconcile: User not found: ${userId}`)
         await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}`, { status: 'paid', paid_at: new Date().toISOString() })
@@ -243,9 +243,31 @@ async function reconcilePayment(order: any): Promise<void> {
         await tg('sendMessage', {
             chat_id: telegramId,
             text: `✅ Оплата через карту прошла успешно!\n\n` +
-                  `💰 Начислено: ${tokensToAdd} токенов${promoText}\n` +
-                  `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
-                  `Спасибо за покупку! 🙏`
+                `💰 Начислено: ${tokensToAdd} токенов${promoText}\n` +
+                `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
+                `Спасибо за покупку! 🙏`
+        })
+    }
+
+    // Send notification to bot owner about reconciled payment
+    const ownerTelegramId = process.env.OWNER_TELEGRAM_ID
+    if (ownerTelegramId) {
+        const userDisplay = user.username
+            ? `@${user.username}`
+            : `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь без имени'
+
+        const currencySymbol = order.currency === 'eur' ? '€' : '₽'
+        const amountFormatted = (order.amount / 100).toFixed(2)
+        const promoText = promoActive ? ` (+${bonusTokens} бонус 🎁)` : ''
+
+        await tg('sendMessage', {
+            chat_id: ownerTelegramId,
+            text: `🔔 Оплата согласована! (вебхук пропущен)\n\n` +
+                `👤 Пользователь: ${userDisplay}\n` +
+                `🆔 Telegram ID: ${telegramId}\n\n` +
+                `💰 Оплачено: ${tokensToAdd} токенов${promoText}\n` +
+                `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
+                `🔗 Order ID: ${order.uuid}`
         })
     }
 }

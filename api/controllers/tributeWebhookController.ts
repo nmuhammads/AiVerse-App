@@ -148,7 +148,7 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookOrder
     console.log(`[TributeWebhook] Processing payment for user ${userId}: base=${baseTokens}, bonus=${bonusTokens}, total=${tokensToAdd}`)
 
     // Get current user balance
-    const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id`)
+    const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id,username,first_name,last_name`)
 
     if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
         console.error(`[TributeWebhook] User not found: ${userId}`)
@@ -203,9 +203,33 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookOrder
         await tg('sendMessage', {
             chat_id: telegramId,
             text: `✅ Оплата через карту прошла успешно!\n\n` +
-                  `💰 Начислено: ${tokensToAdd} токенов${promoText}\n` +
-                  `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
-                  `Спасибо за покупку! 🙏`
+                `💰 Начислено: ${tokensToAdd} токенов${promoText}\n` +
+                `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
+                `Спасибо за покупку! 🙏`
+        })
+    }
+
+    // Send notification to bot owner about successful payment
+    const ownerTelegramId = process.env.OWNER_TELEGRAM_ID
+    if (ownerTelegramId) {
+        const userDisplay = user.username
+            ? `@${user.username}`
+            : `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь без имени'
+
+        const email = payload.email || order.email || 'не указана'
+        const currencySymbol = order.currency === 'eur' ? '€' : '₽'
+        const amountFormatted = (order.amount / 100).toFixed(2)
+        const promoText = promoActive ? ` (+${bonusTokens} бонус 🎁)` : ''
+
+        await tg('sendMessage', {
+            chat_id: ownerTelegramId,
+            text: `🔔 Новая оплата!\n\n` +
+                `👤 Пользователь: ${userDisplay}\n` +
+                `📧 Email: ${email}\n` +
+                `🆔 Telegram ID: ${telegramId}\n\n` +
+                `💰 Оплачено: ${tokensToAdd} токенов${promoText}\n` +
+                `💳 Сумма: ${amountFormatted} ${currencySymbol}\n\n` +
+                `🔗 Order ID: ${order.uuid}`
         })
     }
 }
