@@ -29,6 +29,7 @@ export default function Settings() {
     const navigate = useNavigate()
     const { impact } = useHaptics()
     const { addToHomeScreen, checkHomeScreenStatus, platform, tg, isInTelegram, user } = useTelegram()
+    const { isAuthenticated, authMethod, logout } = useAuthStore()
     const [canAddToHome, setCanAddToHome] = useState(false)
     const [notifExpanded, setNotifExpanded] = useState(false)
     const [langExpanded, setLangExpanded] = useState(false)
@@ -222,7 +223,6 @@ export default function Settings() {
         }
     ]
 
-    const { isAuthenticated, authMethod, logout } = useAuthStore()
     const isWebAuth = isAuthenticated && authMethod === 'web'
 
     const handleLogout = () => {
