@@ -1012,7 +1012,7 @@ export async function webhook(req: Request, res: Response) {
       name: string;
       description: string;
       price: string;
-      deeplink: string;
+      studioUrl: string;
       photo: string;
       examples?: string;
     }> = {
@@ -1020,7 +1020,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'NanoBanana',
         description: '🍌 *NanoBanana* — быстрая генерация изображений\n\n• NanoBanana — 3 токена\n• NanoBanana Pro — 15 токенов (высокое качество, Auto ratio)',
         price: '3-15',
-        deeplink: 'studio-nanobanana-pro',
+        studioUrl: `${APP_URL}/studio?model=nanobanana-pro&media=image`,
         photo: `${APP_URL}/models/nanobanana-pro.png`,
         examples: 'Отлично подходит для быстрых генераций и экспериментов'
       },
@@ -1028,7 +1028,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'Seedream 4',
         description: '⚡ *Seedream 4* — качественная модель генерации изображений\n\n• Стоимость: 4 токена\n• Высокое качество изображений\n• Поддержка различных соотношений сторон',
         price: '4',
-        deeplink: 'studio-seedream4',
+        studioUrl: `${APP_URL}/studio?model=seedream4&media=image`,
         photo: `${APP_URL}/models/seedream.png`,
         examples: 'Идеально для фотореалистичных изображений'
       },
@@ -1036,7 +1036,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'Seedream 4.5',
         description: '⚡ *Seedream 4.5* — улучшенная версия Seedream\n\n• Стоимость: 7 токенов\n• Улучшенное качество деталей\n• Более точное следование промпту',
         price: '7',
-        deeplink: 'studio-seedream4-5',
+        studioUrl: `${APP_URL}/studio?model=seedream4-5&media=image`,
         photo: `${APP_URL}/models/seedream-4-5.png`,
         examples: 'Для самых детализированных изображений'
       },
@@ -1044,7 +1044,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'GPT Image',
         description: '🤖 *GPT Image 1.5* — модель от OpenAI\n\n• Medium качество: 5 токенов\n• High качество: 15 токенов\n• Отличное понимание текста',
         price: '5-15',
-        deeplink: 'studio-gpt-image-1.5',
+        studioUrl: `${APP_URL}/studio?model=gpt-image-1.5&media=image`,
         photo: `${APP_URL}/models/optimized/gpt-image.png`,
         examples: 'Лучший выбор для сложных промптов'
       },
@@ -1052,7 +1052,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'Seedance Pro',
         description: '🎬 *Seedance Pro* — генерация видео\n\n• Text-to-Video и Image-to-Video\n• Разрешение: 480p / 720p\n• Длительность: 4-12 сек\n• Стоимость: 12-116 токенов',
         price: '12-116',
-        deeplink: 'video-seedance-1.5-pro',
+        studioUrl: `${APP_URL}/studio?model=seedance-1.5-pro&media=video`,
         photo: `${APP_URL}/models/seedream.png`,
         examples: '🎥 Создавайте потрясающие видео из текста или изображений!'
       },
@@ -1060,7 +1060,7 @@ export async function webhook(req: Request, res: Response) {
         name: 'Kling AI',
         description: '🎬 *Kling AI* — продвинутая модель видео\n\n• Text-to-Video (T2V): 55-110 токенов\n• Image-to-Video (I2V): 55-110 токенов\n• Motion Control (MC): 30+ токенов\n  ↳ Контроль движения по видео-референсу\n\nПоддержка звука и длинных видео до 10 сек',
         price: '30-220',
-        deeplink: 'video-kling-t2v',
+        studioUrl: `${APP_URL}/studio?model=kling-t2v&media=video`,
         photo: `${APP_URL}/models/optimized/kling.png`,
         examples: '🌟 Используйте Motion Control для точного управления движением!'
       }
@@ -1069,12 +1069,11 @@ export async function webhook(req: Request, res: Response) {
     // Handle model buttons
     if (MODEL_INFO[text]) {
       const model = MODEL_INFO[text]
-      const deepLinkUrl = `https://t.me/${botUsername}?startapp=${model.deeplink}`
       const caption = `${model.description}\n\n💰 Стоимость: ${model.price} токенов\n\n${model.examples || ''}`
 
       const inlineKb = {
         inline_keyboard: [[
-          { text: '🚀 Открыть в Студии', url: deepLinkUrl }
+          { text: '🚀 Открыть в Студии', web_app: { url: model.studioUrl } }
         ]]
       }
 

@@ -63,18 +63,6 @@ export default function Settings() {
         }
     }, [ready, i18n])
 
-    // Return loading state if translations not ready
-    if (!ready) {
-        return (
-            <div className="min-h-dvh bg-black text-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="loader-spinner mx-auto mb-4"></div>
-                    <p className="text-zinc-400">Loading...</p>
-                </div>
-            </div>
-        )
-    }
-
     // Авто-открытие секции уведомлений при переходе из попапа
     useEffect(() => {
         if (searchParams.get('notif') === 'open') {
@@ -136,6 +124,19 @@ export default function Settings() {
             })
         }
     }, [user?.id])
+
+    // Return loading state if translations not ready - MUST be after all hooks
+    if (!ready) {
+        return (
+            <div className="min-h-dvh bg-black text-white flex items-center justify-center">
+                <div className="text-center">
+                    <div className="loader-spinner mx-auto mb-4"></div>
+                    <p className="text-zinc-400">Loading...</p>
+                </div>
+            </div>
+        )
+    }
+
 
     const updateNotifSetting = async (key: keyof NotificationSettings, value: boolean) => {
         if (!user?.id) return
