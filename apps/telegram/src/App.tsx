@@ -55,6 +55,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  // Allow users with ?ref= parameter to pass through (StartParamRouter will redirect to /studio)
+  const hasRefParam = new URLSearchParams(location.search).has('ref');
+  if (hasRefParam) {
+    return <>{children}</>;
+  }
+
   // Not authenticated - redirect to landing
   if (!isAuthenticated) {
     return <Navigate to="/landing" state={{ from: location }} replace />;
