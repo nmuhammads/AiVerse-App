@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, MessageSquare, ArrowUpRight } from 'lucide-react'
 import { useTranslation, Trans } from 'react-i18next'
+import { useAuthStore } from '@/store/authStore'
 
 const STORAGE_KEY = 'has_seen_chat_onboarding_v1'
 
 export function ChatOnboardingOverlay() {
     const { t } = useTranslation()
+    const { isAuthenticated } = useAuthStore()
     const [isVisible, setIsVisible] = useState(false)
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
     const [retryCount, setRetryCount] = useState(0)
 
     useEffect(() => {
+        // Don't show onboarding for unauthenticated users
+        if (!isAuthenticated) return
+
         // Check if already seen
         const hasSeen = localStorage.getItem(STORAGE_KEY)
         if (hasSeen) return
@@ -35,7 +40,7 @@ export function ChatOnboardingOverlay() {
         // Small delay to ensure layout is stable
         const timer = setTimeout(checkTarget, 500)
         return () => clearTimeout(timer)
-    }, [retryCount])
+    }, [retryCount, isAuthenticated])
 
     const handleClose = () => {
         setIsVisible(false)

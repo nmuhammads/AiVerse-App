@@ -408,7 +408,37 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
     if (result.ok && result.data) {
       const user = result.data
       const publicUser = await supaSelect('users', `?auth_id=eq.${user.id}&select=*`)
-      const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || {}
+      let userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || null
+
+      // Auto-create public.users record for Google OAuth users (first login)
+      if (!userData) {
+        const userId = Date.now()
+        const meta = user.user_metadata || {}
+        const createResult = await supaPost('users', {
+          user_id: userId,
+          auth_id: user.id,
+          email: user.email,
+          first_name: meta.full_name || meta.name || meta.first_name || null,
+          avatar_url: meta.avatar_url || meta.picture || null,
+          balance: 6,
+          created_at: new Date().toISOString()
+        })
+
+        if (createResult.ok) {
+          console.log(`[Auth/me] Auto-created public.users for OAuth user ${user.id}, user_id=${userId}`)
+          userData = {
+            user_id: userId,
+            auth_id: user.id,
+            email: user.email,
+            first_name: meta.full_name || meta.name || meta.first_name || null,
+            avatar_url: meta.avatar_url || meta.picture || null,
+            balance: 6
+          }
+        } else {
+          console.error(`[Auth/me] Failed to auto-create public.users for OAuth user ${user.id}:`, createResult.data)
+          userData = {}
+        }
+      }
 
       res.json({
         ok: true,
