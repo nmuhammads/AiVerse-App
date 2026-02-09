@@ -576,8 +576,11 @@ export async function webhook(req: Request, res: Response) {
         const userId = msg.from?.id
         if (userId) {
           // Check if user exists in DB with topics_created flag
-          const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created`)
-          const hasTopics = userQ.ok && userQ.data?.[0]?.topics_created
+          const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created,topic_ids`)
+          const userData = userQ.data?.[0]
+          const hasTopics = userQ.ok && userData?.topics_created === true && Object.keys(userData?.topic_ids || {}).length > 0
+
+          console.log(`[Topics] User ${userId} check: ok=${userQ.ok}, topics_created=${userData?.topics_created}, hasTopics=${hasTopics}`)
 
           if (!hasTopics) {
             console.log(`[Topics] Creating topics for user ${userId}...`)
