@@ -510,8 +510,9 @@ export async function webhook(req: Request, res: Response) {
     const threadId = msg?.message_thread_id
     const userId = msg?.from?.id
 
-    // Handle topic messages (Bot API 9.4 - Forum Topics)
-    if (chatId && threadId && userId) {
+    // DISABLED: Handle topic messages (Bot API 9.4 - Forum Topics) - to be enabled later
+    const TOPICS_ROUTING_ENABLED = false
+    if (TOPICS_ROUTING_ENABLED && chatId && threadId && userId) {
       // Get topic_ids from DB
       const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=topic_ids`)
       const topicIds = userQ.ok && userQ.data?.[0]?.topic_ids || {}
@@ -569,35 +570,39 @@ export async function webhook(req: Request, res: Response) {
         is_persistent: true
       }
 
-      // Check if topics are enabled and create them if needed (Bot API 9.4)
-      const topicsEnabled = await checkBotTopicsEnabled()
-      if (topicsEnabled) {
-        // Check if user already has topics (check in DB or just try to create)
-        const userId = msg.from?.id
-        if (userId) {
-          // Check if user exists in DB with topics_created flag
-          const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created,topic_ids`)
-          const userData = userQ.data?.[0]
-          const hasTopics = userQ.ok && userData?.topics_created === true && Object.keys(userData?.topic_ids || {}).length > 0
+      // DISABLED: Forum topics feature (Bot API 9.4) - to be enabled later
+      const TOPICS_ENABLED = false
+      if (TOPICS_ENABLED) {
+        // Check if topics are enabled and create them if needed (Bot API 9.4)
+        const topicsEnabled = await checkBotTopicsEnabled()
+        if (topicsEnabled) {
+          // Check if user already has topics (check in DB or just try to create)
+          const userId = msg.from?.id
+          if (userId) {
+            // Check if user exists in DB with topics_created flag
+            const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created,topic_ids`)
+            const userData = userQ.data?.[0]
+            const hasTopics = userQ.ok && userData?.topics_created === true && Object.keys(userData?.topic_ids || {}).length > 0
 
-          console.log(`[Topics] User ${userId} check: ok=${userQ.ok}, topics_created=${userData?.topics_created}, hasTopics=${hasTopics}`)
+            console.log(`[Topics] User ${userId} check: ok=${userQ.ok}, topics_created=${userData?.topics_created}, hasTopics=${hasTopics}`)
 
-          if (!hasTopics) {
-            console.log(`[Topics] Creating topics for user ${userId}...`)
-            const topicIds = await createUserTopics(chatId)
+            if (!hasTopics) {
+              console.log(`[Topics] Creating topics for user ${userId}...`)
+              const topicIds = await createUserTopics(chatId)
 
-            if (Object.keys(topicIds).length > 0) {
-              // Save topics_created flag and topic_ids to DB
-              const updateData = { topics_created: true, topic_ids: topicIds }
-              if (userQ.ok && userQ.data?.[0]) {
-                await supaPatch('users', `?user_id=eq.${userId}`, updateData)
-              } else {
-                await supaPost('users', { user_id: userId, ...updateData }, '?on_conflict=user_id')
+              if (Object.keys(topicIds).length > 0) {
+                // Save topics_created flag and topic_ids to DB
+                const updateData = { topics_created: true, topic_ids: topicIds }
+                if (userQ.ok && userQ.data?.[0]) {
+                  await supaPatch('users', `?user_id=eq.${userId}`, updateData)
+                } else {
+                  await supaPost('users', { user_id: userId, ...updateData }, '?on_conflict=user_id')
+                }
+                console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}:`, topicIds)
+
+                // Don't send the regular welcome since topics have their own welcomes
+                return res.json({ ok: true })
               }
-              console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}:`, topicIds)
-
-              // Don't send the regular welcome since topics have their own welcomes
-              return res.json({ ok: true })
             }
           }
         }
