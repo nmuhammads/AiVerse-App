@@ -28,29 +28,52 @@ export function stagingAuthMiddleware(req: Request, res: Response, next: NextFun
         return
     }
 
-    // Skip Telegram Mini App requests (they authenticate via initData)
+    // Skip API routes - they have their own auth mechanism
+    if (req.path.startsWith('/api/')) {
+        next()
+        return
+    }
+
+    // Skip static assets (JS, CSS, images, fonts)
+    const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.webp', '.webm', '.mp4']
+    if (staticExtensions.some(ext => req.path.endsWith(ext))) {
+        next()
+        return
+    }
+
+    // Skip Telegram Mini App requests (they authenticate via initData header)
     const telegramInitData = req.headers['x-telegram-init-data']
     if (telegramInitData) {
         next()
         return
     }
 
-    // Skip initial page load from Telegram WebApp (check URL params)
+    // Skip initial page load from Telegram WebApp (check URL params in query or hash)
     const hasTelegramParams = req.query.tgWebAppData ||
         req.query.tgWebAppStartParam ||
         req.query.tgWebAppVersion ||
-        req.query.start
+        req.query.start ||
+        req.url.includes('tgWebApp') ||
+        req.url.includes('startapp')
     if (hasTelegramParams) {
         next()
         return
     }
 
-    // Skip requests from Telegram WebView (check User-Agent)
-    const userAgent = req.headers['user-agent'] || ''
-    const isTelegramWebView = userAgent.includes('Telegram') ||
-        userAgent.includes('TelegramBot') ||
-        userAgent.includes('WebView')
-    if (isTelegramWebView) {
+    // Skip requests from Telegram WebView (check User-Agent - various Telegram client signatures)
+    const userAgent = (req.headers['user-agent'] || '').toLowerCase()
+    const isTelegramUA = userAgent.includes('telegram') ||
+        userAgent.includes('tgweb') ||
+        userAgent.includes('webview') ||
+        (userAgent.includes('mobile') && userAgent.includes('safari') && !userAgent.includes('chrome'))  // iOS in-app browser
+    if (isTelegramUA) {
+        next()
+        return
+    }
+
+    // Skip if Referer is from the same staging domain (subsequent page loads)
+    const referer = req.headers['referer'] || ''
+    if (referer.includes('railway.app') || referer.includes('localhost')) {
         next()
         return
     }
