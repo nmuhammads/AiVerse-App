@@ -443,6 +443,102 @@ export async function webhook(req: Request, res: Response) {
       return res.json({ ok: true })
     }
 
+    // Handle Callback Queries (inline button presses)
+    if (update.callback_query) {
+      const callback = update.callback_query
+      const callbackChatId = callback.message?.chat?.id
+      const callbackUserId = callback.from?.id
+      const data = callback.data || ''
+
+      // Stars payment callbacks
+      if (data.startsWith('pay_stars_')) {
+        const starAmount = parseInt(data.replace('pay_stars_', ''))
+        const STAR_PACKAGES: Record<number, { tokens: number; spins: number }> = {
+          20: { tokens: 10, spins: 0 },
+          50: { tokens: 25, spins: 0 },
+          100: { tokens: 50, spins: 0 },
+          200: { tokens: 100, spins: 0 },
+          300: { tokens: 150, spins: 0 },
+          600: { tokens: 300, spins: 1 },
+          1000: { tokens: 550, spins: 2 }
+        }
+
+        const pkg = STAR_PACKAGES[starAmount]
+        if (pkg && callbackChatId) {
+          try {
+            // Create Stars invoice
+            const invoiceResult = await tg('createInvoiceLink', {
+              title: `${pkg.tokens} токенов`,
+              description: `Пополнение баланса на ${pkg.tokens} токенов`,
+              payload: JSON.stringify({ packageId: `star_${starAmount}`, tokens: pkg.tokens, spins: pkg.spins }),
+              currency: 'XTR',
+              prices: [{ label: `${pkg.tokens} токенов`, amount: starAmount }]
+            })
+
+            if (invoiceResult?.ok && invoiceResult.result) {
+              const invoiceLink = invoiceResult.result
+              await tg('sendMessage', {
+                chat_id: callbackChatId,
+                text: `💳 *Оплата ${starAmount} Stars*\n\nВы получите: *${pkg.tokens} токенов*${pkg.spins > 0 ? `\n🎰 Бонус: +${pkg.spins} спинов` : ''}\n\n👇 Нажмите кнопку ниже для оплаты:`,
+                parse_mode: 'Markdown',
+                reply_markup: {
+                  inline_keyboard: [[{ text: `⭐ Оплатить ${starAmount} Stars`, url: invoiceLink }]]
+                }
+              })
+            } else {
+              await tg('sendMessage', {
+                chat_id: callbackChatId,
+                text: '❌ Ошибка создания платежа. Попробуйте позже или оплатите через приложение.',
+                reply_markup: {
+                  inline_keyboard: [[{ text: '💎 Открыть приложение', web_app: { url: `${APP_URL}/accumulations` } }]]
+                }
+              })
+            }
+          } catch (e) {
+            console.error('[Payment] Stars invoice error:', e)
+            await tg('sendMessage', {
+              chat_id: callbackChatId,
+              text: '❌ Ошибка создания платежа. Попробуйте позже.'
+            })
+          }
+        }
+
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Topup menu callback from profile
+      if (data === 'topup' && callbackChatId) {
+        // Fetch user balance
+        let balanceText = ''
+        if (callbackUserId) {
+          const userQ = await supaSelect('users', `?user_id=eq.${callbackUserId}&select=balance`)
+          if (userQ.ok && userQ.data?.[0]) {
+            balanceText = `\n\n💰 Ваш баланс: *${userQ.data[0].balance || 0}* токенов`
+          }
+        }
+
+        const topUpText = `💎 *Пополнение баланса*${balanceText}\n\nВыберите пакет Stars или способ оплаты:`
+        const kb = {
+          inline_keyboard: [
+            [{ text: '⭐ 20 Stars → 10 токенов', callback_data: 'pay_stars_20' }],
+            [{ text: '⭐ 50 Stars → 25 токенов', callback_data: 'pay_stars_50' }],
+            [{ text: '⭐ 100 Stars → 50 токенов', callback_data: 'pay_stars_100' }],
+            [{ text: '⭐ 200 Stars → 100 токенов 🔥', callback_data: 'pay_stars_200' }],
+            [{ text: '⭐ 1000 Stars → 550 токенов 🎁', callback_data: 'pay_stars_1000' }],
+            [{ text: '💳 Оплата картой', web_app: { url: `${APP_URL}/accumulations` } }]
+          ]
+        }
+        await tg('sendMessage', { chat_id: callbackChatId, text: topUpText, parse_mode: 'Markdown', reply_markup: kb })
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Default: just answer callback
+      await tg('answerCallbackQuery', { callback_query_id: callback.id })
+      return res.json({ ok: true })
+    }
+
     const msg = update?.message
 
     // Special Logger for User 817308975 to capture file_ids
@@ -889,14 +985,60 @@ export async function webhook(req: Request, res: Response) {
     }
 
     if (text === '👤 Профиль') {
-      const url = `${APP_URL}?tgWebAppStartParam=profile`
-      const kb = { inline_keyboard: [[{ text: '👤 Открыть профиль', web_app: { url } }]] }
-      await tg('sendMessage', {
-        chat_id: chatId,
-        text: '👤 *Ваш профиль*\n\nПросмотр генераций, статистики и достижений',
-        parse_mode: 'Markdown',
-        reply_markup: kb
-      })
+      const userId = msg.from?.id
+      if (userId) {
+        // Fetch user data
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance,username,first_name,spins`)
+
+        // Count generations
+        let genCount = 0
+        try {
+          const genRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/generations?user_id=eq.${userId}&select=id`, {
+            method: 'HEAD',
+            headers: {
+              'apikey': process.env.SUPABASE_ANON_KEY || '',
+              'Prefer': 'count=exact'
+            }
+          })
+          const countHeader = genRes.headers.get('content-range')
+          if (countHeader) {
+            const match = countHeader.match(/\/(\d+)$/)
+            if (match) genCount = parseInt(match[1])
+          }
+        } catch (e) {
+          console.error('[Profile] Gen count error:', e)
+        }
+
+        if (userQ.ok && userQ.data?.[0]) {
+          const user = userQ.data[0]
+          const profileText = `👤 *Ваш профиль*
+
+📛 *Имя:* ${user.first_name || msg.from?.first_name || 'Не указано'}
+🆔 *ID:* \`${userId}\`
+
+💰 *Баланс:* ${user.balance || 0} токенов
+🎰 *Спины:* ${user.spins || 0}
+🎨 *Генераций:* ${genCount}`
+
+          const kb = {
+            inline_keyboard: [
+              [{ text: '🎨 Мои генерации', web_app: { url: `${APP_URL}/profile` } }],
+              [{ text: '💎 Пополнить', callback_data: 'topup' }],
+              [{ text: '⚙️ Настройки', web_app: { url: `${APP_URL}/settings` } }]
+            ]
+          }
+          await tg('sendMessage', { chat_id: chatId, text: profileText, parse_mode: 'Markdown', reply_markup: kb })
+        } else {
+          // User not found in DB, show basic info
+          const basicText = `👤 *Ваш профиль*
+
+📛 *Имя:* ${msg.from?.first_name || 'Не указано'}
+🆔 *ID:* \`${userId}\`
+
+⚠️ Нажмите /start чтобы активировать аккаунт`
+          await tg('sendMessage', { chat_id: chatId, text: basicText, parse_mode: 'Markdown' })
+        }
+      }
       return res.json({ ok: true })
     }
 
@@ -912,14 +1054,24 @@ export async function webhook(req: Request, res: Response) {
         }
       }
 
-      const url = `${APP_URL}?tgWebAppStartParam=accumulations`
-      const kb = { inline_keyboard: [[{ text: '💎 Пополнить баланс', web_app: { url } }]] }
-      await tg('sendMessage', {
-        chat_id: chatId,
-        text: `💎 *Пополнение баланса*${balanceText}\n\nПополните баланс для генерации изображений и видео`,
-        parse_mode: 'Markdown',
-        reply_markup: kb
-      })
+      const topUpText = `💎 *Пополнение баланса*${balanceText}
+
+Выберите пакет Stars или способ оплаты:
+
+⭐ *Telegram Stars* — мгновенная оплата
+💳 *Банковская карта* — EUR/RUB`
+
+      const kb = {
+        inline_keyboard: [
+          [{ text: '⭐ 20 Stars → 10 токенов', callback_data: 'pay_stars_20' }],
+          [{ text: '⭐ 50 Stars → 25 токенов', callback_data: 'pay_stars_50' }],
+          [{ text: '⭐ 100 Stars → 50 токенов', callback_data: 'pay_stars_100' }],
+          [{ text: '⭐ 200 Stars → 100 токенов 🔥', callback_data: 'pay_stars_200' }],
+          [{ text: '⭐ 1000 Stars → 550 токенов 🎁', callback_data: 'pay_stars_1000' }],
+          [{ text: '💳 Оплата картой', web_app: { url: `${APP_URL}/accumulations` } }]
+        ]
+      }
+      await tg('sendMessage', { chat_id: chatId, text: topUpText, parse_mode: 'Markdown', reply_markup: kb })
       return res.json({ ok: true })
     }
 
