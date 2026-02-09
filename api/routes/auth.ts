@@ -73,7 +73,7 @@ async function findUserByTelegramId(telegramId: number) {
  */
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, first_name, last_name } = req.body
+    const { email, password, first_name, last_name, ref } = req.body
 
     if (!email || !password) {
       res.status(400).json({ ok: false, error: 'Email and password are required' })
@@ -114,12 +114,17 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       first_name: first_name || null,
       last_name: last_name || null,
       balance: 6, // Default balance
+      ref: ref || null,
       created_at: new Date().toISOString()
     })
 
     if (!userResult.ok) {
       console.error('[Auth] Failed to create public.users record:', userResult.data)
       // Don't fail - auth user is created, public user creation can be retried
+    }
+
+    if (ref) {
+      console.log(`[Referral/Signup] Set ref=${ref} for user ${userId}`)
     }
 
     res.status(201).json({
@@ -187,7 +192,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/telegram-login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const telegramData = req.body
+    const { ref, ...telegramData } = req.body
 
     if (!telegramData || !telegramData.id || !telegramData.hash) {
       res.status(400).json({ ok: false, error: 'Invalid Telegram data' })
@@ -224,12 +229,17 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
         last_name: telegramData.last_name || null,
         avatar_url: telegramData.photo_url || null,
         balance: 6,
+        ref: ref || null,
         created_at: new Date().toISOString()
       })
 
       if (!createResult.ok) {
         res.status(500).json({ ok: false, error: 'Failed to create user' })
         return
+      }
+
+      if (ref) {
+        console.log(`[Referral/TG-Login] Set ref=${ref} for new user ${telegramId}`)
       }
 
       publicUser = {

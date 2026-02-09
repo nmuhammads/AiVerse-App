@@ -247,7 +247,7 @@ export default function Settings() {
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
             { icon: FileText, label: t('settings.items.privacy'), onClick: () => navigate('/privacy') },
             { icon: FileText, label: t('settings.items.terms'), onClick: () => navigate('/terms') },
-            { icon: Info, label: t('settings.items.version'), value: 'v3.3.2', onClick: () => { } },
+            { icon: Info, label: t('settings.items.version'), value: 'v3.3.5', onClick: () => { } },
             ...(isWebAuth ? [{ icon: LogOut, label: t('settings.items.logout'), onClick: handleLogout, className: 'text-red-400' }] : [])
         ]
     }

@@ -89,9 +89,18 @@ function StartParamRouter() {
     if (processedRef.current) return;
 
     const qs = new URLSearchParams(location.search);
+
+    // Handle web referral: ?ref=username (separate from Telegram's ref- deeplinks)
+    const webRef = qs.get('ref');
+    if (webRef && !localStorage.getItem('aiverse_ref')) {
+      localStorage.setItem('aiverse_ref', webRef);
+      console.log(`[Referral/Web] Saved ref=${webRef} to localStorage`);
+    }
+
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
+
 
     if (!p) return;
 

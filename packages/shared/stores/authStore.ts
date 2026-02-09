@@ -139,21 +139,21 @@ export async function loginWithEmail(email: string, password: string) {
     return data
 }
 
-export async function signupWithEmail(email: string, password: string, firstName?: string, lastName?: string) {
+export async function signupWithEmail(email: string, password: string, firstName?: string, lastName?: string, ref?: string) {
     const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, first_name: firstName, last_name: lastName })
+        body: JSON.stringify({ email, password, first_name: firstName, last_name: lastName, ref })
     })
 
     return await response.json()
 }
 
-export async function loginWithTelegram(telegramData: Record<string, string>) {
+export async function loginWithTelegram(telegramData: Record<string, string>, ref?: string) {
     const response = await fetch('/api/auth/telegram-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(telegramData)
+        body: JSON.stringify({ ...telegramData, ref })
     })
 
     const data = await response.json()
