@@ -97,6 +97,335 @@ async function checkBotTopicsEnabled(): Promise<boolean> {
   }
 }
 
+// Get file URL from Telegram file_id
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
+async function getFileUrl(fileId: string): Promise<string | null> {
+  try {
+    const result = await tg('getFile', { file_id: fileId })
+    if (result?.ok && result.result?.file_path) {
+      return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${result.result.file_path}`
+    }
+    return null
+  } catch (e) {
+    console.error('[Topics] getFileUrl error:', e)
+    return null
+  }
+}
+
+// Find topic name by thread_id
+function getTopicByThreadId(topicIds: Record<string, number>, threadId: number): string | null {
+  for (const [name, id] of Object.entries(topicIds)) {
+    if (id === threadId) return name
+  }
+  return null
+}
+
+// Topic message handler - routes to appropriate handler based on topic
+async function handleTopicMessage(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  topicName: string,
+  text: string,
+  photoFileId?: string
+): Promise<{ handled: boolean }> {
+  console.log(`[Topics] Handling message in "${topicName}" from user ${userId}: ${text.slice(0, 50)}...`)
+
+  // Get photo URL if provided
+  let imageUrl: string | null = null
+  if (photoFileId) {
+    imageUrl = await getFileUrl(photoFileId)
+    console.log(`[Topics] Photo URL: ${imageUrl}`)
+  }
+
+  switch (topicName) {
+    case '🧠 ИИ Чат':
+      await handleAIChat(chatId, threadId, userId, text, imageUrl)
+      return { handled: true }
+
+    case '🍌 NanoBanana':
+      await handleImageGeneration(chatId, threadId, userId, 'nanobanana-pro', text, imageUrl)
+      return { handled: true }
+
+    case '⚡ Seedream':
+      await handleImageGeneration(chatId, threadId, userId, 'seedream4-5', text, imageUrl)
+      return { handled: true }
+
+    case '🤖 GPT Image':
+      await handleImageGeneration(chatId, threadId, userId, 'gpt-image-1.5', text, imageUrl)
+      return { handled: true }
+
+    case '🎬 Видео':
+      await handleVideoTopic(chatId, threadId)
+      return { handled: true }
+
+    case '🎨 Другое':
+      await handleEditorTopic(chatId, threadId)
+      return { handled: true }
+
+    case '🏠 Домой':
+      await handleHomeTopic(chatId, threadId)
+      return { handled: true }
+
+    default:
+      return { handled: false }
+  }
+}
+
+// AI Chat handler using chatService
+import { getChatCompletion } from '../services/chatService.js'
+
+// In-memory chat history (last 10 messages per user)
+const chatHistories: Map<number, Array<{ role: 'user' | 'assistant'; content: string }>> = new Map()
+
+async function handleAIChat(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  text: string,
+  imageUrl: string | null
+): Promise<void> {
+  try {
+    // Get or create history
+    let history = chatHistories.get(userId) || []
+
+    // Add user message
+    const userContent = imageUrl
+      ? [{ type: 'text' as const, text }, { type: 'image_url' as const, image_url: { url: imageUrl } }]
+      : text
+    history.push({ role: 'user', content: typeof userContent === 'string' ? userContent : JSON.stringify(userContent) })
+
+    // Keep last 10 messages
+    if (history.length > 10) history = history.slice(-10)
+    chatHistories.set(userId, history)
+
+    // Send typing action
+    await tg('sendChatAction', { chat_id: chatId, message_thread_id: threadId, action: 'typing' })
+
+    // Get AI response
+    const response = await getChatCompletion(
+      history.map(m => ({ role: m.role, content: m.content })),
+      'deepseek/deepseek-v3.2'
+    )
+
+    // Add assistant message to history
+    history.push({ role: 'assistant', content: response })
+    chatHistories.set(userId, history.slice(-10))
+
+    // Send response
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: response,
+      parse_mode: 'Markdown'
+    })
+  } catch (e) {
+    console.error('[Topics] AI Chat error:', e)
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: '❌ Ошибка AI чата. Попробуйте позже или откройте веб-версию.',
+      reply_markup: {
+        inline_keyboard: [[{ text: '🌐 Открыть в браузере', web_app: { url: APP_URL } }]]
+      }
+    })
+  }
+}
+
+// Image generation handler using Kie.ai
+async function handleImageGeneration(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  model: string,
+  prompt: string,
+  imageUrl: string | null
+): Promise<void> {
+  try {
+    // Check balance
+    const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance,active_generations`)
+    if (!userQ.ok || !userQ.data?.[0]) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: '❌ Пользователь не найден. Нажмите /start'
+      })
+      return
+    }
+
+    const user = userQ.data[0]
+    const activeGens = user.active_generations || 0
+
+    // Check rate limit (max 3 parallel)
+    if (activeGens >= 3) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: '⏳ У вас уже 3 активные генерации. Дождитесь завершения.'
+      })
+      return
+    }
+
+    // Model prices
+    const MODEL_PRICES: Record<string, number> = {
+      'nanobanana-pro': 15,
+      'seedream4-5': 7,
+      'gpt-image-1.5': 5
+    }
+    const price = MODEL_PRICES[model] || 5
+
+    // Check balance
+    if (user.balance < price) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: `❌ Недостаточно токенов. Нужно: ${price}, баланс: ${user.balance}`,
+        reply_markup: {
+          inline_keyboard: [[{ text: '💎 Пополнить', web_app: { url: `${APP_URL}/balance` } }]]
+        }
+      })
+      return
+    }
+
+    // Increment active generations
+    await supaPatch('users', `?user_id=eq.${userId}`, { active_generations: activeGens + 1 })
+
+    // Send progress message
+    const progressMsg = await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: `🎨 Генерирую с ${model}...`
+    })
+
+    try {
+      // TODO: Call Kie.ai API here
+      // For now, placeholder - need to integrate with existing Kie.ai code
+      const KIE_API_KEY = process.env.KIE_API_KEY || ''
+      const KIE_API_URL = 'https://api.kie.ai/v1/images/generations'
+
+      // NanoBanana Pro uses 2K quality by default
+      const quality = model === 'nanobanana-pro' ? '2k' : 'standard'
+
+      const kieBody: Record<string, unknown> = {
+        model,
+        prompt,
+        quality,
+        n: 1
+      }
+      if (imageUrl) {
+        kieBody.image = imageUrl
+      }
+
+      const kieRes = await fetch(KIE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${KIE_API_KEY}`
+        },
+        body: JSON.stringify(kieBody)
+      })
+
+      const kieData = await kieRes.json()
+      console.log('[Topics] Kie.ai response:', kieData)
+
+      if (kieData.data?.[0]?.url) {
+        const resultUrl = kieData.data[0].url
+
+        // Deduct balance
+        await supaPatch('users', `?user_id=eq.${userId}`, { balance: user.balance - price })
+
+        // Log balance change
+        await logBalanceChange({
+          userId,
+          oldBalance: user.balance,
+          newBalance: user.balance - price,
+          reason: 'generation',
+          metadata: { model, source: 'topic' }
+        })
+
+        // Send result
+        await tg('sendPhoto', {
+          chat_id: chatId,
+          message_thread_id: threadId,
+          photo: resultUrl,
+          caption: `✅ Готово! (-${price} токенов)`
+        })
+
+        // Delete progress message
+        if (progressMsg?.result?.message_id) {
+          await tg('deleteMessage', { chat_id: chatId, message_id: progressMsg.result.message_id })
+        }
+      } else {
+        throw new Error(kieData.error?.message || 'Generation failed')
+      }
+    } finally {
+      // Decrement active generations
+      await supaPatch('users', `?user_id=eq.${userId}`, { active_generations: Math.max(0, activeGens) })
+    }
+  } catch (e: any) {
+    console.error('[Topics] Image generation error:', e)
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: `❌ Ошибка генерации: ${e.message || 'Попробуйте позже'}`,
+      reply_markup: {
+        inline_keyboard: [[{ text: '🌐 Открыть в браузере', web_app: { url: `${APP_URL}/studio` } }]]
+      }
+    })
+  }
+}
+
+// Video topic shows buttons only
+async function handleVideoTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: '🎬 *Генерация видео*\n\nВыберите модель для перехода в студию:',
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🌸 Seedance Pro', web_app: { url: `${APP_URL}/studio?model=seedance-1.5-pro&media=video` } }],
+        [{ text: '🎥 Kling T2V / I2V', web_app: { url: `${APP_URL}/studio?model=kling-t2v&media=video` } }],
+        [{ text: '🎬 Kling Motion Control', web_app: { url: `${APP_URL}/studio?model=kling-mc&media=video` } }]
+      ]
+    }
+  })
+}
+
+// Editor topic shows redirect button
+async function handleEditorTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: '🎨 *Редактор*\n\nФункции редактирования доступны в веб-приложении:',
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [[{ text: '🎨 Открыть редактор', web_app: { url: `${APP_URL}/editor` } }]]
+    }
+  })
+}
+
+// Home topic shows help
+async function handleHomeTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: `🏠 *Добро пожаловать в AI Verse!*
+
+📌 *Как использовать топики:*
+
+• 🧠 *ИИ Чат* — общайтесь с AI ассистентом
+• 🍌 *NanoBanana* — быстрая генерация (промпт/фото)
+• ⚡ *Seedream* — качественные арты
+• 🤖 *GPT Image* — OpenAI качество
+• 🎬 *Видео* — создание видео
+• 🎨 *Другое* — редактор изображений
+
+_Отправьте промпт в любой топик для генерации!_`,
+    parse_mode: 'Markdown'
+  })
+}
+
 export async function webhook(req: Request, res: Response) {
   try {
     if (WEBHOOK_SECRET) {
@@ -177,7 +506,33 @@ export async function webhook(req: Request, res: Response) {
     }
 
     const chatId = msg?.chat?.id
-    const text = String(msg?.text || '').trim()
+    const text = String(msg?.text || msg?.caption || '').trim()
+    const threadId = msg?.message_thread_id
+    const userId = msg?.from?.id
+
+    // Handle topic messages (Bot API 9.4 - Forum Topics)
+    if (chatId && threadId && userId) {
+      // Get topic_ids from DB
+      const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=topic_ids`)
+      const topicIds = userQ.ok && userQ.data?.[0]?.topic_ids || {}
+
+      if (Object.keys(topicIds).length > 0) {
+        const topicName = getTopicByThreadId(topicIds, threadId)
+        if (topicName) {
+          // Get photo file_id if present
+          let photoFileId: string | undefined
+          if (msg.photo && Array.isArray(msg.photo) && msg.photo.length > 0) {
+            photoFileId = msg.photo[msg.photo.length - 1].file_id
+          }
+
+          const result = await handleTopicMessage(chatId, threadId, userId, topicName, text || '', photoFileId)
+          if (result.handled) {
+            return res.json({ ok: true })
+          }
+        }
+      }
+    }
+
     if (!chatId || !text) return res.json({ ok: true })
     if (text.startsWith('/start')) {
       const parts = text.split(/\s+/)
@@ -229,13 +584,14 @@ export async function webhook(req: Request, res: Response) {
             const topicIds = await createUserTopics(chatId)
 
             if (Object.keys(topicIds).length > 0) {
-              // Save topics_created flag to DB
+              // Save topics_created flag and topic_ids to DB
+              const updateData = { topics_created: true, topic_ids: topicIds }
               if (userQ.ok && userQ.data?.[0]) {
-                await supaPatch('users', `?user_id=eq.${userId}`, { topics_created: true })
+                await supaPatch('users', `?user_id=eq.${userId}`, updateData)
               } else {
-                await supaPost('users', { user_id: userId, topics_created: true }, '?on_conflict=user_id')
+                await supaPost('users', { user_id: userId, ...updateData }, '?on_conflict=user_id')
               }
-              console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}`)
+              console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}:`, topicIds)
 
               // Don't send the regular welcome since topics have their own welcomes
               return res.json({ ok: true })
