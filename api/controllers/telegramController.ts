@@ -29,6 +29,67 @@ export async function tg(method: string, payload: Record<string, unknown>) {
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
 import { logBalanceChange } from '../services/balanceAuditService.js'
 
+// Topic definitions for private chats (Bot API 9.4)
+const TOPIC_DEFINITIONS = [
+  { name: '🏠 Домой', icon_custom_emoji_id: undefined, welcome: '👋 Добро пожаловать в AI Verse!\n\nЭто главный экран — здесь вы найдёте помощь и навигацию.\n\nИспользуйте топики слева для работы с разными моделями!' },
+  { name: '🧠 ИИ Чат', icon_custom_emoji_id: '5226639745106330551', welcome: '🧠 *ИИ Чат*\n\nЗдесь вы можете общаться с искусственным интеллектом.\n\n_Отправьте сообщение, чтобы начать!_' },
+  { name: '🍌 NanoBanana', icon_custom_emoji_id: '5361573813521756274', welcome: '🍌 *NanoBanana*\n\nБыстрая генерация изображений!\n• NanoBanana — 3 токена\n• NanoBanana Pro — 15 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '⚡ Seedream', icon_custom_emoji_id: '5282731554135615450', welcome: '⚡ *Seedream*\n\nКачественные изображения!\n• Seedream 4 — 4 токена\n• Seedream 4.5 — 7 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '🤖 GPT Image', icon_custom_emoji_id: '5359726582447487916', welcome: '🤖 *GPT Image 1.5*\n\nМодель от OpenAI\n• Medium — 5 токенов\n• High — 15 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '🎬 Видео', icon_custom_emoji_id: '5375464961822695044', welcome: '🎬 *Генерация видео*\n\n• Seedance Pro — 12-116 токенов\n• Kling AI — 30-220 токенов\n  ↳ T2V, I2V, Motion Control\n\n_Отправьте промпт или изображение_' },
+  { name: '🎨 Другое', icon_custom_emoji_id: undefined, welcome: '🎨 *Редактор и другие модели*\n\nЗдесь доступны дополнительные функции:\n• Редактирование изображений\n• Upscale\n• Другие модели\n\n_Откройте мини-апп для доступа_' },
+]
+
+// Create forum topics for a user (Bot API 9.4)
+async function createUserTopics(chatId: number): Promise<Record<string, number>> {
+  const topicIds: Record<string, number> = {}
+
+  for (const topic of TOPIC_DEFINITIONS) {
+    try {
+      const params: Record<string, unknown> = {
+        chat_id: chatId,
+        name: topic.name,
+      }
+      if (topic.icon_custom_emoji_id) {
+        params.icon_custom_emoji_id = topic.icon_custom_emoji_id
+      }
+
+      const result = await tg('createForumTopic', params)
+
+      if (result?.ok && result.result?.message_thread_id) {
+        const threadId = result.result.message_thread_id
+        topicIds[topic.name] = threadId
+
+        // Send welcome message to the topic
+        await tg('sendMessage', {
+          chat_id: chatId,
+          message_thread_id: threadId,
+          text: topic.welcome,
+          parse_mode: 'Markdown'
+        })
+
+        console.log(`[Topics] Created topic "${topic.name}" with id ${threadId} for chat ${chatId}`)
+      } else {
+        console.error(`[Topics] Failed to create topic "${topic.name}":`, result)
+      }
+    } catch (e) {
+      console.error(`[Topics] Error creating topic "${topic.name}":`, e)
+    }
+  }
+
+  return topicIds
+}
+
+// Check if topics are enabled for user
+async function checkTopicsEnabled(chatId: number): Promise<boolean> {
+  try {
+    const result = await tg('getChat', { chat_id: chatId })
+    return result?.ok && result.result?.has_topics_enabled === true
+  } catch {
+    return false
+  }
+}
+
 export async function webhook(req: Request, res: Response) {
   try {
     if (WEBHOOK_SECRET) {
@@ -146,6 +207,35 @@ export async function webhook(req: Request, res: Response) {
         is_persistent: true
       }
 
+      // Check if topics are enabled and create them if needed (Bot API 9.4)
+      const topicsEnabled = await checkTopicsEnabled(chatId)
+      if (topicsEnabled) {
+        // Check if user already has topics (check in DB or just try to create)
+        const userId = msg.from?.id
+        if (userId) {
+          // Check if user exists in DB with topics_created flag
+          const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created`)
+          const hasTopics = userQ.ok && userQ.data?.[0]?.topics_created
+
+          if (!hasTopics) {
+            console.log(`[Topics] Creating topics for user ${userId}...`)
+            const topicIds = await createUserTopics(chatId)
+
+            if (Object.keys(topicIds).length > 0) {
+              // Save topics_created flag to DB
+              if (userQ.ok && userQ.data?.[0]) {
+                await supaPatch('users', `?user_id=eq.${userId}`, { topics_created: true })
+              } else {
+                await supaPost('users', { user_id: userId, topics_created: true }, '?on_conflict=user_id')
+              }
+              console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}`)
+
+              // Don't send the regular welcome since topics have their own welcomes
+              return res.json({ ok: true })
+            }
+          }
+        }
+      }
 
       // Handle referral: /start ref_username
       if (param.startsWith('ref_')) {
