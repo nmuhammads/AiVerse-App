@@ -115,6 +115,38 @@ export async function webhook(req: Request, res: Response) {
       const parts = text.split(/\s+/)
       const param = parts.length > 1 ? parts[1] : ''
 
+      // Reply keyboard with models and buttons (with custom emoji icons - Bot API 9.4)
+      // Custom emoji IDs for animated icons
+      const EMOJI_IDS = {
+        banana: '5361573813521756274',    // 🍌 NanoBanana
+        seedream: '5282731554135615450',  // 🌩 Seedream
+        gptImage: '5359726582447487916',  // 📱 GPT Image
+        aiChat: '5226639745106330551',    // 🧠 AI Chat
+        video: '5375464961822695044',     // 🎬 Video (Kling/Seedance)
+      }
+
+      const mainKeyboard = {
+        keyboard: [
+          [{ text: '🧠 Чат с ИИ', icon_custom_emoji_id: EMOJI_IDS.aiChat }],
+          [
+            { text: '🍌 NanoBanana', icon_custom_emoji_id: EMOJI_IDS.banana },
+            { text: '🌩 Seedream 4', icon_custom_emoji_id: EMOJI_IDS.seedream }
+          ],
+          [
+            { text: '🌩 Seedream 4.5', icon_custom_emoji_id: EMOJI_IDS.seedream },
+            { text: '📱 GPT Image', icon_custom_emoji_id: EMOJI_IDS.gptImage }
+          ],
+          [
+            { text: '🎬 Seedance', icon_custom_emoji_id: EMOJI_IDS.video },
+            { text: '🎬 Kling', icon_custom_emoji_id: EMOJI_IDS.video }
+          ],
+          [{ text: '👤 Профиль' }, { text: '💎 Пополнить' }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true
+      }
+
+
       // Handle referral: /start ref_username
       if (param.startsWith('ref_')) {
         const refValue = param.slice(4) // Remove "ref_"
@@ -133,24 +165,28 @@ export async function webhook(req: Request, res: Response) {
             console.log(`[Referral/Webhook] Created user ${userId} with ref=${refValue}`)
           }
         }
-        const info = '👋 Добро пожаловать в AI Verse!'
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
+        const info = '👋 Добро пожаловать в AI Verse!\n\nВыберите модель для генерации или откройте приложение:'
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Или откройте полную версию:', reply_markup: inlineKb })
         return res.json({ ok: true })
       }
 
       if (APP_URL && (param === 'home' || param === 'generate' || param === 'studio' || param === 'top' || param === 'profile')) {
         const startVal = param === 'studio' ? 'generate' : param
         const url = startVal === 'home' ? APP_URL : `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startVal)}`
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: 'Открыть мини‑апп', reply_markup: kb })
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: '✨ AI Verse — генерация изображений и видео ИИ', reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Откройте мини‑апп:', reply_markup: inlineKb })
       } else {
-        const info = 'AI Verse — мини‑приложение генерации изображений ИИ.'
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
+        const info = '✨ AI Verse — генерация изображений и видео с помощью ИИ!\n\n🎨 Выберите модель кнопками ниже или откройте приложение:'
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Или откройте полную версию:', reply_markup: inlineKb })
       }
       return res.json({ ok: true })
     }
+
     if (text.startsWith('/home')) {
       if (APP_URL) {
         const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
@@ -276,7 +312,158 @@ export async function webhook(req: Request, res: Response) {
       return res.json({ ok: true })
     }
 
+    // Get bot username for deeplinks
+    let botUsername = 'AiVerseAppBot'
+    try {
+      const me = await tg('getMe', {})
+      if (me?.ok && me.result?.username) {
+        botUsername = me.result.username
+      }
+    } catch { /* use default */ }
+
+    // Model button handlers
+    const MODEL_INFO: Record<string, {
+      name: string;
+      description: string;
+      price: string;
+      deeplink: string;
+      photo: string;
+      examples?: string;
+    }> = {
+      '🍌 NanoBanana': {
+        name: 'NanoBanana',
+        description: '🍌 *NanoBanana* — быстрая генерация изображений\n\n• NanoBanana — 3 токена\n• NanoBanana Pro — 15 токенов (высокое качество, Auto ratio)',
+        price: '3-15',
+        deeplink: 'studio-nanobanana-pro',
+        photo: `${APP_URL}/models/nanobanana-pro.png`,
+        examples: 'Отлично подходит для быстрых генераций и экспериментов'
+      },
+      '🌩 Seedream 4': {
+        name: 'Seedream 4',
+        description: '🌩 *Seedream 4* — качественная модель генерации изображений\n\n• Стоимость: 4 токена\n• Высокое качество изображений\n• Поддержка различных соотношений сторон',
+        price: '4',
+        deeplink: 'studio-seedream4',
+        photo: `${APP_URL}/models/seedream.png`,
+        examples: 'Идеально для фотореалистичных изображений'
+      },
+      '🌩 Seedream 4.5': {
+        name: 'Seedream 4.5',
+        description: '🌩 *Seedream 4.5* — улучшенная версия Seedream\n\n• Стоимость: 7 токенов\n• Улучшенное качество деталей\n• Более точное следование промпту',
+        price: '7',
+        deeplink: 'studio-seedream4-5',
+        photo: `${APP_URL}/models/seedream-4-5.png`,
+        examples: 'Для самых детализированных изображений'
+      },
+      '📱 GPT Image': {
+        name: 'GPT Image',
+        description: '📱 *GPT Image 1.5* — модель от OpenAI\n\n• Medium качество: 5 токенов\n• High качество: 15 токенов\n• Отличное понимание текста',
+        price: '5-15',
+        deeplink: 'studio-gpt-image-1.5',
+        photo: `${APP_URL}/models/optimized/gpt-image.png`,
+        examples: 'Лучший выбор для сложных промптов'
+      },
+      '🎬 Seedance': {
+        name: 'Seedance Pro',
+        description: '🎬 *Seedance Pro* — генерация видео\n\n• Text-to-Video и Image-to-Video\n• Разрешение: 480p / 720p\n• Длительность: 4-12 сек\n• Стоимость: 12-116 токенов',
+        price: '12-116',
+        deeplink: 'video-seedance-1.5-pro',
+        photo: `${APP_URL}/models/seedream.png`,
+        examples: '🎥 Создавайте потрясающие видео из текста или изображений!'
+      },
+      '🎬 Kling': {
+        name: 'Kling AI',
+        description: '🎬 *Kling AI* — продвинутая модель видео\n\n• Text-to-Video (T2V): 55-110 токенов\n• Image-to-Video (I2V): 55-110 токенов\n• Motion Control (MC): 30+ токенов\n  ↳ Контроль движения по видео-референсу\n\nПоддержка звука и длинных видео до 10 сек',
+        price: '30-220',
+        deeplink: 'video-kling-t2v',
+        photo: `${APP_URL}/models/optimized/kling.png`,
+        examples: '🌟 Используйте Motion Control для точного управления движением!'
+      }
+    }
+
+    // Handle model buttons
+    if (MODEL_INFO[text]) {
+      const model = MODEL_INFO[text]
+      const deepLinkUrl = `https://t.me/${botUsername}?startapp=${model.deeplink}`
+      const caption = `${model.description}\n\n💰 Стоимость: ${model.price} токенов\n\n${model.examples || ''}`
+
+      const inlineKb = {
+        inline_keyboard: [[
+          { text: '🚀 Открыть в Студии', url: deepLinkUrl }
+        ]]
+      }
+
+      // Send photo with model info
+      const photoResult = await tg('sendPhoto', {
+        chat_id: chatId,
+        photo: model.photo,
+        caption,
+        parse_mode: 'Markdown',
+        reply_markup: inlineKb
+      })
+
+      // Fallback if photo fails
+      if (!photoResult?.ok) {
+        await tg('sendMessage', {
+          chat_id: chatId,
+          text: caption,
+          parse_mode: 'Markdown',
+          reply_markup: inlineKb
+        })
+      }
+
+      return res.json({ ok: true })
+    }
+
+    // Handle additional buttons
+    if (text === '🧠 Чат с ИИ') {
+      const url = `${APP_URL}?tgWebAppStartParam=chat`
+      const kb = { inline_keyboard: [[{ text: '💬 Открыть чат', web_app: { url } }]] }
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '💬 *Чат с ИИ*\n\nОбщайтесь с искусственным интеллектом, задавайте вопросы и получайте ответы!',
+        parse_mode: 'Markdown',
+        reply_markup: kb
+      })
+      return res.json({ ok: true })
+    }
+
+    if (text === '👤 Профиль') {
+      const url = `${APP_URL}?tgWebAppStartParam=profile`
+      const kb = { inline_keyboard: [[{ text: '👤 Открыть профиль', web_app: { url } }]] }
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '👤 *Ваш профиль*\n\nПросмотр генераций, статистики и достижений',
+        parse_mode: 'Markdown',
+        reply_markup: kb
+      })
+      return res.json({ ok: true })
+    }
+
+    if (text === '💎 Пополнить') {
+      // Fetch user balance
+      const userId = msg.from?.id
+      let balanceText = ''
+      if (userId) {
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
+        if (userQ.ok && userQ.data?.[0]) {
+          const balance = userQ.data[0].balance || 0
+          balanceText = `\n\n💰 Ваш баланс: *${balance}* токенов`
+        }
+      }
+
+      const url = `${APP_URL}?tgWebAppStartParam=accumulations`
+      const kb = { inline_keyboard: [[{ text: '💎 Пополнить баланс', web_app: { url } }]] }
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: `💎 *Пополнение баланса*${balanceText}\n\nПополните баланс для генерации изображений и видео`,
+        parse_mode: 'Markdown',
+        reply_markup: kb
+      })
+      return res.json({ ok: true })
+    }
+
     return res.json({ ok: true })
+
   } catch (e) {
     console.error('webhook error', e)
     return res.json({ ok: true })
