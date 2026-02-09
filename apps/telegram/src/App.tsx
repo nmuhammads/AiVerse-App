@@ -97,6 +97,13 @@ function StartParamRouter() {
       console.log(`[Referral/Web] Saved ref=${webRef} to localStorage`);
     }
 
+    // If user came with ref param, redirect to studio (auth modal will show if not logged in)
+    if (webRef) {
+      processedRef.current = true;
+      navigate('/studio', { replace: true, state: { fromDeepLink: true, showAuthModal: true } });
+      return;
+    }
+
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;

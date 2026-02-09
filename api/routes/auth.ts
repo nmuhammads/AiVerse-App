@@ -251,6 +251,12 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
         avatar_url: telegramData.photo_url,
         balance: 6
       }
+    } else {
+      // Existing user - set ref if empty
+      if (ref && !publicUser.ref) {
+        await supaPatch('users', `?user_id=eq.${publicUser.user_id}`, { ref })
+        console.log(`[Referral/TG-Login] Set ref=${ref} for existing user ${telegramId}`)
+      }
     }
 
     // For Telegram login, we create a simple session token
