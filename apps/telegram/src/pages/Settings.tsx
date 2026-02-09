@@ -28,12 +28,13 @@ export default function Settings() {
     const { t, i18n, ready } = useTranslation()
     const navigate = useNavigate()
     const { impact } = useHaptics()
-    const { addToHomeScreen, checkHomeScreenStatus, platform, tg, isInTelegram } = useTelegram()
+    const { addToHomeScreen, checkHomeScreenStatus, platform, tg, isInTelegram, user } = useTelegram()
     const [canAddToHome, setCanAddToHome] = useState(false)
     const [notifExpanded, setNotifExpanded] = useState(false)
     const [langExpanded, setLangExpanded] = useState(false)
     const [notifSettings, setNotifSettings] = useState<NotificationSettings>(defaultSettings)
     const [showArrow, setShowArrow] = useState(false)
+    const [remixCount, setRemixCount] = useState(0)
     const [searchParams] = useSearchParams()
 
     // Fingerprint decoder state
@@ -107,8 +108,7 @@ export default function Settings() {
         }
     }, [isMobile])
 
-    const [remixCount, setRemixCount] = useState(0)
-    const { user } = useTelegram()
+
 
     useEffect(() => {
         if (user?.id) {
