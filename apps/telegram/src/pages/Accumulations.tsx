@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useTelegram } from '@/hooks/useTelegram'
+import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { ArrowRight, Coins, ChevronLeft, ImageOff } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -73,7 +73,9 @@ export default function Accumulations() {
             setLoading(true)
             const limit = 20
             const offset = pageNum * limit
-            const res = await fetch(`/api/user/accumulations?user_id=${user.id}&limit=${limit}&offset=${offset}`)
+            const res = await fetch(`/api/user/accumulations?user_id=${user.id}&limit=${limit}&offset=${offset}`, {
+                headers: { ...getAuthHeaders() }
+            })
             const data = await res.json()
 
             if (data.items && Array.isArray(data.items)) {
