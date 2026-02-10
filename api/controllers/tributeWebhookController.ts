@@ -6,6 +6,7 @@
 import { Request, Response } from 'express'
 import * as crypto from 'crypto'
 import { supaSelect, supaPatch } from '../services/supabaseService.js'
+import { processPartnerBonus } from '../services/partnerService.js'
 import { logBalanceChange } from '../services/balanceAuditService.js'
 import { tg } from './telegramController.js'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
@@ -188,6 +189,9 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookOrder
             amount: order.amount,
         }
     })
+
+    // Partner bonus accrual
+    await processPartnerBonus(userId, order.amount, (order.currency || 'rub').toUpperCase())
 
     // Update order status
     await updateOrderStatus(order.uuid, 'paid')

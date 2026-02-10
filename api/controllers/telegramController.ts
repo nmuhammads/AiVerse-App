@@ -5,6 +5,7 @@ import { addFingerprint } from '../utils/fingerprint.js'
 import { applyTextWatermark, applyImageWatermark } from '../utils/watermark.js'
 import { getTelegramMessage } from '../utils/telegramMessages.js'
 import { compressVideoForTelegram } from '../services/videoProcessingService.js'
+import { processPartnerBonus } from '../services/partnerService.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -749,6 +750,8 @@ export async function webhook(req: Request, res: Response) {
             const spinText = spinsToAdd > 0 ? `\n🎰 Бонус: +${spinsToAdd} ${spinsToAdd === 1 ? 'спин' : 'спина'} для Колеса Фортуны!` : ''
             const promoText = promoActive ? `\n(Включая новогодний бонус +${bonusTokens} 🎁)` : ''
             await tg('sendMessage', { chat_id: userId, text: `✅ Оплата прошла успешно! Начислено ${tokensToAdd} токенов.${promoText}${spinText}` })
+            // Partner bonus accrual
+            await processPartnerBonus(userId, payment.total_amount || 0, 'XTR')
           } else {
             console.error('[Payment] Failed to update balance', updateRes)
             await tg('sendMessage', { chat_id: userId, text: `⚠️ Оплата прошла, но возникла ошибка при начислении. Обратитесь в поддержку.` })
