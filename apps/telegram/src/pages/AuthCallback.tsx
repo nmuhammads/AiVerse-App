@@ -53,6 +53,19 @@ export default function AuthCallback() {
                         setUser(data.user)
                         setAuthMethod('web')
 
+                        // Set referral for OAuth users
+                        const storedRef = localStorage.getItem('aiverse_ref')
+                        if (storedRef && data.user?.id) {
+                            fetch('/api/user/set-referral', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${accessToken}`
+                                },
+                                body: JSON.stringify({ user_id: data.user.id, ref: storedRef })
+                            }).finally(() => localStorage.removeItem('aiverse_ref'))
+                        }
+
                         setStatus('success')
                         setMessage(type === 'signup' ? 'Email подтверждён!' : 'Вход выполнен!')
 

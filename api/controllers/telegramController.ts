@@ -29,6 +29,426 @@ export async function tg(method: string, payload: Record<string, unknown>) {
 import { supaSelect, supaPatch, supaPost } from '../services/supabaseService.js'
 import { logBalanceChange } from '../services/balanceAuditService.js'
 
+// Helper to check if spin event is enabled
+async function isSpinEventEnabled(): Promise<boolean> {
+  try {
+    const result = await supaSelect('event_settings', `?event_key=eq.spin&select=enabled,start_date,end_date`)
+    if (!result.ok || !result.data || result.data.length === 0) {
+      return false
+    }
+    const event = result.data[0]
+    const now = new Date()
+    let isActive = event.enabled
+    if (event.start_date && new Date(event.start_date) > now) {
+      isActive = false
+    }
+    if (event.end_date && new Date(event.end_date) < now) {
+      isActive = false
+    }
+    return isActive
+  } catch (e) {
+    console.error('[Spin] isSpinEventEnabled error:', e)
+    return false
+  }
+}
+
+// Topic definitions for private chats (Bot API 9.4)
+// Note: icon_custom_emoji_id requires Premium, using Unicode emoji in names instead
+const TOPIC_DEFINITIONS = [
+  { name: '🏠 Домой', welcome: '👋 Добро пожаловать в AI Verse!\n\nЭто главный экран — здесь вы найдёте помощь и навигацию.\n\nИспользуйте топики слева для работы с разными моделями!' },
+  { name: '🧠 ИИ Чат', welcome: '🧠 *ИИ Чат*\n\nЗдесь вы можете общаться с искусственным интеллектом.\n\n_Отправьте сообщение, чтобы начать!_' },
+  { name: '🍌 NanoBanana', welcome: '🍌 *NanoBanana*\n\nБыстрая генерация изображений!\n• NanoBanana — 3 токена\n• NanoBanana Pro — 15 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '⚡ Seedream', welcome: '⚡ *Seedream*\n\nКачественные изображения!\n• Seedream 4 — 4 токена\n• Seedream 4.5 — 7 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '🤖 GPT Image', welcome: '🤖 *GPT Image 1.5*\n\nМодель от OpenAI\n• Medium — 5 токенов\n• High — 15 токенов\n\n_Отправьте промпт для генерации_' },
+  { name: '🎬 Видео', welcome: '🎬 *Генерация видео*\n\n• Seedance Pro — 12-116 токенов\n• Kling AI — 30-220 токенов\n  ↳ T2V, I2V, Motion Control\n\n_Отправьте промпт или изображение_' },
+  { name: '🎨 Другое', welcome: '🎨 *Редактор и другие модели*\n\nЗдесь доступны дополнительные функции:\n• Редактирование изображений\n• Upscale\n• Другие модели\n\n_Откройте мини-апп для доступа_' },
+]
+
+// Create forum topics for a user (Bot API 9.4)
+async function createUserTopics(chatId: number): Promise<Record<string, number>> {
+  const topicIds: Record<string, number> = {}
+
+  for (const topic of TOPIC_DEFINITIONS) {
+    try {
+      const params: Record<string, unknown> = {
+        chat_id: chatId,
+        name: topic.name,
+      }
+
+      const result = await tg('createForumTopic', params)
+
+      if (result?.ok && result.result?.message_thread_id) {
+        const threadId = result.result.message_thread_id
+        topicIds[topic.name] = threadId
+
+        // Send welcome message to the topic
+        await tg('sendMessage', {
+          chat_id: chatId,
+          message_thread_id: threadId,
+          text: topic.welcome,
+          parse_mode: 'Markdown'
+        })
+
+        console.log(`[Topics] Created topic "${topic.name}" with id ${threadId} for chat ${chatId}`)
+      } else {
+        console.error(`[Topics] Failed to create topic "${topic.name}":`, result)
+      }
+    } catch (e) {
+      console.error(`[Topics] Error creating topic "${topic.name}":`, e)
+    }
+  }
+
+  return topicIds
+}
+
+// Check if topics are enabled for the bot (Bot API 9.4)
+// This uses getMe since has_topics_enabled is a property of the bot, not the chat
+let botTopicsEnabled: boolean | null = null // Cache the result
+
+async function checkBotTopicsEnabled(): Promise<boolean> {
+  if (botTopicsEnabled !== null) return botTopicsEnabled
+
+  try {
+    const result = await tg('getMe', {})
+    console.log(`[Topics] getMe result:`, JSON.stringify(result?.result, null, 2))
+    botTopicsEnabled = result?.ok && result.result?.has_topics_enabled === true
+    console.log(`[Topics] Bot topics enabled: ${botTopicsEnabled}`)
+    return botTopicsEnabled
+  } catch (e) {
+    console.error(`[Topics] checkBotTopicsEnabled error:`, e)
+    return false
+  }
+}
+
+// Get file URL from Telegram file_id
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
+async function getFileUrl(fileId: string): Promise<string | null> {
+  try {
+    const result = await tg('getFile', { file_id: fileId })
+    if (result?.ok && result.result?.file_path) {
+      return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${result.result.file_path}`
+    }
+    return null
+  } catch (e) {
+    console.error('[Topics] getFileUrl error:', e)
+    return null
+  }
+}
+
+// Find topic name by thread_id
+function getTopicByThreadId(topicIds: Record<string, number>, threadId: number): string | null {
+  for (const [name, id] of Object.entries(topicIds)) {
+    if (id === threadId) return name
+  }
+  return null
+}
+
+// Topic message handler - routes to appropriate handler based on topic
+async function handleTopicMessage(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  topicName: string,
+  text: string,
+  photoFileId?: string
+): Promise<{ handled: boolean }> {
+  console.log(`[Topics] Handling message in "${topicName}" from user ${userId}: ${text.slice(0, 50)}...`)
+
+  // Get photo URL if provided
+  let imageUrl: string | null = null
+  if (photoFileId) {
+    imageUrl = await getFileUrl(photoFileId)
+    console.log(`[Topics] Photo URL: ${imageUrl}`)
+  }
+
+  switch (topicName) {
+    case '🧠 ИИ Чат':
+      await handleAIChat(chatId, threadId, userId, text, imageUrl)
+      return { handled: true }
+
+    case '🍌 NanoBanana':
+      await handleImageGeneration(chatId, threadId, userId, 'nanobanana-pro', text, imageUrl)
+      return { handled: true }
+
+    case '⚡ Seedream':
+      await handleImageGeneration(chatId, threadId, userId, 'seedream4-5', text, imageUrl)
+      return { handled: true }
+
+    case '🤖 GPT Image':
+      await handleImageGeneration(chatId, threadId, userId, 'gpt-image-1.5', text, imageUrl)
+      return { handled: true }
+
+    case '🎬 Видео':
+      await handleVideoTopic(chatId, threadId)
+      return { handled: true }
+
+    case '🎨 Другое':
+      await handleEditorTopic(chatId, threadId)
+      return { handled: true }
+
+    case '🏠 Домой':
+      await handleHomeTopic(chatId, threadId)
+      return { handled: true }
+
+    default:
+      return { handled: false }
+  }
+}
+
+// AI Chat handler using chatService
+import { getChatCompletion } from '../services/chatService.js'
+
+// In-memory chat history (last 10 messages per user)
+const chatHistories: Map<number, Array<{ role: 'user' | 'assistant'; content: string }>> = new Map()
+
+async function handleAIChat(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  text: string,
+  imageUrl: string | null
+): Promise<void> {
+  try {
+    // Get or create history
+    let history = chatHistories.get(userId) || []
+
+    // Add user message
+    const userContent = imageUrl
+      ? [{ type: 'text' as const, text }, { type: 'image_url' as const, image_url: { url: imageUrl } }]
+      : text
+    history.push({ role: 'user', content: typeof userContent === 'string' ? userContent : JSON.stringify(userContent) })
+
+    // Keep last 10 messages
+    if (history.length > 10) history = history.slice(-10)
+    chatHistories.set(userId, history)
+
+    // Send typing action
+    await tg('sendChatAction', { chat_id: chatId, message_thread_id: threadId, action: 'typing' })
+
+    // Get AI response
+    const response = await getChatCompletion(
+      history.map(m => ({ role: m.role, content: m.content })),
+      'deepseek/deepseek-v3.2'
+    )
+
+    // Add assistant message to history
+    history.push({ role: 'assistant', content: response })
+    chatHistories.set(userId, history.slice(-10))
+
+    // Send response
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: response,
+      parse_mode: 'Markdown'
+    })
+  } catch (e) {
+    console.error('[Topics] AI Chat error:', e)
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: '❌ Ошибка AI чата. Попробуйте позже или откройте веб-версию.',
+      reply_markup: {
+        inline_keyboard: [[{ text: '🌐 Открыть в браузере', web_app: { url: APP_URL } }]]
+      }
+    })
+  }
+}
+
+// Image generation handler using Kie.ai
+async function handleImageGeneration(
+  chatId: number,
+  threadId: number,
+  userId: number,
+  model: string,
+  prompt: string,
+  imageUrl: string | null
+): Promise<void> {
+  try {
+    // Check balance
+    const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance,active_generations`)
+    if (!userQ.ok || !userQ.data?.[0]) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: '❌ Пользователь не найден. Нажмите /start'
+      })
+      return
+    }
+
+    const user = userQ.data[0]
+    const activeGens = user.active_generations || 0
+
+    // Check rate limit (max 3 parallel)
+    if (activeGens >= 3) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: '⏳ У вас уже 3 активные генерации. Дождитесь завершения.'
+      })
+      return
+    }
+
+    // Model prices
+    const MODEL_PRICES: Record<string, number> = {
+      'nanobanana-pro': 15,
+      'seedream4-5': 7,
+      'gpt-image-1.5': 5
+    }
+    const price = MODEL_PRICES[model] || 5
+
+    // Check balance
+    if (user.balance < price) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        message_thread_id: threadId,
+        text: `❌ Недостаточно токенов. Нужно: ${price}, баланс: ${user.balance}`,
+        reply_markup: {
+          inline_keyboard: [[{ text: '💎 Пополнить', web_app: { url: `${APP_URL}/balance` } }]]
+        }
+      })
+      return
+    }
+
+    // Increment active generations
+    await supaPatch('users', `?user_id=eq.${userId}`, { active_generations: activeGens + 1 })
+
+    // Send progress message
+    const progressMsg = await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: `🎨 Генерирую с ${model}...`
+    })
+
+    try {
+      // TODO: Call Kie.ai API here
+      // For now, placeholder - need to integrate with existing Kie.ai code
+      const KIE_API_KEY = process.env.KIE_API_KEY || ''
+      const KIE_API_URL = 'https://api.kie.ai/v1/images/generations'
+
+      // NanoBanana Pro uses 2K quality by default
+      const quality = model === 'nanobanana-pro' ? '2k' : 'standard'
+
+      const kieBody: Record<string, unknown> = {
+        model,
+        prompt,
+        quality,
+        n: 1
+      }
+      if (imageUrl) {
+        kieBody.image = imageUrl
+      }
+
+      const kieRes = await fetch(KIE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${KIE_API_KEY}`
+        },
+        body: JSON.stringify(kieBody)
+      })
+
+      const kieData = await kieRes.json()
+      console.log('[Topics] Kie.ai response:', kieData)
+
+      if (kieData.data?.[0]?.url) {
+        const resultUrl = kieData.data[0].url
+
+        // Deduct balance
+        await supaPatch('users', `?user_id=eq.${userId}`, { balance: user.balance - price })
+
+        // Log balance change
+        await logBalanceChange({
+          userId,
+          oldBalance: user.balance,
+          newBalance: user.balance - price,
+          reason: 'generation',
+          metadata: { model, source: 'topic' }
+        })
+
+        // Send result
+        await tg('sendPhoto', {
+          chat_id: chatId,
+          message_thread_id: threadId,
+          photo: resultUrl,
+          caption: `✅ Готово! (-${price} токенов)`
+        })
+
+        // Delete progress message
+        if (progressMsg?.result?.message_id) {
+          await tg('deleteMessage', { chat_id: chatId, message_id: progressMsg.result.message_id })
+        }
+      } else {
+        throw new Error(kieData.error?.message || 'Generation failed')
+      }
+    } finally {
+      // Decrement active generations
+      await supaPatch('users', `?user_id=eq.${userId}`, { active_generations: Math.max(0, activeGens) })
+    }
+  } catch (e: any) {
+    console.error('[Topics] Image generation error:', e)
+    await tg('sendMessage', {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text: `❌ Ошибка генерации: ${e.message || 'Попробуйте позже'}`,
+      reply_markup: {
+        inline_keyboard: [[{ text: '🌐 Открыть в браузере', web_app: { url: `${APP_URL}/studio` } }]]
+      }
+    })
+  }
+}
+
+// Video topic shows buttons only
+async function handleVideoTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: '🎬 *Генерация видео*\n\nВыберите модель для перехода в студию:',
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🌸 Seedance Pro', web_app: { url: `${APP_URL}/studio?model=seedance-1.5-pro&media=video` } }],
+        [{ text: '🎥 Kling T2V / I2V', web_app: { url: `${APP_URL}/studio?model=kling-t2v&media=video` } }],
+        [{ text: '🎬 Kling Motion Control', web_app: { url: `${APP_URL}/studio?model=kling-mc&media=video` } }]
+      ]
+    }
+  })
+}
+
+// Editor topic shows redirect button
+async function handleEditorTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: '🎨 *Редактор*\n\nФункции редактирования доступны в веб-приложении:',
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [[{ text: '🎨 Открыть редактор', web_app: { url: `${APP_URL}/editor` } }]]
+    }
+  })
+}
+
+// Home topic shows help
+async function handleHomeTopic(chatId: number, threadId: number): Promise<void> {
+  await tg('sendMessage', {
+    chat_id: chatId,
+    message_thread_id: threadId,
+    text: `🏠 *Добро пожаловать в AI Verse!*
+
+📌 *Как использовать топики:*
+
+• 🧠 *ИИ Чат* — общайтесь с AI ассистентом
+• 🍌 *NanoBanana* — быстрая генерация (промпт/фото)
+• ⚡ *Seedream* — качественные арты
+• 🤖 *GPT Image* — OpenAI качество
+• 🎬 *Видео* — создание видео
+• 🎨 *Другое* — редактор изображений
+
+_Отправьте промпт в любой топик для генерации!_`,
+    parse_mode: 'Markdown'
+  })
+}
+
 export async function webhook(req: Request, res: Response) {
   try {
     if (WEBHOOK_SECRET) {
@@ -43,6 +463,232 @@ export async function webhook(req: Request, res: Response) {
     if (update.pre_checkout_query) {
       const id = update.pre_checkout_query.id
       await tg('answerPreCheckoutQuery', { pre_checkout_query_id: id, ok: true })
+      return res.json({ ok: true })
+    }
+
+    // Handle Callback Queries (inline button presses)
+    if (update.callback_query) {
+      const callback = update.callback_query
+      const callbackChatId = callback.message?.chat?.id
+      const callbackMessageId = callback.message?.message_id
+      const callbackUserId = callback.from?.id
+      const data = callback.data || ''
+
+      // Helper to get user balance text
+      const getBalanceText = async () => {
+        if (callbackUserId) {
+          const userQ = await supaSelect('users', `?user_id=eq.${callbackUserId}&select=balance`)
+          if (userQ.ok && userQ.data?.[0]) {
+            return `\n\n💰 Ваш баланс: *${userQ.data[0].balance || 0}* токенов`
+          }
+        }
+        return ''
+      }
+
+      // Step 1: Show payment method choice (Stars or Card)
+      if (data === 'topup' && callbackChatId && callbackMessageId) {
+        const balanceText = await getBalanceText()
+        const methodText = `💎 *Пополнение баланса*${balanceText}
+
+Выберите способ оплаты:
+
+⭐ *Telegram Stars* — мгновенная оплата
+💳 *Банковская карта* — EUR/RUB`
+
+        const kb = {
+          inline_keyboard: [
+            [{ text: '⭐ Telegram Stars', callback_data: 'topup_stars' }],
+            [{ text: '💳 Банковская карта', callback_data: 'topup_card' }],
+            [{ text: '« Назад', callback_data: 'back_to_profile' }]
+          ]
+        }
+        await tg('editMessageText', {
+          chat_id: callbackChatId,
+          message_id: callbackMessageId,
+          text: methodText,
+          parse_mode: 'Markdown',
+          reply_markup: kb
+        })
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Step 2: Show Stars packages (min 50 tokens)
+      if (data === 'topup_stars' && callbackChatId && callbackMessageId) {
+        const balanceText = await getBalanceText()
+        const starsText = `⭐ *Оплата Telegram Stars*${balanceText}
+
+Выберите пакет:`
+
+        const kb = {
+          inline_keyboard: [
+            [{ text: '⭐ 50 Stars → 25 токенов', callback_data: 'pay_stars_50' }],
+            [{ text: '⭐ 100 Stars → 50 токенов', callback_data: 'pay_stars_100' }],
+            [{ text: '⭐ 200 Stars → 100 токенов 🔥', callback_data: 'pay_stars_200' }],
+            [{ text: '⭐ 600 Stars → 300 токенов +🎰', callback_data: 'pay_stars_600' }],
+            [{ text: '⭐ 1000 Stars → 550 токенов 🎁', callback_data: 'pay_stars_1000' }],
+            [{ text: '« Назад', callback_data: 'topup' }]
+          ]
+        }
+        await tg('editMessageText', {
+          chat_id: callbackChatId,
+          message_id: callbackMessageId,
+          text: starsText,
+          parse_mode: 'Markdown',
+          reply_markup: kb
+        })
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Step 2 alt: Show Card payment options
+      if (data === 'topup_card' && callbackChatId && callbackMessageId) {
+        const balanceText = await getBalanceText()
+        const cardText = `💳 *Оплата картой*${balanceText}
+
+Нажмите кнопку ниже чтобы открыть страницу оплаты:
+
+Принимаем: Visa, Mastercard, МИР, UnionPay`
+
+        const kb = {
+          inline_keyboard: [
+            [{ text: '💳 Открыть оплату', web_app: { url: `${APP_URL}?tgWebAppStartParam=balance` } }],
+            [{ text: '« Назад', callback_data: 'topup' }]
+          ]
+        }
+        await tg('editMessageText', {
+          chat_id: callbackChatId,
+          message_id: callbackMessageId,
+          text: cardText,
+          parse_mode: 'Markdown',
+          reply_markup: kb
+        })
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Step 3: Stars payment - create invoice
+      if (data.startsWith('pay_stars_') && callbackChatId && callbackMessageId) {
+        const starAmount = parseInt(data.replace('pay_stars_', ''))
+        const STAR_PACKAGES: Record<number, { tokens: number; spins: number }> = {
+          50: { tokens: 25, spins: 0 },
+          100: { tokens: 50, spins: 0 },
+          200: { tokens: 100, spins: 0 },
+          600: { tokens: 300, spins: 1 },
+          1000: { tokens: 550, spins: 2 }
+        }
+
+        const pkg = STAR_PACKAGES[starAmount]
+        if (pkg) {
+          try {
+            // Create Stars invoice
+            const invoiceResult = await tg('createInvoiceLink', {
+              title: `${pkg.tokens} токенов`,
+              description: `Пополнение баланса на ${pkg.tokens} токенов`,
+              payload: JSON.stringify({ packageId: `star_${starAmount}`, tokens: pkg.tokens, spins: pkg.spins }),
+              currency: 'XTR',
+              prices: [{ label: `${pkg.tokens} токенов`, amount: starAmount }]
+            })
+
+            if (invoiceResult?.ok && invoiceResult.result) {
+              const invoiceLink = invoiceResult.result
+              const bonusText = pkg.spins > 0 ? `\n🎰 Бонус: +${pkg.spins} ${pkg.spins === 1 ? 'спин' : 'спина'}` : ''
+
+              await tg('editMessageText', {
+                chat_id: callbackChatId,
+                message_id: callbackMessageId,
+                text: `💳 *Оплата ${starAmount} Stars*\n\nВы получите: *${pkg.tokens} токенов*${bonusText}\n\n👇 Нажмите кнопку для оплаты:`,
+                parse_mode: 'Markdown',
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: `⭐ Оплатить ${starAmount} Stars`, url: invoiceLink }],
+                    [{ text: '« Назад к пакетам', callback_data: 'topup_stars' }]
+                  ]
+                }
+              })
+            } else {
+              await tg('editMessageText', {
+                chat_id: callbackChatId,
+                message_id: callbackMessageId,
+                text: '❌ Ошибка создания платежа. Попробуйте позже.',
+                parse_mode: 'Markdown',
+                reply_markup: {
+                  inline_keyboard: [[{ text: '« Назад', callback_data: 'topup_stars' }]]
+                }
+              })
+            }
+          } catch (e) {
+            console.error('[Payment] Stars invoice error:', e)
+            await tg('editMessageText', {
+              chat_id: callbackChatId,
+              message_id: callbackMessageId,
+              text: '❌ Ошибка создания платежа. Попробуйте позже.',
+              parse_mode: 'Markdown',
+              reply_markup: {
+                inline_keyboard: [[{ text: '« Назад', callback_data: 'topup_stars' }]]
+              }
+            })
+          }
+        }
+
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Back to profile
+      if (data === 'back_to_profile' && callbackChatId && callbackMessageId && callbackUserId) {
+        // Re-fetch and show profile
+        const userQ = await supaSelect('users', `?user_id=eq.${callbackUserId}&select=balance,username,first_name,spins`)
+
+        let genCount = 0
+        try {
+          const genRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/generations?user_id=eq.${callbackUserId}&select=id`, {
+            method: 'HEAD',
+            headers: {
+              'apikey': process.env.SUPABASE_ANON_KEY || '',
+              'Prefer': 'count=exact'
+            }
+          })
+          const countHeader = genRes.headers.get('content-range')
+          if (countHeader) {
+            const match = countHeader.match(/\/(\d+)$/)
+            if (match) genCount = parseInt(match[1])
+          }
+        } catch (e) { /* ignore */ }
+
+        if (userQ.ok && userQ.data?.[0]) {
+          const user = userQ.data[0]
+          const spinEnabled = await isSpinEventEnabled()
+          const spinLine = spinEnabled ? `\n🎰 *Спины:* ${user.spins || 0}` : ''
+          const profileText = `👤 *Ваш профиль*
+
+📛 *Имя:* ${user.first_name || callback.from?.first_name || 'Не указано'}
+🆔 *ID:* \`${callbackUserId}\`
+
+💰 *Баланс:* ${user.balance || 0} токенов${spinLine}
+🎨 *Генераций:* ${genCount}`
+
+          const kb = {
+            inline_keyboard: [
+              [{ text: '🎨 Мои генерации', web_app: { url: `${APP_URL}/profile` } }],
+              [{ text: '💎 Пополнить', callback_data: 'topup' }],
+              [{ text: '⚙️ Настройки', web_app: { url: `${APP_URL}/settings` } }]
+            ]
+          }
+          await tg('editMessageText', {
+            chat_id: callbackChatId,
+            message_id: callbackMessageId,
+            text: profileText,
+            parse_mode: 'Markdown',
+            reply_markup: kb
+          })
+        }
+        await tg('answerCallbackQuery', { callback_query_id: callback.id })
+        return res.json({ ok: true })
+      }
+
+      // Default: just answer callback
+      await tg('answerCallbackQuery', { callback_query_id: callback.id })
       return res.json({ ok: true })
     }
 
@@ -68,14 +714,20 @@ export async function webhook(req: Request, res: Response) {
       const userId = msg.from?.id
       const payload = JSON.parse(payment.invoice_payload || '{}')
       const baseTokens = Number(payload.tokens || 0)
-      const spinsToAdd = Number(payload.spins || 0)
+      let spinsToAdd = Number(payload.spins || 0)
+
+      // Check if spin event is enabled - don't award spins if disabled
+      const spinEventEnabled = await isSpinEventEnabled()
+      if (!spinEventEnabled) {
+        spinsToAdd = 0
+      }
 
       // Apply New Year promo bonus (+20%)
       const promoActive = isPromoActive()
       const tokensToAdd = promoActive ? calculateBonusTokens(baseTokens) : baseTokens
       const bonusTokens = promoActive ? getBonusAmount(baseTokens) : 0
 
-      console.log(`[Payment] Successful payment from ${userId}, base: ${baseTokens}, bonus: ${bonusTokens}, total: ${tokensToAdd}, promoActive: ${promoActive}, spins: ${spinsToAdd}, payload:`, payload)
+      console.log(`[Payment] Successful payment from ${userId}, base: ${baseTokens}, bonus: ${bonusTokens}, total: ${tokensToAdd}, promoActive: ${promoActive}, spins: ${spinsToAdd}, spinEventEnabled: ${spinEventEnabled}, payload:`, payload)
 
       if (userId && tokensToAdd > 0) {
         // Fetch current balance and spins
@@ -109,11 +761,107 @@ export async function webhook(req: Request, res: Response) {
     }
 
     const chatId = msg?.chat?.id
-    const text = String(msg?.text || '').trim()
+    const text = String(msg?.text || msg?.caption || '').trim()
+    const threadId = msg?.message_thread_id
+    const userId = msg?.from?.id
+
+    // DISABLED: Handle topic messages (Bot API 9.4 - Forum Topics) - to be enabled later
+    const TOPICS_ROUTING_ENABLED = false
+    if (TOPICS_ROUTING_ENABLED && chatId && threadId && userId) {
+      // Get topic_ids from DB
+      const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=topic_ids`)
+      const topicIds = userQ.ok && userQ.data?.[0]?.topic_ids || {}
+
+      if (Object.keys(topicIds).length > 0) {
+        const topicName = getTopicByThreadId(topicIds, threadId)
+        if (topicName) {
+          // Get photo file_id if present
+          let photoFileId: string | undefined
+          if (msg.photo && Array.isArray(msg.photo) && msg.photo.length > 0) {
+            photoFileId = msg.photo[msg.photo.length - 1].file_id
+          }
+
+          const result = await handleTopicMessage(chatId, threadId, userId, topicName, text || '', photoFileId)
+          if (result.handled) {
+            return res.json({ ok: true })
+          }
+        }
+      }
+    }
+
     if (!chatId || !text) return res.json({ ok: true })
     if (text.startsWith('/start')) {
       const parts = text.split(/\s+/)
       const param = parts.length > 1 ? parts[1] : ''
+
+      // Reply keyboard with models and buttons (with custom emoji icons - Bot API 9.4)
+      // Custom emoji IDs for animated icons
+      const EMOJI_IDS = {
+        banana: '5361573813521756274',    // 🍌 NanoBanana
+        seedream: '5282731554135615450',  // 🌩 Seedream
+        gptImage: '5359726582447487916',  // 📱 GPT Image
+        aiChat: '5226639745106330551',    // 🧠 AI Chat
+        video: '5375464961822695044',     // 🎬 Video (Kling/Seedance)
+      }
+
+      const mainKeyboard = {
+        keyboard: [
+          [{ text: 'Чат с ИИ', icon_custom_emoji_id: EMOJI_IDS.aiChat }],
+          [
+            { text: 'NanoBanana', icon_custom_emoji_id: EMOJI_IDS.banana },
+            { text: 'Seedream 4', icon_custom_emoji_id: EMOJI_IDS.seedream }
+          ],
+          [
+            { text: 'Seedream 4.5', icon_custom_emoji_id: EMOJI_IDS.seedream },
+            { text: 'GPT Image', icon_custom_emoji_id: EMOJI_IDS.gptImage }
+          ],
+          [
+            { text: 'Seedance', icon_custom_emoji_id: EMOJI_IDS.video },
+            { text: 'Kling', icon_custom_emoji_id: EMOJI_IDS.video }
+          ],
+          [{ text: '👤 Профиль' }, { text: '💎 Пополнить' }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true
+      }
+
+      // DISABLED: Forum topics feature (Bot API 9.4) - to be enabled later
+      const TOPICS_ENABLED = false
+      if (TOPICS_ENABLED) {
+        // Check if topics are enabled and create them if needed (Bot API 9.4)
+        const topicsEnabled = await checkBotTopicsEnabled()
+        if (topicsEnabled) {
+          // Check if user already has topics (check in DB or just try to create)
+          const userId = msg.from?.id
+          if (userId) {
+            // Check if user exists in DB with topics_created flag
+            const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=user_id,topics_created,topic_ids`)
+            const userData = userQ.data?.[0]
+            const hasTopics = userQ.ok && userData?.topics_created === true && Object.keys(userData?.topic_ids || {}).length > 0
+
+            console.log(`[Topics] User ${userId} check: ok=${userQ.ok}, topics_created=${userData?.topics_created}, hasTopics=${hasTopics}`)
+
+            if (!hasTopics) {
+              console.log(`[Topics] Creating topics for user ${userId}...`)
+              const topicIds = await createUserTopics(chatId)
+
+              if (Object.keys(topicIds).length > 0) {
+                // Save topics_created flag and topic_ids to DB
+                const updateData = { topics_created: true, topic_ids: topicIds }
+                if (userQ.ok && userQ.data?.[0]) {
+                  await supaPatch('users', `?user_id=eq.${userId}`, updateData)
+                } else {
+                  await supaPost('users', { user_id: userId, ...updateData }, '?on_conflict=user_id')
+                }
+                console.log(`[Topics] Created ${Object.keys(topicIds).length} topics for user ${userId}:`, topicIds)
+
+                // Don't send the regular welcome since topics have their own welcomes
+                return res.json({ ok: true })
+              }
+            }
+          }
+        }
+      }
 
       // Handle referral: /start ref_username
       if (param.startsWith('ref_')) {
@@ -133,24 +881,28 @@ export async function webhook(req: Request, res: Response) {
             console.log(`[Referral/Webhook] Created user ${userId} with ref=${refValue}`)
           }
         }
-        const info = '👋 Добро пожаловать в AI Verse!'
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
+        const info = '👋 Добро пожаловать в AI Verse!\n\nВыберите модель для генерации или откройте приложение:'
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Или откройте полную версию:', reply_markup: inlineKb })
         return res.json({ ok: true })
       }
 
       if (APP_URL && (param === 'home' || param === 'generate' || param === 'studio' || param === 'top' || param === 'profile')) {
         const startVal = param === 'studio' ? 'generate' : param
         const url = startVal === 'home' ? APP_URL : `${APP_URL}?tgWebAppStartParam=${encodeURIComponent(startVal)}`
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: 'Открыть мини‑апп', reply_markup: kb })
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: '✨ AI Verse — генерация изображений и видео ИИ', reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Откройте мини‑апп:', reply_markup: inlineKb })
       } else {
-        const info = 'AI Verse — мини‑приложение генерации изображений ИИ.'
-        const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
-        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: kb })
+        const info = '✨ AI Verse — генерация изображений и видео с помощью ИИ!\n\n🎨 Выберите модель кнопками ниже или откройте приложение:'
+        const inlineKb = { inline_keyboard: [[{ text: '🚀 Открыть приложение', web_app: { url: APP_URL } }]] }
+        await tg('sendMessage', { chat_id: chatId, text: info, reply_markup: mainKeyboard })
+        await tg('sendMessage', { chat_id: chatId, text: '👇 Или откройте полную версию:', reply_markup: inlineKb })
       }
       return res.json({ ok: true })
     }
+
     if (text.startsWith('/home')) {
       if (APP_URL) {
         const kb = { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: APP_URL } }]] }
@@ -276,7 +1028,210 @@ export async function webhook(req: Request, res: Response) {
       return res.json({ ok: true })
     }
 
+    // Get bot username for deeplinks
+    let botUsername = 'AiVerseAppBot'
+    try {
+      const me = await tg('getMe', {})
+      if (me?.ok && me.result?.username) {
+        botUsername = me.result.username
+      }
+    } catch { /* use default */ }
+
+    // Model button handlers
+    const MODEL_INFO: Record<string, {
+      name: string;
+      description: string;
+      price: string;
+      studioUrl: string;
+      photo: string;
+      examples?: string;
+    }> = {
+      'NanoBanana': {
+        name: 'NanoBanana',
+        description: '🍌 *NanoBanana* — быстрая генерация изображений\n\n• NanoBanana — 3 токена\n• NanoBanana Pro — 15 токенов (высокое качество, Auto ratio)',
+        price: '3-15',
+        studioUrl: `${APP_URL}/studio?model=nanobanana-pro&media=image`,
+        photo: `${APP_URL}/models/nanobanana-pro.png`,
+        examples: 'Отлично подходит для быстрых генераций и экспериментов'
+      },
+      'Seedream 4': {
+        name: 'Seedream 4',
+        description: '⚡ *Seedream 4* — качественная модель генерации изображений\n\n• Стоимость: 4 токена\n• Высокое качество изображений\n• Поддержка различных соотношений сторон',
+        price: '4',
+        studioUrl: `${APP_URL}/studio?model=seedream4&media=image`,
+        photo: `${APP_URL}/models/seedream.png`,
+        examples: 'Идеально для фотореалистичных изображений'
+      },
+      'Seedream 4.5': {
+        name: 'Seedream 4.5',
+        description: '⚡ *Seedream 4.5* — улучшенная версия Seedream\n\n• Стоимость: 7 токенов\n• Улучшенное качество деталей\n• Более точное следование промпту',
+        price: '7',
+        studioUrl: `${APP_URL}/studio?model=seedream4-5&media=image`,
+        photo: `${APP_URL}/models/seedream-4-5.png`,
+        examples: 'Для самых детализированных изображений'
+      },
+      'GPT Image': {
+        name: 'GPT Image',
+        description: '🤖 *GPT Image 1.5* — модель от OpenAI\n\n• Medium качество: 5 токенов\n• High качество: 15 токенов\n• Отличное понимание текста',
+        price: '5-15',
+        studioUrl: `${APP_URL}/studio?model=gpt-image-1.5&media=image`,
+        photo: `${APP_URL}/models/optimized/gpt-image.png`,
+        examples: 'Лучший выбор для сложных промптов'
+      },
+      'Seedance': {
+        name: 'Seedance Pro',
+        description: '🎬 *Seedance Pro* — генерация видео\n\n• Text-to-Video и Image-to-Video\n• Разрешение: 480p / 720p\n• Длительность: 4-12 сек\n• Стоимость: 12-116 токенов',
+        price: '12-116',
+        studioUrl: `${APP_URL}/studio?model=seedance-1.5-pro&media=video`,
+        photo: `${APP_URL}/models/seedream.png`,
+        examples: '🎥 Создавайте потрясающие видео из текста или изображений!'
+      },
+      'Kling': {
+        name: 'Kling AI',
+        description: '🎬 *Kling AI* — продвинутая модель видео\n\n• Text-to-Video (T2V): 55-110 токенов\n• Image-to-Video (I2V): 55-110 токенов\n• Motion Control (MC): 30+ токенов\n  ↳ Контроль движения по видео-референсу\n\nПоддержка звука и длинных видео до 10 сек',
+        price: '30-220',
+        studioUrl: `${APP_URL}/studio?model=kling-t2v&media=video`,
+        photo: `${APP_URL}/models/optimized/kling.png`,
+        examples: '🌟 Используйте Motion Control для точного управления движением!'
+      }
+    }
+
+    // Handle model buttons
+    if (MODEL_INFO[text]) {
+      const model = MODEL_INFO[text]
+      const caption = `${model.description}\n\n💰 Стоимость: ${model.price} токенов\n\n${model.examples || ''}`
+
+      const inlineKb = {
+        inline_keyboard: [[
+          { text: '🚀 Открыть в Студии', web_app: { url: model.studioUrl } }
+        ]]
+      }
+
+      // Send photo with model info
+      const photoResult = await tg('sendPhoto', {
+        chat_id: chatId,
+        photo: model.photo,
+        caption,
+        parse_mode: 'Markdown',
+        reply_markup: inlineKb
+      })
+
+      // Fallback if photo fails
+      if (!photoResult?.ok) {
+        await tg('sendMessage', {
+          chat_id: chatId,
+          text: caption,
+          parse_mode: 'Markdown',
+          reply_markup: inlineKb
+        })
+      }
+
+      return res.json({ ok: true })
+    }
+
+    // Handle additional buttons
+    if (text === 'Чат с ИИ') {
+      const url = `${APP_URL}?tgWebAppStartParam=chat`
+      const kb = { inline_keyboard: [[{ text: '💬 Открыть чат', web_app: { url } }]] }
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '💬 *Чат с ИИ*\n\nОбщайтесь с искусственным интеллектом, задавайте вопросы и получайте ответы!',
+        parse_mode: 'Markdown',
+        reply_markup: kb
+      })
+      return res.json({ ok: true })
+    }
+
+    if (text === '👤 Профиль') {
+      const userId = msg.from?.id
+      if (userId) {
+        // Fetch user data
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance,username,first_name,spins`)
+
+        // Count generations
+        let genCount = 0
+        try {
+          const genRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/generations?user_id=eq.${userId}&select=id`, {
+            method: 'HEAD',
+            headers: {
+              'apikey': process.env.SUPABASE_ANON_KEY || '',
+              'Prefer': 'count=exact'
+            }
+          })
+          const countHeader = genRes.headers.get('content-range')
+          if (countHeader) {
+            const match = countHeader.match(/\/(\d+)$/)
+            if (match) genCount = parseInt(match[1])
+          }
+        } catch (e) {
+          console.error('[Profile] Gen count error:', e)
+        }
+
+        if (userQ.ok && userQ.data?.[0]) {
+          const user = userQ.data[0]
+          const spinEnabled = await isSpinEventEnabled()
+          const spinLine = spinEnabled ? `\n🎰 *Спины:* ${user.spins || 0}` : ''
+          const profileText = `👤 *Ваш профиль*
+
+📛 *Имя:* ${user.first_name || msg.from?.first_name || 'Не указано'}
+🆔 *ID:* \`${userId}\`
+
+💰 *Баланс:* ${user.balance || 0} токенов${spinLine}
+🎨 *Генераций:* ${genCount}`
+
+          const kb = {
+            inline_keyboard: [
+              [{ text: '🎨 Мои генерации', web_app: { url: `${APP_URL}/profile` } }],
+              [{ text: '💎 Пополнить', callback_data: 'topup' }],
+              [{ text: '⚙️ Настройки', web_app: { url: `${APP_URL}/settings` } }]
+            ]
+          }
+          await tg('sendMessage', { chat_id: chatId, text: profileText, parse_mode: 'Markdown', reply_markup: kb })
+        } else {
+          // User not found in DB, show basic info
+          const basicText = `👤 *Ваш профиль*
+
+📛 *Имя:* ${msg.from?.first_name || 'Не указано'}
+🆔 *ID:* \`${userId}\`
+
+⚠️ Нажмите /start чтобы активировать аккаунт`
+          await tg('sendMessage', { chat_id: chatId, text: basicText, parse_mode: 'Markdown' })
+        }
+      }
+      return res.json({ ok: true })
+    }
+
+    if (text === '💎 Пополнить') {
+      // Fetch user balance
+      const userId = msg.from?.id
+      let balanceText = ''
+      if (userId) {
+        const userQ = await supaSelect('users', `?user_id=eq.${userId}&select=balance`)
+        if (userQ.ok && userQ.data?.[0]) {
+          const balance = userQ.data[0].balance || 0
+          balanceText = `\n\n💰 Ваш баланс: *${balance}* токенов`
+        }
+      }
+
+      const methodText = `💎 *Пополнение баланса*${balanceText}
+
+Выберите способ оплаты:
+
+⭐ *Telegram Stars* — мгновенная оплата
+💳 *Банковская карта* — EUR/RUB`
+
+      const kb = {
+        inline_keyboard: [
+          [{ text: '⭐ Telegram Stars', callback_data: 'topup_stars' }],
+          [{ text: '💳 Банковская карта', callback_data: 'topup_card' }]
+        ]
+      }
+      await tg('sendMessage', { chat_id: chatId, text: methodText, parse_mode: 'Markdown', reply_markup: kb })
+      return res.json({ ok: true })
+    }
+
     return res.json({ ok: true })
+
   } catch (e) {
     console.error('webhook error', e)
     return res.json({ ok: true })

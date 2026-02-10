@@ -1,0 +1,59 @@
+# AiVerse - AI Creative Platform
+# https://llmstxt.org/
+
+> AiVerse is an AI-powered creative platform that enables users to generate images, videos, and chat with AI assistants. Available as a Telegram Mini App and web application.
+
+## About AiVerse
+
+AiVerse is a next-generation AI creative suite designed for content creators, artists, and anyone looking to explore artificial intelligence capabilities. Our platform combines multiple AI technologies into one seamless experience.
+
+## Core Features
+
+### AI Image Generation
+- Generate stunning images from text prompts
+- Multiple AI models including FLUX, GPT-Image, and more
+- Style customization and advanced parameters
+- High-resolution outputs up to 4K
+
+### AI Video Generation
+- Create videos from text descriptions
+- Support for Seedance, Kling, and other video models
+- Transform images to videos
+- Professional quality video exports
+
+### AI Chat Assistants
+- Conversational AI powered by GPT-4, Claude, and DeepSeek
+- Intelligent responses and creative assistance
+- Multi-language support (English, Russian, Spanish, French, German, Arabic)
+- Context-aware conversations
+
+### Community & Rewards
+- Daily bonuses and engagement rewards
+- Referral program for users
+- Community challenges and events
+- Achievement system with spin rewards
+
+## Technical Information
+
+- **Website**: https://www.aiverseapp.net
+- **Telegram Bot**: @aiversebot
+- **Contact**: contact@aiverseapp.net
+- **Supported Languages**: English, Russian, Spanish, French, German, Arabic
+
+## Pages
+
+- [Home](https://www.aiverseapp.net/)
+- [Login](https://www.aiverseapp.net/login)
+- [Studio](https://www.aiverseapp.net/studio)
+- [Privacy Policy](https://www.aiverseapp.net/privacy)
+- [Terms of Service](https://www.aiverseapp.net/terms)
+
+## API Access
+
+AiVerse provides AI generation capabilities through the Telegram Mini App platform. Direct API access is not currently available for external developers.
+
+## Contact
+
+For partnerships, support, or inquiries:
+- Email: contact@aiverseapp.net
+- Telegram: @aiversebot

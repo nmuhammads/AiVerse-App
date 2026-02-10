@@ -16,6 +16,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const { isAuthenticated, isLoading } = useAuthStore()
     const { isInTelegram, user: telegramUser } = useTelegram()
 
+    // DEV MODE: bypass auth for local development
+    const isDevMode = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true'
+    if (isDevMode) {
+        return <>{children}</>
+    }
+
     // In Telegram Mini App - always allow (auth handled by initData)
     if (isInTelegram && telegramUser) {
         return <>{children}</>

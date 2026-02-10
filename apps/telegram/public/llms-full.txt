@@ -1,0 +1,138 @@
+# AiVerse - Complete AI Creative Platform Documentation
+# Extended version for LLM context
+
+## Platform Overview
+
+AiVerse is a comprehensive AI-powered creative platform that democratizes access to cutting-edge artificial intelligence tools. Our mission is to empower creators of all skill levels to produce professional-quality content using the latest AI technologies.
+
+### What Makes AiVerse Unique
+
+1. **Multi-Model Approach**: We aggregate the best AI models from various providers, giving users access to FLUX, GPT-4, Claude, Seedance, Kling, and more through a single unified interface.
+
+2. **Telegram Integration**: Native Telegram Mini App experience allows users to create AI content directly within their messaging app, making AI accessible without additional downloads.
+
+3. **Web Platform**: Full-featured web application at https://www.aiverseapp.net for desktop users requiring more screen space for creative work.
+
+4. **Gamification**: Unique reward system with daily bonuses, spins, and referral rewards keeps users engaged while creating.
+
+## Detailed Feature Breakdown
+
+### Image Generation Capabilities
+
+AiVerse supports multiple state-of-the-art image generation models:
+
+- **FLUX**: Fast, high-quality image generation with excellent prompt adherence
+- **GPT-Image**: OpenAI's DALL-E powered image creation
+- **Stable Diffusion XL**: Open-source powerhouse for detailed imagery
+- **Midjourney-style**: Artistic and creative image outputs
+
+**Supported Parameters:**
+- Resolution: Up to 4K (4096x4096 pixels)
+- Aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4
+- Style presets: Photorealistic, Anime, Digital Art, Oil Painting, etc.
+- Negative prompts for refined control
+
+### Video Generation Capabilities
+
+Create AI videos with our cutting-edge video models:
+
+- **Seedance**: Text-to-video and image-to-video generation
+- **Kling AI**: High-quality video synthesis
+- **Custom models**: Continuously adding new video AI capabilities
+
+**Video Features:**
+- Duration: 3-10 seconds
+- Resolution: Up to 1080p
+- Frame rates: 24-30 FPS
+- Input modes: Text-to-video, Image-to-video
+
+### AI Chat System
+
+Intelligent conversational AI for various use cases:
+
+- **GPT-4 Turbo**: OpenAI's most capable model
+- **Claude 3**: Anthropic's helpful AI assistant
+- **DeepSeek**: Cost-effective alternative for general queries
+
+**Chat Features:**
+- Context memory within conversations
+- Multi-turn dialogue support
+- Code generation and explanation
+- Creative writing assistance
+- Translation and language learning
+
+## User Journey
+
+### New User Flow
+1. Access via Telegram bot @aiversebot or website https://www.aiverseapp.net
+2. Automatic account creation with referral tracking
+3. Receive welcome bonus coins
+4. Explore Studio for image/video generation
+5. Engage with daily bonuses and community features
+
+### Premium Features
+- Increased generation limits
+- Priority queue processing
+- Access to premium AI models
+- Extended video duration
+- Higher resolution outputs
+
+## Technical Architecture
+
+### Platform Components
+- **Frontend**: React-based SPA with TypeScript
+- **Telegram Integration**: Telegram Mini Apps SDK
+- **Authentication**: Telegram OAuth + Google OAuth for web
+- **Backend**: Node.js/Express API
+- **Database**: Supabase (PostgreSQL)
+- **AI Providers**: Multiple AI service integrations
+
+### Supported Languages
+- English (en)
+- Russian (ru)
+- Spanish (es)
+- French (fr)
+- German (de)
+- Arabic (ar)
+
+## Business Information
+
+### Company Details
+- **Product Name**: AiVerse
+- **Domain**: aiverseapp.net
+- **Category**: AI/ML, Creative Tools, SaaS
+- **Target Audience**: Content creators, social media managers, artists, developers
+
+### Contact Information
+- **General Inquiries**: contact@aiverseapp.net
+- **Telegram Bot**: @aiversebot
+- **Support**: Available through Telegram bot
+
+## Frequently Asked Questions
+
+**Q: Is AiVerse free to use?**
+A: AiVerse offers a freemium model with daily free generations. Premium subscriptions unlock additional features and limits.
+
+**Q: What AI models does AiVerse support?**
+A: We support FLUX, GPT-4, GPT-Image, Claude, DeepSeek, Seedance, Kling, and more models are continuously being added.
+
+**Q: Can I use AiVerse without Telegram?**
+A: Yes! Access the full web platform at https://www.aiverseapp.net with Google login.
+
+**Q: Is my data secure?**
+A: We follow industry-standard security practices. See our Privacy Policy at https://www.aiverseapp.net/privacy.
+
+**Q: How do referrals work?**
+A: Share your unique referral link. When friends join and make generations, both of you earn bonus coins.
+
+## Sitemap
+
+- Homepage: https://www.aiverseapp.net/
+- Login: https://www.aiverseapp.net/login
+- Studio (requires auth): https://www.aiverseapp.net/studio
+- Privacy Policy: https://www.aiverseapp.net/privacy
+- Terms of Service: https://www.aiverseapp.net/terms
+
+---
+Last Updated: February 2026
+Version: 1.0

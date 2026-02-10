@@ -73,7 +73,7 @@ async function findUserByTelegramId(telegramId: number) {
  */
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, first_name, last_name } = req.body
+    const { email, password, first_name, last_name, ref } = req.body
 
     if (!email || !password) {
       res.status(400).json({ ok: false, error: 'Email and password are required' })
@@ -114,12 +114,17 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       first_name: first_name || null,
       last_name: last_name || null,
       balance: 6, // Default balance
+      ref: ref || null,
       created_at: new Date().toISOString()
     })
 
     if (!userResult.ok) {
       console.error('[Auth] Failed to create public.users record:', userResult.data)
       // Don't fail - auth user is created, public user creation can be retried
+    }
+
+    if (ref) {
+      console.log(`[Referral/Signup] Set ref=${ref} for user ${userId}`)
     }
 
     res.status(201).json({
@@ -187,7 +192,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/telegram-login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const telegramData = req.body
+    const { ref, ...telegramData } = req.body
 
     if (!telegramData || !telegramData.id || !telegramData.hash) {
       res.status(400).json({ ok: false, error: 'Invalid Telegram data' })
@@ -224,12 +229,17 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
         last_name: telegramData.last_name || null,
         avatar_url: telegramData.photo_url || null,
         balance: 6,
+        ref: ref || null,
         created_at: new Date().toISOString()
       })
 
       if (!createResult.ok) {
         res.status(500).json({ ok: false, error: 'Failed to create user' })
         return
+      }
+
+      if (ref) {
+        console.log(`[Referral/TG-Login] Set ref=${ref} for new user ${telegramId}`)
       }
 
       publicUser = {
@@ -240,6 +250,12 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
         last_name: telegramData.last_name,
         avatar_url: telegramData.photo_url,
         balance: 6
+      }
+    } else {
+      // Existing user - set ref if empty
+      if (ref && !publicUser.ref) {
+        await supaPatch('users', `?user_id=eq.${publicUser.user_id}`, { ref })
+        console.log(`[Referral/TG-Login] Set ref=${ref} for existing user ${telegramId}`)
       }
     }
 
@@ -392,7 +408,53 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
     if (result.ok && result.data) {
       const user = result.data
       const publicUser = await supaSelect('users', `?auth_id=eq.${user.id}&select=*`)
-      const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || {}
+      let userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || null
+
+      // If not found by auth_id, try to find by email and link them
+      if (!userData && user.email) {
+        const byEmail = await supaSelect('users', `?email=eq.${encodeURIComponent(user.email)}&select=*`)
+        if (byEmail.ok && Array.isArray(byEmail.data) && byEmail.data[0]) {
+          // Found existing user by email — link auth_id
+          const existingUser = byEmail.data[0]
+          const meta = user.user_metadata || {}
+          await supaPatch('users', `?user_id=eq.${existingUser.user_id}`, {
+            auth_id: user.id,
+            avatar_url: existingUser.avatar_url || meta.avatar_url || meta.picture || null
+          })
+          userData = { ...existingUser, auth_id: user.id }
+          console.log(`[Auth/me] Linked auth_id ${user.id} to existing user ${existingUser.user_id} (found by email)`)
+        }
+      }
+
+      // Still not found — create new user (first-time Google OAuth)
+      if (!userData) {
+        const userId = Date.now()
+        const meta = user.user_metadata || {}
+        const createResult = await supaPost('users', {
+          user_id: userId,
+          auth_id: user.id,
+          email: user.email,
+          first_name: meta.full_name || meta.name || meta.first_name || null,
+          avatar_url: meta.avatar_url || meta.picture || null,
+          balance: 6,
+          created_at: new Date().toISOString()
+        })
+
+        if (createResult.ok) {
+          console.log(`[Auth/me] Auto-created public.users for OAuth user ${user.id}, user_id=${userId}`)
+          userData = {
+            user_id: userId,
+            auth_id: user.id,
+            email: user.email,
+            first_name: meta.full_name || meta.name || meta.first_name || null,
+            avatar_url: meta.avatar_url || meta.picture || null,
+            balance: 6
+          }
+        } else {
+          console.error(`[Auth/me] Failed to auto-create public.users for OAuth user ${user.id}:`, createResult.data)
+          userData = {}
+        }
+      }
 
       res.json({
         ok: true,

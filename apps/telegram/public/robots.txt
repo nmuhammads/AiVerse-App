@@ -1,0 +1,17 @@
+# robots.txt for aiverseapp.net
+# https://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /privacy
+Allow: /terms
+Allow: /studio
+
+# Block internal/API paths
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Sitemap location
+Sitemap: https://www.aiverseapp.net/sitemap.xml

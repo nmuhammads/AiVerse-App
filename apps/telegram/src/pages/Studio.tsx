@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { type ModelType } from '@/store/generationStore'
 import { DevModeBanner } from '@/components/DevModeBanner'
 import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
@@ -7,9 +8,12 @@ import { PaymentModal } from '@/components/PaymentModal'
 import { AIChatOverlay } from '@/components/AIChatOverlay'
 import { ChatOnboardingOverlay } from '@/components/ChatOnboardingOverlay'
 import { ChatModeExitOnboarding } from '@/components/ChatModeExitOnboarding'
+import { AuthModal } from '@/components/AuthModal'
 import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
+import { useAuthStore } from '@aiverse/shared/stores/authStore'
 import { useTranslation } from 'react-i18next'
 import { Zap, Pencil } from 'lucide-react'
+import WebApp from '@twa-dev/sdk'
 
 // Components
 import { ModelSelector } from '@/pages/Studio/ModelSelector'
@@ -76,6 +80,18 @@ function StudioHeader({ t, balance, onOpenEditor, onOpenPayment }: StudioHeaderP
 export default function Studio() {
   const activeGens = useActiveGenerationsStore(state => state.generations)
   const hasActiveGens = activeGens.length > 0
+  const location = useLocation()
+  const { isAuthenticated } = useAuthStore()
+  const isInTelegram = !!(WebApp.initData && WebApp.initDataUnsafe?.user)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+
+  // Show auth modal if user came from ref link and not authenticated
+  useEffect(() => {
+    const state = location.state as { showAuthModal?: boolean } | null
+    if (state?.showAuthModal && !isAuthenticated && !isInTelegram) {
+      setShowAuthModal(true)
+    }
+  }, [location.state, isAuthenticated, isInTelegram])
 
   const {
     t,
@@ -522,6 +538,11 @@ export default function Studio() {
         />
 
       </div>
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
+      />
       <ChatOnboardingOverlay />
     </div>
   )

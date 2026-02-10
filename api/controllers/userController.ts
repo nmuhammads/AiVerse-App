@@ -762,3 +762,38 @@ export async function updateLanguage(req: Request, res: Response) {
   }
 }
 
+/**
+ * Set referral for OAuth users
+ * Called after Google OAuth when user has ref in localStorage
+ */
+export async function setReferral(req: Request, res: Response) {
+  try {
+    const { user_id, ref } = req.body
+    if (!user_id || !ref) {
+      return res.status(400).json({ error: 'user_id and ref required' })
+    }
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Supabase not configured' })
+    }
+
+    // Check if user already has a ref
+    const existing = await supaSelect('users', `?user_id=eq.${user_id}&select=ref`)
+    if (existing.ok && Array.isArray(existing.data) && existing.data[0]?.ref) {
+      console.log(`[Referral/OAuth] User ${user_id} already has ref=${existing.data[0].ref}, skipping`)
+      return res.json({ ok: true, message: 'ref already set' })
+    }
+
+    // Set ref
+    const update = await supaPatch('users', `?user_id=eq.${user_id}`, { ref })
+    if (!update.ok) {
+      return res.status(500).json({ error: 'failed to set ref' })
+    }
+
+    console.log(`[Referral/OAuth] Set ref=${ref} for user ${user_id}`)
+    return res.json({ ok: true })
+  } catch (e) {
+    console.error('setReferral error:', e)
+    return res.status(500).json({ error: 'set referral failed' })
+  }
+}

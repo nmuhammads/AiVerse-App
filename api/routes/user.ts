@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward, searchUsers, updateLanguage } from '../controllers/userController.js'
+import { getAvatar, uploadAvatar, getUserInfo, subscribeBot, listGenerations, syncAvatar, togglePublish, getLeaderboard, getRemixRewards, setCover, toggleFollow, checkFollowStatus, getFollowing, getFollowers, checkChannelSubscription, claimChannelReward, searchUsers, updateLanguage, setReferral } from '../controllers/userController.js'
 import { updateNotificationSettings } from '../controllers/notificationController.js'
 import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js'
 
@@ -27,6 +27,7 @@ router.patch('/language', requireAuth as any, updateLanguage)
 router.post('/follow', requireAuth as any, toggleFollow)
 router.get('/follow-status/:userId', optionalAuth as any, checkFollowStatus)
 router.post('/claim-channel-reward', requireAuth as any, claimChannelReward)
+router.post('/set-referral', requireAuth as any, setReferral)
 
 export default router
 

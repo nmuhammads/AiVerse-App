@@ -19,12 +19,20 @@ export function useRequireAuth() {
     const { isAuthenticated } = useAuthStore()
     const inTelegram = isInTelegramWebApp()
 
+    // DEV MODE: bypass auth for local development
+    const isDevMode = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true'
+
     /**
      * Check if user can perform action
      * @returns true if authenticated and can proceed
      * @returns false if not authenticated (will redirect to login)
      */
     const requireAuth = (returnPath?: string): boolean => {
+        // DEV mode - always allow
+        if (isDevMode) {
+            return true
+        }
+
         // Telegram users are always authenticated
         if (inTelegram) {
             return true
@@ -58,7 +66,7 @@ export function useRequireAuth() {
     return {
         requireAuth,
         withAuth,
-        isAuthenticated: inTelegram || isAuthenticated,
-        isGuest: !inTelegram && !isAuthenticated
+        isAuthenticated: isDevMode || inTelegram || isAuthenticated,
+        isGuest: !isDevMode && !inTelegram && !isAuthenticated
     }
 }

@@ -9,6 +9,7 @@ import express, {
 } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { stagingAuthMiddleware } from './middleware/stagingAuth.js'
 import authRoutes from './routes/auth.js'
 import generationRoutes from './routes/generation.js'
 import enhanceRoutes from './routes/enhance.js'
@@ -35,6 +36,9 @@ dotenv.config()
 const app: express.Application = express()
 
 app.use(cors())
+
+// Staging protection - requires STAGING_PASSWORD env var
+app.use(stagingAuthMiddleware)
 
 // Capture raw body for Tribute webhook signature verification
 // Must be before express.json() so we can access the original bytes

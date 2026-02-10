@@ -76,8 +76,10 @@ export default function Login() {
             setError('')
 
             try {
-                const result = await loginWithTelegram(user)
+                const ref = localStorage.getItem('aiverse_ref') || undefined
+                const result = await loginWithTelegram(user, ref)
                 if (result.ok) {
+                    localStorage.removeItem('aiverse_ref')
                     navigate('/')
                 } else {
                     setError(result.error || t('login.error.telegramFailed'))
@@ -102,8 +104,10 @@ export default function Login() {
 
         try {
             if (isSignup) {
-                const result = await signupWithEmail(email, password, firstName)
+                const ref = localStorage.getItem('aiverse_ref') || undefined
+                const result = await signupWithEmail(email, password, firstName, undefined, ref)
                 if (result.ok) {
+                    localStorage.removeItem('aiverse_ref')
                     setSuccess(result.message || t('login.success.checkEmail'))
                     setIsSignup(false)
                 } else {

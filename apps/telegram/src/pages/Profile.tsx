@@ -63,7 +63,7 @@ const GridImage = ({ src, originalUrl, alt, className, onImageError }: { src: st
 import { PaymentModal } from '@/components/PaymentModal'
 import { toast } from 'sonner'
 import { GenerationSelector } from '@/components/GenerationSelector'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useGenerationStore } from '@/store/generationStore'
@@ -162,6 +162,17 @@ export default function Profile() {
       })
       .catch((e) => console.error('Failed to fetch spin status', e))
   }, [])
+
+  // Auto-open PaymentModal if ?payment=true query param
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('payment') === 'true') {
+      setIsPaymentModalOpen(true)
+      // Clean up the URL
+      navigate('/profile', { replace: true })
+    }
+  }, [location.search, navigate])
 
   const displayName = (user?.first_name && user?.last_name)
     ? `${user.first_name} ${user.last_name} `

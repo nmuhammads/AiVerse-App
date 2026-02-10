@@ -28,12 +28,14 @@ export default function Settings() {
     const { t, i18n, ready } = useTranslation()
     const navigate = useNavigate()
     const { impact } = useHaptics()
-    const { addToHomeScreen, checkHomeScreenStatus, platform, tg, isInTelegram } = useTelegram()
+    const { addToHomeScreen, checkHomeScreenStatus, platform, tg, isInTelegram, user } = useTelegram()
+    const { isAuthenticated, authMethod, logout } = useAuthStore()
     const [canAddToHome, setCanAddToHome] = useState(false)
     const [notifExpanded, setNotifExpanded] = useState(false)
     const [langExpanded, setLangExpanded] = useState(false)
     const [notifSettings, setNotifSettings] = useState<NotificationSettings>(defaultSettings)
     const [showArrow, setShowArrow] = useState(false)
+    const [remixCount, setRemixCount] = useState(0)
     const [searchParams] = useSearchParams()
 
     // Fingerprint decoder state
@@ -63,18 +65,6 @@ export default function Settings() {
         }
     }, [ready, i18n])
 
-    // Return loading state if translations not ready
-    if (!ready) {
-        return (
-            <div className="min-h-dvh bg-black text-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="loader-spinner mx-auto mb-4"></div>
-                    <p className="text-zinc-400">Loading...</p>
-                </div>
-            </div>
-        )
-    }
-
     // Авто-открытие секции уведомлений при переходе из попапа
     useEffect(() => {
         if (searchParams.get('notif') === 'open') {
@@ -91,8 +81,10 @@ export default function Settings() {
             tg.BackButton.show()
             const handleBack = () => {
                 impact('light')
-                if (location.state?.fromDeepLink) {
-                    navigate('/', { replace: true })
+                // If opened via deeplink or no browser history, go to studio
+                // window.history.length <= 2 means user opened app directly to this page
+                if (location.state?.fromDeepLink || window.history.length <= 2) {
+                    navigate('/studio', { replace: true })
                 } else {
                     navigate(-1)
                 }
@@ -119,8 +111,7 @@ export default function Settings() {
         }
     }, [isMobile])
 
-    const [remixCount, setRemixCount] = useState(0)
-    const { user } = useTelegram()
+
 
     useEffect(() => {
         if (user?.id) {
@@ -136,6 +127,19 @@ export default function Settings() {
             })
         }
     }, [user?.id])
+
+    // Return loading state if translations not ready - MUST be after all hooks
+    if (!ready) {
+        return (
+            <div className="min-h-dvh bg-black text-white flex items-center justify-center">
+                <div className="text-center">
+                    <div className="loader-spinner mx-auto mb-4"></div>
+                    <p className="text-zinc-400">Loading...</p>
+                </div>
+            </div>
+        )
+    }
+
 
     const updateNotifSetting = async (key: keyof NotificationSettings, value: boolean) => {
         if (!user?.id) return
@@ -221,7 +225,6 @@ export default function Settings() {
         }
     ]
 
-    const { isAuthenticated, authMethod, logout } = useAuthStore()
     const isWebAuth = isAuthenticated && authMethod === 'web'
 
     const handleLogout = () => {
@@ -244,7 +247,7 @@ export default function Settings() {
             { icon: Clock, label: t('settings.items.storage'), value: t('settings.items.storageValue'), onClick: () => toast.info(t('settings.messages.storageToast'), { duration: 5000 }) },
             { icon: FileText, label: t('settings.items.privacy'), onClick: () => navigate('/privacy') },
             { icon: FileText, label: t('settings.items.terms'), onClick: () => navigate('/terms') },
-            { icon: Info, label: t('settings.items.version'), value: 'v3.3.2', onClick: () => { } },
+            { icon: Info, label: t('settings.items.version'), value: 'v3.3.5', onClick: () => { } },
             ...(isWebAuth ? [{ icon: LogOut, label: t('settings.items.logout'), onClick: handleLogout, className: 'text-red-400' }] : [])
         ]
     }

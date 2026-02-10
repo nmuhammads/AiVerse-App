@@ -44,8 +44,20 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { isAuthenticated } = useAuthStore();
 
+  // DEV MODE: bypass auth for local development
+  const isDevMode = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
+  if (isDevMode) {
+    return <>{children}</>;
+  }
+
   // In Telegram Mini App - always allow
   if (isInTelegramWebApp()) {
+    return <>{children}</>;
+  }
+
+  // Allow users with ?ref= parameter to pass through (StartParamRouter will redirect to /studio)
+  const hasRefParam = new URLSearchParams(location.search).has('ref');
+  if (hasRefParam) {
     return <>{children}</>;
   }
 
@@ -83,9 +95,25 @@ function StartParamRouter() {
     if (processedRef.current) return;
 
     const qs = new URLSearchParams(location.search);
+
+    // Handle web referral: ?ref=username (separate from Telegram's ref- deeplinks)
+    const webRef = qs.get('ref');
+    if (webRef && !localStorage.getItem('aiverse_ref')) {
+      localStorage.setItem('aiverse_ref', webRef);
+      console.log(`[Referral/Web] Saved ref=${webRef} to localStorage`);
+    }
+
+    // If user came with ref param, redirect to studio (auth modal will show if not logged in)
+    if (webRef) {
+      processedRef.current = true;
+      navigate('/studio', { replace: true, state: { fromDeepLink: true, showAuthModal: true } });
+      return;
+    }
+
     const fromQuery = qs.get("tgWebAppStartParam") || qs.get("start") || (qs.has("generate") ? "generate" : null) || qs.get("p");
     const fromSdk = WebApp?.initDataUnsafe?.start_param || null;
     const p = fromSdk || fromQuery;
+
 
     if (!p) return;
 
@@ -118,6 +146,10 @@ function StartParamRouter() {
       }
       if (p === "accumulations") {
         navigate("/accumulations", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "balance" || p === "payment") {
+        navigate("/profile?payment=true", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "contests" || p === "events") {
