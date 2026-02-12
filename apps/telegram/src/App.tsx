@@ -273,10 +273,10 @@ function AppLayout() {
     : /Android/.test(navigator.userAgent) ? 'android' : 'ios-or-desktop'
 
   return (
-    <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : ''} min-h-screen flex flex-col`}>
+    <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : ''} h-dvh flex flex-col overflow-hidden`}>
       <Header />
       <StartParamRouter />
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <Routes>
           {/* Public routes (viewable without auth, but need auth for actions) */}
           <Route path="/" element={<RequireAuth><PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary></RequireAuth>} />
