@@ -80,6 +80,68 @@ export async function supaDelete(table: string, filter: string) {
     }
 }
 
+// ============ Storage Functions ============
+
+/**
+ * Create a signed URL for a file in a private Supabase Storage bucket
+ */
+export async function supaStorageSignedUrl(bucket: string, filePath: string, expiresIn = 3600): Promise<string> {
+    try {
+        const url = `${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${filePath}`
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expiresIn })
+        })
+        const data = await r.json().catch(() => null)
+        if (r.ok && data?.signedURL) {
+            return `${SUPABASE_URL}/storage/v1${data.signedURL}`
+        }
+        console.error(`[SupaBase] SignedUrl error (${bucket}/${filePath}):`, data)
+        return ''
+    } catch (e) {
+        console.error(`[SupaBase] SignedUrl error (${bucket}/${filePath}):`, e)
+        return ''
+    }
+}
+
+/**
+ * Upload a file to a Supabase Storage bucket
+ */
+export async function supaStorageUploadFile(bucket: string, filePath: string, buf: Buffer, contentType = 'image/jpeg') {
+    try {
+        const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${filePath}`
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { ...supaHeaders(), 'Content-Type': contentType, 'x-upsert': 'true' },
+            body: buf as any
+        })
+        const data = await r.json().catch(() => null)
+        return { ok: r.ok, data }
+    } catch (e) {
+        console.error(`[SupaBase] Upload error (${bucket}/${filePath}):`, e)
+        return { ok: false, data: null }
+    }
+}
+
+/**
+ * Delete file(s) from a Supabase Storage bucket
+ */
+export async function supaStorageDeleteFile(bucket: string, filePaths: string[]) {
+    try {
+        const url = `${SUPABASE_URL}/storage/v1/object/${bucket}`
+        const r = await fetch(url, {
+            method: 'DELETE',
+            headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prefixes: filePaths })
+        })
+        return { ok: r.ok }
+    } catch (e) {
+        console.error(`[SupaBase] Storage delete error (${bucket}):`, e)
+        return { ok: false }
+    }
+}
+
 // ============ App Config Functions ============
 
 /**

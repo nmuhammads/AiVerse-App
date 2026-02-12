@@ -205,6 +205,13 @@ export default function Studio() {
     videoDurationSeconds,
     klingVideoMode,
     imageCount,
+
+    // Avatars
+    avatars,
+    isLoadingAvatars,
+    handleAddAvatar,
+    handleDeleteAvatar,
+    handleSelectAvatar,
   } = useStudio()
 
   // Prevent body scroll when in chat mode
@@ -397,6 +404,11 @@ export default function Studio() {
             }}
             onRemoveUploadedImage={removeUploadedImage}
             onSetUploadedImages={setUploadedImages}
+            avatars={avatars}
+            isLoadingAvatars={isLoadingAvatars}
+            onAddAvatar={handleAddAvatar}
+            onDeleteAvatar={handleDeleteAvatar}
+            onSelectAvatar={handleSelectAvatar}
           />
 
           <SettingsPanel
