@@ -130,6 +130,19 @@
             "found": "Autor gefunden!",
             "notFound": "Autoren-Fingerabdruck nicht gefunden",
             "noFingerprint": "Kein Autoren-Fingerabdruck in diesem Prompt gefunden"
+        },
+        "avatars": {
+            "title": "Avatar-Verwaltung",
+            "description": "Fotoreferenzen zur Generierung von Bildern mit Ihrem Aussehen.",
+            "empty": "Keine Avatare",
+            "confirmDelete": "«{{name}}» löschen?",
+            "add": "Avatar hinzufügen",
+            "selectPhoto": "Foto auswählen",
+            "namePlaceholder": "Z.B.: Mein Porträt",
+            "save": "Speichern",
+            "added": "Avatar hinzugefügt",
+            "error": "Fehler",
+            "deleted": "Avatar gelöscht"
         }
     },
     "watermark": {
@@ -296,7 +309,9 @@
             "endFrame": "Endbild",
             "addStartFrame": "Hinzufügen",
             "addEndFrame": "Optional",
-            "framesHint": "Startbild ist erforderlich. Das Endbild ist optional, um das endgültige Aussehen des Videos zu steuern."
+            "framesHint": "Startbild ist erforderlich. Das Endbild ist optional, um das endgültige Aussehen des Videos zu steuern.",
+            "uploadStart": "Upload gestartet",
+            "uploadEnd": "Upload beendet"
         },
         "prompt": {
             "from": "Prompt von {{username}}",
@@ -311,7 +326,19 @@
             "selectPhoto": "Foto auswählen",
             "pasteHint": "Hier lange drücken → Einfügen",
             "copyHint": "Foto kopieren → auf lila Bereich drücken → Einfügen",
-            "remixHint": "Beim Remixen die Referenzfotos bei Bedarf durch eigene ersetzen (eines oder mehrere)"
+            "remixHint": "Beim Remixen die Referenzfotos bei Bedarf durch eigene ersetzen (eines oder mehrere)",
+            "addReferencesOrAvatar": "Referenzen hinzufügen oder Avatar wählen (bis zu {{limit}})"
+        },
+        "avatars": {
+            "title": "Meine Avatare",
+            "add": "Avatar hinzufügen",
+            "addFirst": "Avatar hinzufügen",
+            "loading": "Laden...",
+            "delete": "Löschen",
+            "cancel": "Abbrechen",
+            "new": "Neu",
+            "save": "Speichern",
+            "namePlaceholder": "Z.B.: Mein Porträt"
         },
         "aspectRatio": "Seitenverhältnis",
         "quality": {

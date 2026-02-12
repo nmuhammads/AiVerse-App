@@ -19,6 +19,13 @@ import {
     calculateKlingCost
 } from '@/pages/Studio/constants'
 
+export type Avatar = {
+    id: number
+    display_name: string
+    url: string
+    created_at: string
+}
+
 export function useStudio() {
     const { t } = useTranslation()
     const {
@@ -110,6 +117,10 @@ export function useStudio() {
     const [isOptimizing, setIsOptimizing] = useState(false)
     const [isDescribeModalOpen, setIsDescribeModalOpen] = useState(false)
 
+    // Avatars (reference photos)
+    const [avatars, setAvatars] = useState<Avatar[]>([])
+    const [isLoadingAvatars, setIsLoadingAvatars] = useState(false)
+
     // Реактивно отслеживаем доступные слоты
     const availableSlots = useActiveGenerationsStore(
         (state) => MAX_ACTIVE_IMAGES - state.generations
@@ -154,6 +165,27 @@ export function useStudio() {
             })
         }
     }, [user?.id, isPaymentModalOpen, isGenerating])
+
+    // Fetch user avatars
+    useEffect(() => {
+        const fetchAvatars = async () => {
+            setIsLoadingAvatars(true)
+            try {
+                const res = await fetch('/api/avatars', {
+                    headers: { ...getAuthHeaders() }
+                })
+                const data = await res.json()
+                if (res.ok && data.avatars) {
+                    setAvatars(data.avatars.filter((a: Avatar) => a.url))
+                }
+            } catch (e) {
+                console.error('[Avatars] Failed to fetch:', e)
+            } finally {
+                setIsLoadingAvatars(false)
+            }
+        }
+        fetchAvatars()
+    }, [user?.id])
 
     // Handle Remix & Contest Entry
     useEffect(() => {
@@ -361,6 +393,55 @@ export function useStudio() {
                 }
             }
         }
+    }
+
+    // Avatar handlers
+    const handleAddAvatar = async (imageBase64: string, displayName: string) => {
+        try {
+            const res = await fetch('/api/avatars', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                body: JSON.stringify({ image: imageBase64, display_name: displayName })
+            })
+            const data = await res.json()
+            if (res.ok && data.avatar) {
+                setAvatars(prev => [data.avatar, ...prev])
+                toast.success(t('studio.avatars.added', 'Аватар добавлен'))
+                notify('success')
+            } else {
+                toast.error(data.error || t('studio.avatars.error', 'Ошибка'))
+                notify('error')
+            }
+        } catch (e) {
+            console.error('[Avatar] Add failed:', e)
+            toast.error(t('studio.avatars.error', 'Ошибка'))
+            notify('error')
+        }
+    }
+
+    const handleDeleteAvatar = async (avatarId: number) => {
+        try {
+            const res = await fetch(`/api/avatars/${avatarId}`, {
+                method: 'DELETE',
+                headers: { ...getAuthHeaders() }
+            })
+            if (res.ok) {
+                setAvatars(prev => prev.filter(a => a.id !== avatarId))
+                toast.success(t('studio.avatars.deleted', 'Аватар удалён'))
+                notify('success')
+            } else {
+                notify('error')
+            }
+        } catch (e) {
+            console.error('[Avatar] Delete failed:', e)
+            notify('error')
+        }
+    }
+
+    const handleSelectAvatar = (url: string) => {
+        addUploadedImage(url)
+        setGenerationMode('image')
+        impact('light')
     }
 
     const handleOptimizePrompt = async () => {
@@ -833,5 +914,12 @@ export function useStudio() {
         imageCount,
         studioMode,
         setStudioMode,
+
+        // Avatars
+        avatars,
+        isLoadingAvatars,
+        handleAddAvatar,
+        handleDeleteAvatar,
+        handleSelectAvatar,
     }
 }

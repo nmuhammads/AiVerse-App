@@ -130,6 +130,19 @@
             "found": "¡Autor encontrado!",
             "notFound": "Huella del autor no encontrada",
             "noFingerprint": "No hay huella del autor en este prompt"
+        },
+        "avatars": {
+            "title": "Gestión de avatares",
+            "description": "Referencias fotográficas para generar imágenes con tu apariencia.",
+            "empty": "No hay avatares",
+            "confirmDelete": "¿Eliminar «{{name}}»?",
+            "add": "Añadir avatar",
+            "selectPhoto": "Seleccionar foto",
+            "namePlaceholder": "Ej: Mi retrato",
+            "save": "Guardar",
+            "added": "Avatar añadido",
+            "error": "Error",
+            "deleted": "Avatar eliminado"
         }
     },
     "watermark": {
@@ -296,7 +309,9 @@
             "endFrame": "Fotograma final",
             "addStartFrame": "Añadir",
             "addEndFrame": "Opcional",
-            "framesHint": "El fotograma inicial es obligatorio. El final es opcional para controlar el aspecto final del video."
+            "framesHint": "El fotograma inicial es obligatorio. El final es opcional para controlar el aspecto final del video.",
+            "uploadStart": "Inicio de carga",
+            "uploadEnd": "Carga finalizada"
         },
         "prompt": {
             "from": "Prompt de {{username}}",
@@ -311,7 +326,19 @@
             "selectPhoto": "Seleccionar foto",
             "pasteHint": "Manten presionado aquí → Pegar",
             "copyHint": "Copia la foto → presiona el área morada → Pegar",
-            "remixHint": "Al remezclar, reemplaza las fotos de referencia por las tuyas (una o más) si es necesario"
+            "remixHint": "Al remezclar, reemplaza las fotos de referencia por las tuyas (una o más) si es necesario",
+            "addReferencesOrAvatar": "Añadir referencias o seleccionar avatar (hasta {{limit}})"
+        },
+        "avatars": {
+            "title": "Mis avatares",
+            "add": "Añadir avatar",
+            "addFirst": "Añadir avatar",
+            "loading": "Cargando...",
+            "delete": "Eliminar",
+            "cancel": "Cancelar",
+            "new": "Nuevo",
+            "save": "Guardar",
+            "namePlaceholder": "Ej: Mi retrato"
         },
         "aspectRatio": "Relación de Aspecto",
         "quality": {

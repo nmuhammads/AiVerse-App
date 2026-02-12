@@ -130,6 +130,19 @@
             "found": "Auteur trouvé !",
             "notFound": "Empreinte de l'auteur non trouvée",
             "noFingerprint": "Aucune empreinte d'auteur trouvée dans ce prompt"
+        },
+        "avatars": {
+            "title": "Gestion des avatars",
+            "description": "Références photo pour générer des images à votre effigie.",
+            "empty": "Aucun avatar",
+            "confirmDelete": "Supprimer «{{name}}» ?",
+            "add": "Ajouter un avatar",
+            "selectPhoto": "Choisir une photo",
+            "namePlaceholder": "Ex : Mon portrait",
+            "save": "Enregistrer",
+            "added": "Avatar ajouté",
+            "error": "Erreur",
+            "deleted": "Avatar supprimé"
         }
     },
     "watermark": {
@@ -296,7 +309,9 @@
             "endFrame": "Image finale",
             "addStartFrame": "Ajouter",
             "addEndFrame": "Optionnel",
-            "framesHint": "L'image initiale est requise. L'image finale est optionnelle pour contrôler l'aspect final."
+            "framesHint": "L'image initiale est requise. L'image finale est optionnelle pour contrôler l'aspect final.",
+            "uploadStart": "Début du téléchargement",
+            "uploadEnd": "Téléchargement terminé"
         },
         "prompt": {
             "from": "Prompt de {{username}}",
@@ -311,7 +326,19 @@
             "selectPhoto": "Sélectionner photo",
             "pasteHint": "Appui long ici → Coller",
             "copyHint": "Copiez la photo → appuyez sur la zone violette → Coller",
-            "remixHint": "Lors d'un remix, remplacez les photos de référence par les vôtres si nécessaire"
+            "remixHint": "Lors d'un remix, remplacez les photos de référence par les vôtres si nécessaire",
+            "addReferencesOrAvatar": "Ajouter réf. ou choisir avatar (max {{limit}})"
+        },
+        "avatars": {
+            "title": "Mes avatars",
+            "add": "Ajouter avatar",
+            "addFirst": "Ajouter avatar",
+            "loading": "Chargement...",
+            "delete": "Supprimer",
+            "cancel": "Annuler",
+            "new": "Nouveau",
+            "save": "Enregistrer",
+            "namePlaceholder": "Ex : Mon portrait"
         },
         "aspectRatio": "Ratio d'aspect",
         "quality": {

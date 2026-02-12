@@ -130,6 +130,19 @@
             "found": "Author found!",
             "notFound": "Author fingerprint not found",
             "noFingerprint": "No author fingerprint in this prompt"
+        },
+        "avatars": {
+            "title": "Manage Avatars",
+            "description": "Photo references for generating images with your likeness.",
+            "empty": "No avatars",
+            "confirmDelete": "Delete «{{name}}»?",
+            "add": "Add Avatar",
+            "selectPhoto": "Select Photo",
+            "namePlaceholder": "E.g., My Portrait",
+            "save": "Save",
+            "added": "Avatar added",
+            "error": "Error",
+            "deleted": "Avatar deleted"
         }
     },
     "watermark": {
@@ -296,7 +309,9 @@
             "endFrame": "End frame",
             "addStartFrame": "Add",
             "addEndFrame": "Optional",
-            "framesHint": "Start frame is required. End frame is optional to control the final look of the video."
+            "framesHint": "Start frame is required. End frame is optional to control the final look of the video.",
+            "uploadStart": "Upload started",
+            "uploadEnd": "Upload finished"
         },
         "prompt": {
             "from": "Prompt from {{username}}",
@@ -311,7 +326,19 @@
             "selectPhoto": "Select photo",
             "pasteHint": "Press and hold here → Paste",
             "copyHint": "Copy photo → press and hold purple area → Paste",
-            "remixHint": "When remixing, replace reference photos with your own (one or more) if necessary"
+            "remixHint": "When remixing, replace reference photos with your own (one or more) if necessary",
+            "addReferencesOrAvatar": "Add references or select avatar (up to {{limit}})"
+        },
+        "avatars": {
+            "title": "My Avatars",
+            "add": "Add Avatar",
+            "addFirst": "Add Avatar",
+            "loading": "Loading...",
+            "delete": "Delete",
+            "cancel": "Cancel",
+            "new": "New",
+            "save": "Save",
+            "namePlaceholder": "E.g., My Portrait"
         },
         "aspectRatio": "Aspect Ratio",
         "quality": {

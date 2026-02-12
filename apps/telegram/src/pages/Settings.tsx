@@ -1,9 +1,10 @@
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets, LogOut, FileText } from 'lucide-react'
+import { ChevronLeft, Globe, Bell, Info, Shield, ChevronRight, Moon, Zap, Users, MessageCircle, Clock, ChevronDown, ArrowLeft, Check, Search, User, Droplets, LogOut, FileText, Plus, Trash2, Image as ImageIcon, Loader2, X } from 'lucide-react'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useTelegram, getAuthHeaders } from '@/hooks/useTelegram'
 import { useAuthStore } from '@/store/authStore'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { compressImage } from '@/utils/imageCompression'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { DevModeBanner } from '@/components/DevModeBanner'
@@ -37,6 +38,16 @@ export default function Settings() {
     const [showArrow, setShowArrow] = useState(false)
     const [remixCount, setRemixCount] = useState(0)
     const [searchParams] = useSearchParams()
+
+    // Avatar management state
+    const [avatarsExpanded, setAvatarsExpanded] = useState(false)
+    const [avatars, setAvatars] = useState<{ id: number, display_name: string, url: string }[]>([])
+    const [isLoadingAvatars, setIsLoadingAvatars] = useState(false)
+    const [showAddAvatarModal, setShowAddAvatarModal] = useState(false)
+    const [avatarName, setAvatarName] = useState('')
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+    const avatarFileRef = useRef<HTMLInputElement>(null)
 
     // Fingerprint decoder state
     const [fingerprintExpanded, setFingerprintExpanded] = useState(false)
@@ -127,6 +138,78 @@ export default function Settings() {
             })
         }
     }, [user?.id])
+
+    // Fetch avatars when section is expanded
+    useEffect(() => {
+        if (avatarsExpanded && user?.id && avatars.length === 0) {
+            setIsLoadingAvatars(true)
+            fetch('/api/avatars', { headers: getAuthHeaders() })
+                .then(r => r.json())
+                .then(data => {
+                    if (data?.avatars && Array.isArray(data.avatars)) {
+                        setAvatars(data.avatars.filter((a: any) => a.url))
+                    }
+                })
+                .catch(() => { })
+                .finally(() => setIsLoadingAvatars(false))
+        }
+    }, [avatarsExpanded, user?.id])
+
+    const handleAddAvatar = async () => {
+        if (!avatarPreview || !avatarName.trim()) return
+        setIsUploadingAvatar(true)
+        try {
+            const res = await fetch('/api/avatars', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                body: JSON.stringify({ image: avatarPreview, display_name: avatarName.trim() })
+            })
+            const data = await res.json()
+            if (res.ok && data?.avatar) {
+                setAvatars(prev => [data.avatar, ...prev])
+                toast.success(t('settings.avatars.added', 'Аватар добавлен'))
+                setShowAddAvatarModal(false)
+                setAvatarName('')
+                setAvatarPreview(null)
+            } else {
+                toast.error(data?.error || 'Error')
+            }
+        } catch {
+            toast.error(t('settings.avatars.error', 'Ошибка'))
+        } finally {
+            setIsUploadingAvatar(false)
+        }
+    }
+
+    const handleDeleteAvatar = async (id: number) => {
+        try {
+            const res = await fetch(`/api/avatars/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            })
+            if (res.ok) {
+                setAvatars(prev => prev.filter(a => a.id !== id))
+                toast.success(t('settings.avatars.deleted', 'Аватар удалён'))
+            }
+        } catch {
+            toast.error(t('settings.avatars.error', 'Ошибка'))
+        }
+    }
+
+    const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        try {
+            const compressed = await compressImage(file)
+            setAvatarPreview(compressed)
+        } catch {
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = (ev) => {
+                if (ev.target?.result) setAvatarPreview(ev.target.result as string)
+            }
+        }
+    }
 
     // Return loading state if translations not ready - MUST be after all hooks
     if (!ready) {
@@ -398,6 +481,66 @@ export default function Settings() {
                             <ChevronRight size={16} className="text-zinc-600" />
                         </button>
 
+                        {/* Avatar Management */}
+                        <button
+                            onClick={() => { impact('light'); setAvatarsExpanded(!avatarsExpanded) }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors border-b border-white/5"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <User size={16} />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-sm font-medium text-white">{t('settings.avatars.title', 'Управление аватарами')}</div>
+                            </div>
+                            <ChevronDown size={16} className={`text-zinc-600 transition-transform ${avatarsExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {avatarsExpanded && (
+                            <div className="border-t border-white/5 p-4 space-y-3">
+                                <p className="text-xs text-zinc-500">{t('settings.avatars.description', 'Фото-референсы для генерации изображений с вашей внешностью.')}</p>
+
+                                {isLoadingAvatars ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 size={20} className="animate-spin text-zinc-500" />
+                                    </div>
+                                ) : avatars.length === 0 ? (
+                                    <div className="text-center py-4 text-zinc-600 text-xs">
+                                        {t('settings.avatars.empty', 'Нет аватаров')}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {avatars.map((avatar) => (
+                                            <div key={avatar.id} className="relative group">
+                                                <div className="aspect-square rounded-xl overflow-hidden bg-zinc-800">
+                                                    <img src={avatar.url} alt={avatar.display_name} className="w-full h-full object-cover" loading="lazy" />
+                                                </div>
+                                                <div className="text-[10px] text-zinc-500 text-center mt-1 truncate">{avatar.display_name}</div>
+                                                <button
+                                                    onClick={() => {
+                                                        impact('medium')
+                                                        if (confirm(t('settings.avatars.confirmDelete', { name: avatar.display_name, defaultValue: `Удалить «${avatar.display_name}»?` }))) {
+                                                            handleDeleteAvatar(avatar.id)
+                                                        }
+                                                    }}
+                                                    className="absolute top-1 right-1 p-1.5 bg-black/60 rounded-full text-red-400 opacity-0 group-hover:opacity-100 sm:group-hover:opacity-100 active:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => { impact('light'); setShowAddAvatarModal(true) }}
+                                    className="w-full py-2.5 rounded-xl border border-dashed border-white/10 flex items-center justify-center gap-2 text-zinc-400 hover:border-white/20 hover:text-white transition-colors text-sm"
+                                >
+                                    <Plus size={16} />
+                                    {t('settings.avatars.add', 'Добавить аватар')}
+                                </button>
+                            </div>
+                        )}
+
                         {/* Fingerprint Decoder */}
                         <button
                             onClick={() => { impact('light'); setFingerprintExpanded(!fingerprintExpanded) }}
@@ -483,6 +626,55 @@ export default function Settings() {
 
             {/* iOS Install Prompt Modal */}
             {showIOSPrompt && <IOSInstallPrompt onClose={() => setShowIOSPrompt(false)} />}
+
+            {/* Add Avatar Modal */}
+            {showAddAvatarModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddAvatarModal(false)}>
+                    <div className="bg-zinc-900 rounded-2xl border border-white/10 w-full max-w-sm p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white">{t('settings.avatars.add', 'Добавить аватар')}</h3>
+                            <button onClick={() => setShowAddAvatarModal(false)} className="p-1 text-zinc-500 hover:text-white transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {avatarPreview ? (
+                            <div className="relative aspect-square rounded-xl overflow-hidden bg-zinc-800 max-w-[160px] mx-auto">
+                                <img src={avatarPreview} alt="preview" className="w-full h-full object-cover" />
+                                <button onClick={() => setAvatarPreview(null)} className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white">
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => avatarFileRef.current?.click()}
+                                className="w-full aspect-square max-w-[160px] mx-auto rounded-xl border-2 border-dashed border-white/10 bg-zinc-800/50 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:border-white/20 hover:text-zinc-400 transition-colors"
+                            >
+                                <ImageIcon size={24} />
+                                <span className="text-xs">{t('settings.avatars.selectPhoto', 'Выбрать фото')}</span>
+                            </button>
+                        )}
+                        <input ref={avatarFileRef} type="file" accept="image/*" onChange={handleAvatarFileSelect} className="hidden" />
+
+                        <input
+                            type="text"
+                            value={avatarName}
+                            onChange={(e) => setAvatarName(e.target.value.slice(0, 30))}
+                            placeholder={t('settings.avatars.namePlaceholder', 'Например: Мой портрет')}
+                            className="w-full px-3 py-2.5 rounded-xl bg-zinc-800 border border-white/10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-white/20"
+                        />
+
+                        <button
+                            onClick={handleAddAvatar}
+                            disabled={!avatarPreview || !avatarName.trim() || isUploadingAvatar}
+                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                        >
+                            {isUploadingAvatar ? <Loader2 size={16} className="animate-spin" /> : null}
+                            {t('settings.avatars.save', 'Сохранить')}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
