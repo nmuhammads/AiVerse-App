@@ -518,7 +518,7 @@ export default function Settings() {
                                                 <button
                                                     onClick={() => {
                                                         impact('medium')
-                                                        if (confirm(t('settings.avatars.confirmDelete', `Удалить «${avatar.display_name}»?`))) {
+                                                        if (confirm(t('settings.avatars.confirmDelete', { name: avatar.display_name, defaultValue: `Удалить «${avatar.display_name}»?` }))) {
                                                             handleDeleteAvatar(avatar.id)
                                                         }
                                                     }}
