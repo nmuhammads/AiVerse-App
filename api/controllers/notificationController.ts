@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { supaSelect, supaPost, supaPatch, supaHeaders, SUPABASE_URL, SUPABASE_KEY } from '../services/supabaseService.js'
+import { supaSelect, supaPost, supaPatch, supaDelete, supaHeaders, SUPABASE_URL, SUPABASE_KEY } from '../services/supabaseService.js'
 
 // Default notification settings
 const defaultSettings = {
@@ -131,11 +131,10 @@ export async function createNotification(
         const toDelete = existing.data.slice(19).map((n: { id: number }) => n.id)
         if (toDelete.length > 0) {
             // Delete old ones
-            for (const id of toDelete) {
-                await fetch(`${SUPABASE_URL}/rest/v1/notifications?id=eq.${id}`, {
-                    method: 'DELETE',
-                    headers: supaHeaders()
-                })
+            const chunkSize = 50
+            for (let i = 0; i < toDelete.length; i += chunkSize) {
+                const chunk = toDelete.slice(i, i + chunkSize)
+                await supaDelete('notifications', `?id=in.(${chunk.join(',')})`)
             }
         }
     }
