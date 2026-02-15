@@ -38,6 +38,8 @@ interface TributeWebhookOrderPayload {
     createdAt?: string
     source?: string           // e.g. 'aiverse_hub_bot' — origin of the order
     transactionId?: number    // payment transaction ID (for refunds)
+    chargeUuid?: string       // UUID of charge (for token charge events)
+    charge_uuid?: string      // alternative key name
 }
 
 /**
@@ -106,8 +108,33 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
         if (!orderData.uuid) {
             // Non-order events (e.g. token charge events) — handle separately
             if (eventName === 'shopTokenChargeSuccess' || eventName === 'shopTokenChargeFailed') {
-                console.log(`[TributeWebhook] Token charge event: ${eventName}`, JSON.stringify(orderData))
-                res.status(200).json({ ok: true, message: `Logged ${eventName}` })
+                const chargeUuid = orderData.chargeUuid || orderData.charge_uuid || (body.payload && body.payload.chargeUuid)
+                console.log(`[TributeWebhook] Token charge event: ${eventName}, chargeUuid=${chargeUuid}`)
+
+                if (chargeUuid) {
+                    // Find order by charge UUID
+                    const chargeOrderResult = await supaSelect('tribute_orders', `?uuid=eq.${chargeUuid}&select=*`)
+                    if (chargeOrderResult.ok && Array.isArray(chargeOrderResult.data) && chargeOrderResult.data.length > 0) {
+                        const chargeOrder = chargeOrderResult.data[0]
+
+                        if (eventName === 'shopTokenChargeSuccess' && chargeOrder.status !== 'paid') {
+                            // Credit tokens if not already done by polling
+                            const userResult = await supaSelect('users', `?user_id=eq.${chargeOrder.user_id}&select=balance`)
+                            if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
+                                const currentBalance = userResult.data[0].balance || 0
+                                const newBalance = currentBalance + chargeOrder.tokens
+                                await supaPatch('users', `?user_id=eq.${chargeOrder.user_id}`, { balance: newBalance })
+                                await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}`, { status: 'paid', paid_at: new Date().toISOString() })
+                                console.log(`[TributeWebhook] Charge credited (fallback): user ${chargeOrder.user_id} balance ${currentBalance} -> ${newBalance}`)
+                            }
+                        } else if (eventName === 'shopTokenChargeFailed' && chargeOrder.status !== 'failed') {
+                            await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}`, { status: 'failed' })
+                            console.log(`[TributeWebhook] Charge failed: ${chargeUuid}`)
+                        }
+                    }
+                }
+
+                res.status(200).json({ ok: true, message: `Processed ${eventName}` })
                 return
             }
             console.warn(`[TributeWebhook] No uuid found in webhook payload`)
