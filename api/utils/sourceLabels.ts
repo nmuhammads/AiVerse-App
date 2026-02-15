@@ -6,14 +6,14 @@
 const SOURCE_LABELS: Record<string, string> = {
     'aiverse_telegram_app': '📱 Mini App',
     'aiverse_hub_bot': '🤖 Хаб-бот',
-    'nanobanana_bot': '🍌 @BananNanoBot',
-    'seedream_bot': '⚡ @seedreameditbot',
-    'gptimage_bot': '🤖 @GPTimagePro_bot',
+    'BananNanoBot': '🍌 @BananNanoBot',
+    'seedreameditbot': '⚡ @seedreameditbot',
+    'GPTimagePro_bot': '🤖 @GPTimagePro_bot',
     'sora_pro_bot': '🎬 Sora Pro Bot',
-    'seedance_bot': '🌸 @seedancepro_bot',
-    'tryon_bot': '👗 @TryOnAI_bot',
-    'wan3_bot': '🎥 @wan3bot',
-    'klingpro_bot': '🎬 @klingprobot',
+    'seedancepro_bot': '🌸 @seedancepro_bot',
+    'TryOnAI_bot': '👗 @TryOnAI_bot',
+    'wan3bot': '🎥 @wan3bot',
+    'klingprobot': '🎬 @klingprobot',
 }
 
 /**
