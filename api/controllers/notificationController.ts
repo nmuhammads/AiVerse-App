@@ -100,9 +100,10 @@ export async function markAllNewsRead(req: Request, res: Response) {
     const news = await supaSelect('app_news', `?starts_at=lte.${now}&or=(expires_at.is.null,expires_at.gte.${now})&select=id`)
     const newsIds = Array.isArray(news.data) ? news.data.map((n: { id: number }) => n.id) : []
 
-    // Insert read records for each (ignore duplicates)
-    for (const newsId of newsIds) {
-        await supaPost('user_read_news', { user_id, news_id: newsId }, '?on_conflict=user_id,news_id')
+    // Insert read records for each (ignore duplicates) - bulk insert
+    if (newsIds.length > 0) {
+        const payload = newsIds.map(newsId => ({ user_id, news_id: newsId }))
+        await supaPost('user_read_news', payload, '?on_conflict=user_id,news_id')
     }
 
     return res.json({ ok: true, marked: newsIds.length })
