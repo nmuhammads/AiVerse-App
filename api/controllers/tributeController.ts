@@ -21,6 +21,9 @@ interface CreateOrderBody {
     currency: TributeCurrency
     email?: string
     saveCard?: boolean
+    source?: string           // e.g. 'aiverse_hub_bot' — caller can identify itself
+    successUrl?: string       // override default success redirect URL
+    failUrl?: string          // override default fail redirect URL
 }
 
 /**
@@ -88,15 +91,15 @@ export async function createTributeOrder(req: AuthenticatedRequest, res: Respons
             currency: currency,
             title: orderTitle,
             description: orderDescription,
-            successUrl: `${APP_URL}/payment/success`,
-            failUrl: `${APP_URL}/payment/fail`,
+            successUrl: req.body.successUrl || `${APP_URL}/payment/success`,
+            failUrl: req.body.failUrl || `${APP_URL}/payment/fail`,
             email: email,
             customerId: tributeCustomerId,
             savePaymentMethod: saveCard === true,
         })
 
         // Save order to database
-        const orderData = {
+        const orderData: any = {
             uuid: tributeOrder.uuid,
             user_id: userId,
             amount: orderAmount,
@@ -105,6 +108,7 @@ export async function createTributeOrder(req: AuthenticatedRequest, res: Respons
             status: 'pending',
             payment_url: tributeOrder.paymentUrl,
         }
+        if (req.body.source) orderData.source = req.body.source
 
         const saveResult = await supaPost('tribute_orders', orderData)
         if (!saveResult.ok) {
@@ -424,7 +428,7 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
         })
 
         // Save order to database
-        const orderData = {
+        const orderData: any = {
             uuid: charge.chargeUuid,
             user_id: userId,
             amount: orderAmount,
@@ -433,6 +437,7 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
             status: 'pending',
             payment_method: 'saved_card',
         }
+        if (req.body.source) orderData.source = req.body.source
         await supaPost('tribute_orders', orderData)
 
         // Poll charge status (max 3 attempts, 2 sec interval)
