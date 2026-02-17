@@ -8,6 +8,7 @@ import { createOrder, getOrderStatus, listTokens, createCharge, getCharge, deact
 import { findPackage, getPackageTitle, getPackageDescription, calculateCustomPrice } from '../config/tokenPackages.js'
 import { supaPost, supaSelect, supaPatch } from '../services/supabaseService.js'
 import { logBalanceChange } from '../services/balanceAuditService.js'
+import { processPartnerBonus } from '../services/partnerService.js'
 import { tg } from './telegramController.js'
 import { isPromoActive, calculateBonusTokens, getBonusAmount } from '../utils/promoUtils.js'
 import { getSourceLabel } from '../utils/sourceLabels.js'
@@ -240,6 +241,7 @@ async function reconcilePayment(order: any): Promise<void> {
             amount: order.amount,
         }
     })
+    await processPartnerBonus(userId, order.amount, (order.currency || 'rub').toUpperCase())
 
     // Update order status
     await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}`, { status: 'paid', paid_at: new Date().toISOString() })
@@ -454,6 +456,14 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
         }
 
         if (finalStatus === 'success') {
+            // If webhook already processed this charge, avoid double-credit.
+            const orderStatusResult = await supaSelect('tribute_orders', `?uuid=eq.${charge.chargeUuid}&select=status`)
+            const orderStatus = (orderStatusResult.ok && Array.isArray(orderStatusResult.data) && orderStatusResult.data[0]?.status) || 'pending'
+            if (orderStatus === 'paid') {
+                res.json({ success: true, status: 'success', tokensAdded: 0 })
+                return
+            }
+
             // Credit tokens to user
             const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id,username,first_name,last_name`)
             if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
@@ -479,6 +489,7 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
                         paymentMethod: 'saved_card',
                     }
                 })
+                await processPartnerBonus(userId, orderAmount, currency.toUpperCase())
 
                 console.log(`[TributeController] Charge success: user ${userId} balance ${currentBalance} -> ${newBalance}`)
 

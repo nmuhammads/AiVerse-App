@@ -125,6 +125,11 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
                                 const newBalance = currentBalance + chargeOrder.tokens
                                 await supaPatch('users', `?user_id=eq.${chargeOrder.user_id}`, { balance: newBalance })
                                 await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}`, { status: 'paid', paid_at: new Date().toISOString() })
+                                await processPartnerBonus(
+                                    chargeOrder.user_id,
+                                    chargeOrder.amount,
+                                    (chargeOrder.currency || 'rub').toUpperCase()
+                                )
                                 console.log(`[TributeWebhook] Charge credited (fallback): user ${chargeOrder.user_id} balance ${currentBalance} -> ${newBalance}`)
                             }
                         } else if (eventName === 'shopTokenChargeFailed' && chargeOrder.status !== 'failed') {
