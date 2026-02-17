@@ -1,20 +1,26 @@
 {
-    "name": "AiVerse",
+    "name": "AiVerse - AI Creative Platform",
     "short_name": "AiVerse",
+    "description": "Generate stunning images and videos with AI. Use GPT Image, Kling, NanoBanana PRO and more AI models.",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "orientation": "portrait",
     "background_color": "#000000",
     "theme_color": "#000000",
+    "categories": ["entertainment", "productivity", "utilities"],
     "icons": [
         {
             "src": "/logo.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         },
         {
             "src": "/logo.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         }
     ]
 }

@@ -25,7 +25,8 @@ export interface CreateOrderParams {
     successUrl: string
     failUrl: string
     email?: string
-    customerId: string       // our user_id as string
+    customerId: string       // tribute_customer_id (UUID)
+    savePaymentMethod?: boolean // save card for future charges (requires shop.recurrent = true)
 }
 
 export interface TributeOrderResponse {
@@ -152,6 +153,7 @@ export async function createOrder(params: CreateOrderParams): Promise<TributeOrd
             failUrl: params.failUrl,
             email: params.email,
             customerId: params.customerId,
+            ...(params.savePaymentMethod ? { savePaymentMethod: true } : {}),
         }),
     })
 

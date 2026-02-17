@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { SEO } from '@/components/SEO';
 import { Calendar, Trophy, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -119,6 +120,11 @@ export default function EventsPage() {
 
     return (
         <div className="min-h-screen bg-black pb-24 px-4" style={{ paddingTop: getPaddingTop() }}>
+            <SEO
+                title="AI Art Contests & Events"
+                description="Join AI art contests and events on AiVerse. Compete with other creators, win prizes, and showcase your AI-generated artwork."
+                path="/events"
+            />
             {/* Header */}
             <div className="flex flex-col gap-4 mb-6">
                 <h1 className="text-2xl font-bold text-white">{t('events.pageTitle')}</h1>

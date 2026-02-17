@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express'
-import { createTributeOrder, checkOrderStatus, getPackagesList } from '../controllers/tributeController.js'
+import { createTributeOrder, checkOrderStatus, getPackagesList, getSavedCards, chargeWithSavedCard, deleteSavedCard } from '../controllers/tributeController.js'
 import { handleTributeWebhook } from '../controllers/tributeWebhookController.js'
 import { requireAuth } from '../middleware/authMiddleware.js'
 
@@ -13,6 +13,11 @@ const router = Router()
 // Protected routes (require authentication)
 router.post('/create-order', requireAuth as any, createTributeOrder)
 router.get('/order/:uuid/status', checkOrderStatus)
+
+// Saved cards (Token Charging)
+router.get('/saved-cards', requireAuth as any, getSavedCards)
+router.post('/charge', requireAuth as any, chargeWithSavedCard)
+router.delete('/saved-cards/:token', requireAuth as any, deleteSavedCard)
 
 // Public route - get available packages
 router.get('/packages', getPackagesList)

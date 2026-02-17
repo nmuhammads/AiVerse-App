@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { supaSelect, supaPost, supaPatch, supaHeaders, SUPABASE_URL, SUPABASE_KEY } from '../services/supabaseService.js'
+import { supaSelect, supaPost, supaPatch, supaDelete, supaHeaders, SUPABASE_URL, SUPABASE_KEY } from '../services/supabaseService.js'
 
 // Default notification settings
 const defaultSettings = {
@@ -100,9 +100,10 @@ export async function markAllNewsRead(req: Request, res: Response) {
     const news = await supaSelect('app_news', `?starts_at=lte.${now}&or=(expires_at.is.null,expires_at.gte.${now})&select=id`)
     const newsIds = Array.isArray(news.data) ? news.data.map((n: { id: number }) => n.id) : []
 
-    // Insert read records for each (ignore duplicates)
-    for (const newsId of newsIds) {
-        await supaPost('user_read_news', { user_id, news_id: newsId }, '?on_conflict=user_id,news_id')
+    // Insert read records for each (ignore duplicates) - bulk insert
+    if (newsIds.length > 0) {
+        const payload = newsIds.map(newsId => ({ user_id, news_id: newsId }))
+        await supaPost('user_read_news', payload, '?on_conflict=user_id,news_id')
     }
 
     return res.json({ ok: true, marked: newsIds.length })
@@ -131,11 +132,10 @@ export async function createNotification(
         const toDelete = existing.data.slice(19).map((n: { id: number }) => n.id)
         if (toDelete.length > 0) {
             // Delete old ones
-            for (const id of toDelete) {
-                await fetch(`${SUPABASE_URL}/rest/v1/notifications?id=eq.${id}`, {
-                    method: 'DELETE',
-                    headers: supaHeaders()
-                })
+            const chunkSize = 50
+            for (let i = 0; i < toDelete.length; i += chunkSize) {
+                const chunk = toDelete.slice(i, i + chunkSize)
+                await supaDelete('notifications', `?id=in.(${chunk.join(',')})`)
             }
         }
     }

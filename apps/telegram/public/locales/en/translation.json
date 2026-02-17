@@ -555,7 +555,19 @@
             "errorNetwork": "Network error",
             "sbpCommission": "Service commission charged for SBP payments",
             "minPurchase": "Minimum purchase via administrator with bonus — 200 tokens"
-        }
+        },
+        "savedCards": {
+            "title": "Payment Method",
+            "saved": "Saved Cards",
+            "newCard": "+ New Card",
+            "saveCheckbox": "Save card for future purchases",
+            "or": "or",
+            "charging": "Processing payment...",
+            "success": "✅ Payment successful!",
+            "failed": "❌ Payment failed",
+            "tryAgain": "Try another card"
+        },
+        "acceptedCards": "Accepted:"
     },
     "generationSelector": {
         "title": "Select creation",

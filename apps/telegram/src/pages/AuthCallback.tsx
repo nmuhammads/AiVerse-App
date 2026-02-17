@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { SEO } from '@/components/SEO'
 
 export default function AuthCallback() {
     const navigate = useNavigate()
@@ -101,6 +102,12 @@ export default function AuthCallback() {
 
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">
+            <SEO
+                title="Authentication"
+                description="Authentication callback page."
+                path="/auth/callback"
+                robots="noindex, nofollow"
+            />
             <div className="text-center">
                 {status === 'loading' && (
                     <>

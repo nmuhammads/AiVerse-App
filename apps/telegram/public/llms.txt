@@ -39,12 +39,18 @@ AiVerse is a next-generation AI creative suite designed for content creators, ar
 - **Telegram Bot**: @aiversebot
 - **Contact**: contact@aiverseapp.net
 - **Supported Languages**: English, Russian, Spanish, French, German, Arabic
+- **Sitemap**: https://www.aiverseapp.net/sitemap.xml
+- **Robots**: https://www.aiverseapp.net/robots.txt
 
 ## Pages
 
-- [Home](https://www.aiverseapp.net/)
-- [Login](https://www.aiverseapp.net/login)
+- [Main Website](https://www.aiverseapp.net/)
+- [Landing](https://www.aiverseapp.net/landing)
 - [Studio](https://www.aiverseapp.net/studio)
+- [Community Feed](https://www.aiverseapp.net/home)
+- [Top Creators](https://www.aiverseapp.net/top)
+- [Events](https://www.aiverseapp.net/events)
+- [FAQ](https://www.aiverseapp.net/faq)
 - [Privacy Policy](https://www.aiverseapp.net/privacy)
 - [Terms of Service](https://www.aiverseapp.net/terms)
 

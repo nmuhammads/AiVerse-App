@@ -22,7 +22,8 @@ export type BalanceChangeReason =
     | 'editor'           // Списание за editor
     | 'channel_reward'   // Награда за подписку на канал
     | 'referral'         // Реферальный бонус
-    | 'promo';           // Промокод
+    | 'promo'            // Промокод
+    | 'tribute_card_charge'; // Оплата сохранённой картой (Token Charging)
 
 
 export interface BalanceChangeParams {

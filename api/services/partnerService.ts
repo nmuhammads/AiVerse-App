@@ -71,19 +71,21 @@ export async function processPartnerBonus(
             console.log(`[Partner] Bonus: +${bonusAmount} Stars for partner @${partnerUsername} (${percent}% of ${amount} XTR from user ${sourceUserId})`)
         } else {
             // Card payment (RUB, EUR or USD)
-            // Convert EUR/USD to RUB for unified rubles balance
-            let rubAmount = bonusAmount
+            // amount/bonusAmount are in minor units: cents (EUR/USD) or kopecks (RUB)
+            // Final partner balance is stored in RUB major units.
+            let bonusRubles = bonusAmount / 100 // RUB: kopecks -> rubles
             if (currencyUpper === 'EUR') {
-                rubAmount = Math.floor(bonusAmount * EUR_TO_RUB_RATE / 100) // amount in cents, rate per euro
+                bonusRubles = (bonusAmount * EUR_TO_RUB_RATE) / 100 // cents -> EUR -> RUB
             } else if (currencyUpper === 'USD') {
-                rubAmount = Math.floor(bonusAmount * USD_TO_RUB_RATE / 100) // amount in cents, rate per dollar
+                bonusRubles = (bonusAmount * USD_TO_RUB_RATE) / 100 // cents -> USD -> RUB
             }
+            bonusRubles = Number(bonusRubles.toFixed(2))
 
             const currentRubles = Number(partner.partner_balance_rubles || 0)
             await supaPatch('users', `?user_id=eq.${partner.user_id}`, {
-                partner_balance_rubles: currentRubles + rubAmount / 100 // convert kopecks/cents to rubles
+                partner_balance_rubles: currentRubles + bonusRubles
             })
-            console.log(`[Partner] Bonus: +${(rubAmount / 100).toFixed(2)}₽ for partner @${partnerUsername} (${percent}% of ${amount} ${currencyUpper} from user ${sourceUserId})`)
+            console.log(`[Partner] Bonus: +${bonusRubles.toFixed(2)}₽ for partner @${partnerUsername} (${percent}% of ${amount} ${currencyUpper} from user ${sourceUserId})`)
         }
     } catch (e) {
         // Never let partner bonus errors break payment flow

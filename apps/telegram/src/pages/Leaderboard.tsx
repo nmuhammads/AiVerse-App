@@ -1,6 +1,7 @@
 import { Crown, Heart, Repeat } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { SEO } from '@/components/SEO'
 import { useTranslation } from 'react-i18next'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -115,6 +116,11 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
+      <SEO
+        title="Top Creators - AI Art Leaderboard"
+        description="Discover top AI artists on AiVerse. See the most popular creators and their best AI-generated images and videos."
+        path="/top"
+      />
       <div className="mx-auto max-w-3xl px-4 py-4 space-y-3">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-white">

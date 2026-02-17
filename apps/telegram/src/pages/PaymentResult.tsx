@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, XCircle, Loader2, Home, RefreshCw } from 'lucide-react'
+import { SEO } from '@/components/SEO'
 
 type PaymentStatus = 'success' | 'fail' | 'checking'
 
@@ -67,6 +68,12 @@ export function PaymentResult() {
     if (status === 'checking') {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+                <SEO
+                    title="Payment Status"
+                    description="Payment status page."
+                    path={location.pathname}
+                    robots="noindex, nofollow"
+                />
                 <div className="text-center">
                     <Loader2 className="w-16 h-16 text-violet-500 animate-spin mx-auto mb-4" />
                     <h1 className="text-xl font-bold text-white mb-2">
@@ -79,6 +86,12 @@ export function PaymentResult() {
 
     return (
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+            <SEO
+                title="Payment Result"
+                description="Payment result page."
+                path={location.pathname}
+                robots="noindex, nofollow"
+            />
             <div className="w-full max-w-md text-center">
                 {status === 'success' ? (
                     <>

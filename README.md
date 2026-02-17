@@ -158,6 +158,7 @@ GOOGLE_CLIENT_ID=your_google_client_id
 
 # Payments
 TRIBUTE_API_KEY=your_tribute_key
+TRIBUTE_TOKEN_CHARGING_ENABLED=false
 
 # Server
 PORT=3000
@@ -232,6 +233,7 @@ railway up
 - `WEBAPP_URL`
 - `GOOGLE_CLIENT_ID`
 - `TRIBUTE_API_KEY`
+- `TRIBUTE_TOKEN_CHARGING_ENABLED=false`
 - `NODE_ENV=production`
 
 ---

@@ -41,3 +41,5 @@ docs/Private/*
 bd/authscheme.sql
 bd/publicscheme.sql
 .agent/*
+todo/*
+docs/*

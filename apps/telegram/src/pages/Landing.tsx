@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Sparkles, Video, MessageSquare, Trophy, ArrowRight, Globe } from 'lucide-react'
 
 import { LanguageSelector } from '@/components/ui/LanguageSelector'
+import { SEO } from '@/components/SEO'
 
 const LANGUAGES = [
     { code: 'ru', label: 'Русский', flag: '🇷🇺' },
@@ -52,6 +53,11 @@ export default function Landing() {
 
     return (
         <div className="min-h-screen bg-black text-white overflow-x-hidden">
+            <SEO
+                title="AiVerse - AI Creative Platform"
+                description="Generate stunning images and videos with AI. Use GPT Image, Kling, NanoBanana PRO and more. Chat with AI assistants. Free to start."
+                path="/landing"
+            />
             {/* Background gradient */}
             <div className="fixed inset-0 bg-gradient-to-br from-violet-950/30 via-black to-fuchsia-950/20 pointer-events-none" />
 

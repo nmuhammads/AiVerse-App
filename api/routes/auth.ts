@@ -12,6 +12,8 @@ import {
   getSupabaseAdmin
 } from '../services/authService.js'
 import { supaSelect, supaPost, supaPatch } from '../services/supabaseService.js'
+import { requireAuth, type AuthenticatedRequest } from '../middleware/authMiddleware.js'
+import { createTelegramSessionToken, verifyTelegramSessionToken } from '../utils/telegramSessionToken.js'
 
 const router = Router()
 
@@ -259,22 +261,12 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
       }
     }
 
-    // For Telegram login, we create a simple session token
-    // (Full Supabase Auth integration for TG users is optional and more complex)
-    const sessionToken = crypto.randomBytes(32).toString('hex')
-    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
-
-    // Store session (you might want to store this in a sessions table)
-    // For now, we'll return a signed token
-    const tokenPayload = {
-      user_id: publicUser.user_id,
+    const { token: accessToken, expiresAt } = createTelegramSessionToken({
+      user_id: Number(publicUser.user_id),
       telegram_id: telegramId,
-      type: 'telegram',
-      exp: Math.floor(expiresAt / 1000)
-    }
-
-    // Simple base64 encoding (in production, use proper JWT)
-    const accessToken = Buffer.from(JSON.stringify(tokenPayload)).toString('base64url')
+      username: publicUser.username || undefined,
+      first_name: publicUser.first_name || undefined,
+    })
 
     res.json({
       ok: true,
@@ -299,12 +291,18 @@ router.post('/telegram-login', async (req: Request, res: Response): Promise<void
  * Link Telegram account to existing user
  * POST /api/auth/link-telegram
  */
-router.post('/link-telegram', async (req: Request, res: Response): Promise<void> => {
+router.post('/link-telegram', requireAuth as any, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const authenticatedUserId = req.user?.id
     const { user_id, telegram_data } = req.body
 
-    if (!user_id || !telegram_data) {
-      res.status(400).json({ ok: false, error: 'user_id and telegram_data are required' })
+    if (!authenticatedUserId || !telegram_data) {
+      res.status(400).json({ ok: false, error: 'telegram_data is required' })
+      return
+    }
+
+    if (user_id && Number(user_id) !== Number(authenticatedUserId)) {
+      res.status(403).json({ ok: false, error: 'Cannot link Telegram to another user' })
       return
     }
 
@@ -314,19 +312,26 @@ router.post('/link-telegram', async (req: Request, res: Response): Promise<void>
       return
     }
 
+    // Check auth_date is not too old (24 hours)
+    const authDate = parseInt(telegram_data.auth_date, 10) * 1000
+    if (!authDate || Date.now() - authDate > 24 * 60 * 60 * 1000) {
+      res.status(401).json({ ok: false, error: 'Telegram authentication expired' })
+      return
+    }
+
     const telegramId = parseInt(telegram_data.id, 10)
 
     // Check if telegram_id is already linked to another account
     const existing = await supaSelect('users', `?telegram_id=eq.${telegramId}&select=user_id`)
     if (existing.ok && Array.isArray(existing.data) && existing.data.length > 0) {
-      if (existing.data[0].user_id !== user_id) {
+      if (existing.data[0].user_id !== authenticatedUserId) {
         res.status(409).json({ ok: false, error: 'This Telegram account is already linked to another user' })
         return
       }
     }
 
     // Link Telegram to user
-    const updateResult = await supaPatch('users', `?user_id=eq.${user_id}`, {
+    const updateResult = await supaPatch('users', `?user_id=eq.${authenticatedUserId}`, {
       telegram_id: telegramId,
       username: telegram_data.username || undefined,
       avatar_url: telegram_data.photo_url || undefined
@@ -472,35 +477,26 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    // Try to decode as simple Telegram token
-    try {
-      const payload = JSON.parse(Buffer.from(token, 'base64url').toString())
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        res.status(401).json({ ok: false, error: 'Token expired' })
+    // Try signed Telegram session token
+    const tgPayload = verifyTelegramSessionToken(token)
+    if (tgPayload?.user_id) {
+      const publicUser = await supaSelect('users', `?user_id=eq.${tgPayload.user_id}&select=*`)
+      const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || null
+
+      if (userData) {
+        res.json({
+          ok: true,
+          user: {
+            id: userData.user_id,
+            telegram_id: userData.telegram_id,
+            first_name: userData.first_name,
+            username: userData.username,
+            balance: userData.balance,
+            avatar_url: userData.avatar_url
+          }
+        })
         return
       }
-
-      if (payload.user_id) {
-        const publicUser = await supaSelect('users', `?user_id=eq.${payload.user_id}&select=*`)
-        const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || null
-
-        if (userData) {
-          res.json({
-            ok: true,
-            user: {
-              id: userData.user_id,
-              telegram_id: userData.telegram_id,
-              first_name: userData.first_name,
-              username: userData.username,
-              balance: userData.balance,
-              avatar_url: userData.avatar_url
-            }
-          })
-          return
-        }
-      }
-    } catch {
-      // Not a valid token format
     }
 
     res.status(401).json({ ok: false, error: 'Invalid token' })
