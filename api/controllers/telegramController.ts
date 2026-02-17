@@ -6,6 +6,13 @@ import { applyTextWatermark, applyImageWatermark } from '../utils/watermark.js'
 import { getTelegramMessage } from '../utils/telegramMessages.js'
 import { compressVideoForTelegram } from '../services/videoProcessingService.js'
 import { processPartnerBonus } from '../services/partnerService.js'
+import {
+  buildStarsInvoicePayload,
+  getStarsPackageByAmount,
+  getStarsPackageById,
+  parseStarsPayload,
+  calculateTokensForStars,
+} from '../config/starsPackages.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const API = TOKEN ? `https://api.telegram.org/bot${TOKEN}` : ''
@@ -571,24 +578,16 @@ export async function webhook(req: Request, res: Response) {
       // Step 3: Stars payment - create invoice
       if (data.startsWith('pay_stars_') && callbackChatId && callbackMessageId) {
         const starAmount = parseInt(data.replace('pay_stars_', ''))
-        const STAR_PACKAGES: Record<number, { tokens: number; spins: number }> = {
-          50: { tokens: 25, spins: 0 },
-          100: { tokens: 50, spins: 0 },
-          200: { tokens: 100, spins: 0 },
-          600: { tokens: 300, spins: 1 },
-          1000: { tokens: 550, spins: 2 }
-        }
-
-        const pkg = STAR_PACKAGES[starAmount]
+        const pkg = getStarsPackageByAmount(starAmount)
         if (pkg) {
           try {
             // Create Stars invoice
             const invoiceResult = await tg('createInvoiceLink', {
               title: `${pkg.tokens} токенов`,
               description: `Пополнение баланса на ${pkg.tokens} токенов`,
-              payload: JSON.stringify({ packageId: `star_${starAmount}`, tokens: pkg.tokens, spins: pkg.spins }),
+              payload: buildStarsInvoicePayload(pkg.id),
               currency: 'XTR',
-              prices: [{ label: `${pkg.tokens} токенов`, amount: starAmount }]
+              prices: [{ label: `${pkg.tokens} токенов`, amount: pkg.starsAmount }]
             })
 
             if (invoiceResult?.ok && invoiceResult.result) {
@@ -713,9 +712,60 @@ export async function webhook(req: Request, res: Response) {
     if (msg?.successful_payment) {
       const payment = msg.successful_payment
       const userId = msg.from?.id
-      const payload = JSON.parse(payment.invoice_payload || '{}')
-      const baseTokens = Number(payload.tokens || 0)
-      let spinsToAdd = Number(payload.spins || 0)
+      const starsPaid = Number(payment.total_amount || 0)
+      const parsed = parseStarsPayload(payment.invoice_payload || '')
+
+      let baseTokens = 0
+      let spinsToAdd = 0
+      let paymentLabel = ''
+
+      if (parsed?.type === 'custom') {
+        // Custom amount — verify stars match what was actually paid
+        const expectedStars = parsed.starsAmount
+        if (expectedStars !== starsPaid) {
+          console.error('[Payment] Custom payload/amount mismatch, skipping credit:', {
+            userId, starsPaid, expectedStars, tokens: parsed.tokens,
+          })
+          return res.json({ ok: true })
+        }
+        // Re-derive tokens from paid stars as extra safety
+        const derivedTokens = calculateTokensForStars(starsPaid)
+        if (!derivedTokens || derivedTokens !== parsed.tokens) {
+          console.error('[Payment] Custom token derivation mismatch, skipping credit:', {
+            userId, starsPaid, payloadTokens: parsed.tokens, derivedTokens,
+          })
+          return res.json({ ok: true })
+        }
+        baseTokens = derivedTokens
+        spinsToAdd = 0
+        paymentLabel = `custom(${starsPaid}stars)`
+      } else {
+        // Predefined package
+        const packageFromPayload = parsed?.packageId ? getStarsPackageById(parsed.packageId) : null
+        const packageByAmount = getStarsPackageByAmount(starsPaid)
+
+        if (!packageByAmount && !packageFromPayload) {
+          console.error('[Payment] Unknown Stars amount, skipping credit:', {
+            userId, starsPaid, payload: payment.invoice_payload,
+          })
+          return res.json({ ok: true })
+        }
+
+        const pkg = packageByAmount || packageFromPayload!
+        // Anti-fraud: if both resolve, they must agree
+        if (packageFromPayload && packageByAmount && packageFromPayload.id !== packageByAmount.id) {
+          console.error('[Payment] Payload/amount mismatch, skipping credit:', {
+            userId, starsPaid,
+            payloadPackageId: packageFromPayload.id,
+            amountPackageId: packageByAmount.id,
+          })
+          return res.json({ ok: true })
+        }
+
+        baseTokens = pkg.tokens
+        spinsToAdd = pkg.spins
+        paymentLabel = pkg.id
+      }
 
       // Check if spin event is enabled - don't award spins if disabled
       const spinEventEnabled = await isSpinEventEnabled()
@@ -728,7 +778,7 @@ export async function webhook(req: Request, res: Response) {
       const tokensToAdd = promoActive ? calculateBonusTokens(baseTokens) : baseTokens
       const bonusTokens = promoActive ? getBonusAmount(baseTokens) : 0
 
-      console.log(`[Payment] Successful payment from ${userId}, base: ${baseTokens}, bonus: ${bonusTokens}, total: ${tokensToAdd}, promoActive: ${promoActive}, spins: ${spinsToAdd}, spinEventEnabled: ${spinEventEnabled}, payload:`, payload)
+      console.log(`[Payment] Successful Stars payment from ${userId}, starsPaid: ${starsPaid}, package: ${paymentLabel}, base: ${baseTokens}, bonus: ${bonusTokens}, total: ${tokensToAdd}, promoActive: ${promoActive}, spins: ${spinsToAdd}, spinEventEnabled: ${spinEventEnabled}`)
 
       if (userId && tokensToAdd > 0) {
         // Fetch current balance and spins
@@ -2205,4 +2255,3 @@ export async function sendWithWatermark(req: Request, res: Response) {
     return res.status(500).json({ ok: false })
   }
 }
-

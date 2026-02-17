@@ -7,6 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
+import { verifyTelegramSessionToken } from '../utils/telegramSessionToken.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 
@@ -14,6 +15,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 export interface AuthenticatedRequest extends Request {
     user?: {
         id: number
+        telegram_id?: number
         username?: string
         first_name?: string
         last_name?: string
@@ -21,6 +23,57 @@ export interface AuthenticatedRequest extends Request {
         is_premium?: boolean
         auth_method: 'telegram' | 'jwt'
     }
+}
+
+function toNumericId(value: unknown): number | null {
+    if (value === undefined || value === null || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function enforceAuthenticatedIdentity(req: AuthenticatedRequest, userId: number): { ok: boolean; message?: string } {
+    // Header checks (legacy flows may still send x-user-id)
+    const headerUserId = toNumericId(req.headers['x-user-id'])
+    if (headerUserId && headerUserId !== userId) {
+        return { ok: false, message: 'User identity mismatch in header' }
+    }
+
+    // Body checks
+    const body = req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : null
+    if (body) {
+        const bodyUserId = toNumericId(body.user_id)
+        const bodyUserIdCamel = toNumericId(body.userId)
+        const followerId = toNumericId(body.followerId)
+
+        if (bodyUserId && bodyUserId !== userId) {
+            return { ok: false, message: 'User identity mismatch in body.user_id' }
+        }
+        if (bodyUserIdCamel && bodyUserIdCamel !== userId) {
+            return { ok: false, message: 'User identity mismatch in body.userId' }
+        }
+        if (followerId && followerId !== userId) {
+            return { ok: false, message: 'User identity mismatch in body.followerId' }
+        }
+
+        // Backward-compatible defaulting for controllers that still expect user_id/userId.
+        if (!bodyUserId) body.user_id = userId
+        if (!bodyUserIdCamel) body.userId = userId
+        if (Object.prototype.hasOwnProperty.call(body, 'followerId') && !followerId) body.followerId = userId
+    }
+
+    // Query checks for protected GET endpoints
+    const query = req.query as Record<string, unknown>
+    const queryUserId = toNumericId(query.user_id)
+    const queryFollowerId = toNumericId(query.follower_id)
+    if (queryUserId && queryUserId !== userId) {
+        return { ok: false, message: 'User identity mismatch in query.user_id' }
+    }
+    if (queryFollowerId && queryFollowerId !== userId) {
+        return { ok: false, message: 'User identity mismatch in query.follower_id' }
+    }
+    if (!queryUserId) query.user_id = String(userId)
+
+    return { ok: true }
 }
 
 /**
@@ -89,6 +142,7 @@ export function validateTelegramInitData(initData: string): AuthenticatedRequest
 
         return {
             id: user.id,
+            telegram_id: user.id,
             username: user.username,
             first_name: user.first_name,
             last_name: user.last_name,
@@ -103,30 +157,20 @@ export function validateTelegramInitData(initData: string): AuthenticatedRequest
 }
 
 /**
- * Validate simple Telegram token (base64url encoded JSON)
+ * Validate signed Telegram session token (Bearer token)
  */
-function validateSimpleTelegramToken(token: string): AuthenticatedRequest['user'] | null {
-    try {
-        const payload = JSON.parse(Buffer.from(token, 'base64url').toString())
-
-        // Check expiration
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-            console.warn('[Auth] Simple token expired')
-            return null
-        }
-
-        if (!payload.user_id) {
-            return null
-        }
-
-        return {
-            id: payload.user_id,
-            username: payload.username,
-            first_name: payload.first_name,
-            auth_method: 'jwt'
-        }
-    } catch {
+function validateTelegramSessionToken(token: string): AuthenticatedRequest['user'] | null {
+    const payload = verifyTelegramSessionToken(token)
+    if (!payload) {
         return null
+    }
+
+    return {
+        id: payload.user_id,
+        telegram_id: payload.telegram_id,
+        username: payload.username,
+        first_name: payload.first_name,
+        auth_method: 'jwt',
     }
 }
 
@@ -149,9 +193,14 @@ async function validateSupabaseToken(token: string): Promise<AuthenticatedReques
         const { supaSelect } = await import('../services/supabaseService.js')
         const publicUser = await supaSelect('users', `?auth_id=eq.${authUser.id}&select=user_id,username,first_name,last_name`)
         const userData = (publicUser.ok && Array.isArray(publicUser.data) && publicUser.data[0]) || {}
+        const userId = Number(userData.user_id || 0)
+        if (!userId) {
+            console.warn('[Auth] Supabase user has no linked public.users row')
+            return null
+        }
 
         return {
-            id: userData.user_id || 0,
+            id: userId,
             username: userData.username,
             first_name: userData.first_name || authUser.user_metadata?.first_name,
             last_name: userData.last_name || authUser.user_metadata?.last_name,
@@ -175,6 +224,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
         const user = validateTelegramInitData(telegramInitData)
         if (user) {
             req.user = user
+            const identityCheck = enforceAuthenticatedIdentity(req, user.id)
+            if (!identityCheck.ok) {
+                res.status(403).json({ error: 'Forbidden', message: identityCheck.message })
+                return
+            }
             return next()
         }
     }
@@ -184,10 +238,15 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7)
 
-        // Try simple Telegram token first (faster, no network call)
-        const simpleUser = validateSimpleTelegramToken(token)
+        // Try signed Telegram token first (no network call)
+        const simpleUser = validateTelegramSessionToken(token)
         if (simpleUser) {
             req.user = simpleUser
+            const identityCheck = enforceAuthenticatedIdentity(req, simpleUser.id)
+            if (!identityCheck.ok) {
+                res.status(403).json({ error: 'Forbidden', message: identityCheck.message })
+                return
+            }
             return next()
         }
 
@@ -195,6 +254,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
         const supabaseUser = await validateSupabaseToken(token)
         if (supabaseUser) {
             req.user = supabaseUser
+            const identityCheck = enforceAuthenticatedIdentity(req, supabaseUser.id)
+            if (!identityCheck.ok) {
+                res.status(403).json({ error: 'Forbidden', message: identityCheck.message })
+                return
+            }
             return next()
         }
     }
@@ -226,7 +290,7 @@ export async function optionalAuth(req: AuthenticatedRequest, res: Response, nex
     if (!req.user && authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7)
 
-        const simpleUser = validateSimpleTelegramToken(token)
+        const simpleUser = validateTelegramSessionToken(token)
         if (simpleUser) {
             req.user = simpleUser
         } else {

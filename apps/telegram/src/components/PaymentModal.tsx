@@ -23,13 +23,13 @@ interface SavedCard {
 }
 
 const PACKAGES_STARS = [
-    { id: 'star_20', tokens: 10, price: 20, spins: 0 },
-    { id: 'star_50', tokens: 25, price: 50, spins: 0 },
-    { id: 'star_100', tokens: 50, price: 100, spins: 0 },
-    { id: 'star_200', tokens: 100, price: 200, popular: true, spins: 0 },
-    { id: 'star_300', tokens: 150, price: 300, spins: 0 },
-    { id: 'star_600', tokens: 300, price: 600, spins: 1 },
-    { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true, spins: 2 },
+    { id: 'star_20', tokens: 10, price: 20 },
+    { id: 'star_50', tokens: 25, price: 50 },
+    { id: 'star_100', tokens: 50, price: 100 },
+    { id: 'star_200', tokens: 100, price: 200, popular: true },
+    { id: 'star_300', tokens: 150, price: 300 },
+    { id: 'star_600', tokens: 300, price: 600 },
+    { id: 'star_1000', tokens: 550, price: 1000, bonus: '+50 FREE', popular: true },
 ]
 
 // EUR packages via Tribute Shop API (1 EUR ≈ 90 RUB)
@@ -56,7 +56,16 @@ const PACKAGES_USD = [
     { id: 'usd_800', tokens: 800, price: 1870, bonus: '+11%', priceLabel: '$18.70' },
 ]
 
-// Custom token pricing
+// Custom token pricing — Stars
+const STARS_PER_TOKEN = 2
+const MIN_CUSTOM_STARS_TOKENS = 10
+const MAX_CUSTOM_STARS_TOKENS = 5000
+
+function calculateStarsForTokens(tokens: number): number {
+    return Math.ceil(tokens * STARS_PER_TOKEN)
+}
+
+// Custom token pricing — Card
 const BASE_RATE_RUB = 200   // kopecks per token (2 RUB)
 const BASE_RATE_EUR = 2.2   // cents per token (€0.022)
 const BASE_RATE_USD = 2.6   // cents per token ($0.026)
@@ -252,8 +261,14 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     // Get current price label for the selected package/custom amount
     const getCurrentPriceLabel = (): string => {
-        if (isCustomMode && customTokens && parseInt(customTokens) >= MIN_CUSTOM_TOKENS) {
-            return calculateCustomTokenPrice(parseInt(customTokens), webCurrency).priceLabel
+        if (isCustomMode && customTokens) {
+            const count = parseInt(customTokens)
+            if (activeMethod === 'stars' && count >= MIN_CUSTOM_STARS_TOKENS && count <= MAX_CUSTOM_STARS_TOKENS) {
+                return `${calculateStarsForTokens(count)} ⭐`
+            }
+            if (activeMethod === 'card' && count >= MIN_CUSTOM_TOKENS && count <= MAX_CUSTOM_TOKENS) {
+                return calculateCustomTokenPrice(count, webCurrency).priceLabel
+            }
         }
         return selectedPackage.priceLabel || `${selectedPackage.price} ${currencySymbol}`
     }
@@ -270,10 +285,17 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     const handlePayment = async () => {
         impact('medium')
         if (activeMethod === 'stars') {
+            // Validate custom mode for Stars
+            const starsCustomCount = isCustomMode ? parseInt(customTokens) : 0
+            if (isCustomMode && (!starsCustomCount || starsCustomCount < MIN_CUSTOM_STARS_TOKENS || starsCustomCount > MAX_CUSTOM_STARS_TOKENS)) {
+                return
+            }
+
             // In dev mode, redirect to hub bot for Stars payment
             if (isDevMode()) {
                 const wa = (window as any).Telegram?.WebApp
-                const link = `https://t.me/aiverse_hub_bot?start=pay-stars-${selectedPackage.tokens}`
+                const tokensForLink = isCustomMode ? starsCustomCount : selectedPackage.tokens
+                const link = `https://t.me/aiverse_hub_bot?start=pay-stars-${tokensForLink}`
                 if (wa) {
                     wa.openTelegramLink(link)
                     onClose()
@@ -285,16 +307,15 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
             setLoading(true)
             try {
+                const customCount = isCustomMode ? parseInt(customTokens) : 0
+                const starsBody = (isCustomMode && customCount >= MIN_CUSTOM_STARS_TOKENS && customCount <= MAX_CUSTOM_STARS_TOKENS)
+                    ? { customTokens: customCount }
+                    : { packageId: selectedPackage.id }
+
                 const response = await fetch('/api/payment/create-stars-invoice', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                    body: JSON.stringify({
-                        title: t('payment.packages.tokens', { count: selectedPackage.tokens }),
-                        description: t('payment.messages.description', { count: selectedPackage.tokens }),
-                        payload: JSON.stringify({ packageId: selectedPackage.id, tokens: selectedPackage.tokens, spins: selectedPackage.spins || 0 }),
-                        currency: 'XTR',
-                        amount: selectedPackage.price
-                    })
+                    body: JSON.stringify(starsBody)
                 })
                 const data = await response.json()
 
@@ -700,7 +721,6 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                                         <div className="text-[10px] text-emerald-400 font-bold">+{getBonusAmount(pkg.tokens)} 🎁</div>
                                                     )}
                                                     {pkg.bonus && !isPromoActive() && <div className="text-[10px] text-emerald-400 font-bold">{t('payment.packages.bonus')} {pkg.bonus}</div>}
-                                                    {pkg.spins > 0 && <div className="text-[10px] text-violet-400 font-bold">{t('payment.packages.spins', { count: pkg.spins })}</div>}
                                                 </div>
                                                 <div className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
                                                     {pkg.priceLabel || `${pkg.price} ${currencySymbol}`}
@@ -722,62 +742,70 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                 })}
                             </div>
 
-                            {/* Custom Token Input (card only) */}
-                            {activeMethod === 'card' && (
-                                <div className="mt-3 pt-3 border-t border-white/5">
-                                    <div className="text-[11px] text-zinc-400 mb-2 text-center font-medium">
-                                        {t('payment.customInput.label', 'Или введите своё количество')}
-                                    </div>
-                                    <div className="relative">
-                                        <input
-                                            ref={inputRef}
-                                            type="number"
-                                            min={MIN_CUSTOM_TOKENS}
-                                            max={MAX_CUSTOM_TOKENS}
-                                            placeholder={t('payment.customInput.placeholder', 'Введите количество токенов...')}
-                                            value={customTokens}
-                                            inputMode="numeric"
-                                            onFocus={() => {
-                                                setIsCustomMode(true)
-                                            }}
-                                            onChange={(e) => {
-                                                setCustomTokens(e.target.value)
-                                                setIsCustomMode(true)
-                                            }}
-                                            className="w-full h-12 px-4 pr-20 rounded-xl bg-zinc-800/70 border border-white/10 text-white text-sm font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
-                                        />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">{t('payment.customInput.tokens', 'tokens')}</span>
-                                    </div>
-                                    {isCustomMode && customTokens && (() => {
-                                        const count = parseInt(customTokens)
-                                        if (!count || count < MIN_CUSTOM_TOKENS) {
-                                            return (
-                                                <div className="text-xs text-red-400 mt-2 text-center font-medium">
-                                                    {t('payment.customInput.min', { min: MIN_CUSTOM_TOKENS })}
-                                                </div>
-                                            )
-                                        }
-                                        if (count > MAX_CUSTOM_TOKENS) {
-                                            return (
-                                                <div className="text-xs text-red-400 mt-2 text-center font-medium">
-                                                    {t('payment.customInput.max', { max: MAX_CUSTOM_TOKENS.toLocaleString() })}
-                                                </div>
-                                            )
-                                        }
-                                        const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
+                            {/* Custom Token Input */}
+                            <div className="mt-3 pt-3 border-t border-white/5">
+                                <div className="text-[11px] text-zinc-400 mb-2 text-center font-medium">
+                                    {t('payment.customInput.label', 'Или введите своё количество')}
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        ref={inputRef}
+                                        type="number"
+                                        min={activeMethod === 'stars' ? MIN_CUSTOM_STARS_TOKENS : MIN_CUSTOM_TOKENS}
+                                        max={activeMethod === 'stars' ? MAX_CUSTOM_STARS_TOKENS : MAX_CUSTOM_TOKENS}
+                                        placeholder={t('payment.customInput.placeholder', 'Введите количество токенов...')}
+                                        value={customTokens}
+                                        inputMode="numeric"
+                                        onFocus={() => {
+                                            setIsCustomMode(true)
+                                        }}
+                                        onChange={(e) => {
+                                            setCustomTokens(e.target.value)
+                                            setIsCustomMode(true)
+                                        }}
+                                        className="w-full h-12 px-4 pr-20 rounded-xl bg-zinc-800/70 border border-white/10 text-white text-sm font-medium placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">{t('payment.customInput.tokens', 'tokens')}</span>
+                                </div>
+                                {isCustomMode && customTokens && (() => {
+                                    const count = parseInt(customTokens)
+                                    const minTokens = activeMethod === 'stars' ? MIN_CUSTOM_STARS_TOKENS : MIN_CUSTOM_TOKENS
+                                    const maxTokens = activeMethod === 'stars' ? MAX_CUSTOM_STARS_TOKENS : MAX_CUSTOM_TOKENS
+                                    if (!count || count < minTokens) {
                                         return (
-                                            <div className="flex items-center justify-center gap-2 mt-2">
-                                                <span className="text-sm text-white font-bold">{priceLabel}</span>
-                                                {discount > 0 && (
-                                                    <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                                                        {getDiscountTier(count).label}
-                                                    </span>
-                                                )}
+                                            <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                                {t('payment.customInput.min', { min: minTokens })}
                                             </div>
                                         )
-                                    })()}
-                                </div>
-                            )}
+                                    }
+                                    if (count > maxTokens) {
+                                        return (
+                                            <div className="text-xs text-red-400 mt-2 text-center font-medium">
+                                                {t('payment.customInput.max', { max: maxTokens.toLocaleString() })}
+                                            </div>
+                                        )
+                                    }
+                                    if (activeMethod === 'stars') {
+                                        const stars = calculateStarsForTokens(count)
+                                        return (
+                                            <div className="flex items-center justify-center gap-2 mt-2">
+                                                <span className="text-sm text-white font-bold">{stars} ⭐</span>
+                                            </div>
+                                        )
+                                    }
+                                    const { priceLabel, discount } = calculateCustomTokenPrice(count, webCurrency)
+                                    return (
+                                        <div className="flex items-center justify-center gap-2 mt-2">
+                                            <span className="text-sm text-white font-bold">{priceLabel}</span>
+                                            {discount > 0 && (
+                                                <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                                    {getDiscountTier(count).label}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )
+                                })()}
+                            </div>
                         </div>
 
                         {/* Footer Action */}
@@ -790,25 +818,10 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                     : 'bg-white text-black hover:bg-zinc-200 shadow-white/10'
                                     }`}
                             >
-                                {loading ? t('payment.button.processing') : (
-                                    activeMethod === 'card'
-                                        ? (isCustomMode && customTokens && parseInt(customTokens) >= MIN_CUSTOM_TOKENS
-                                            ? `${t('payment.button.paySimple')} ${calculateCustomTokenPrice(parseInt(customTokens), webCurrency).priceLabel}`
-                                            : selectedPackage.priceLabel
-                                                ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
-                                                : t('payment.button.pay', { amount: selectedPackage.price, symbol: currencySymbol, method: t('payment.methods.card') })
-                                        )
-                                        : (isCustomMode && customTokens && parseInt(customTokens) >= MIN_CUSTOM_TOKENS
-                                            ? `${t('payment.button.paySimple')} ${calculateCustomTokenPrice(parseInt(customTokens), webCurrency).priceLabel}`
-                                            : selectedPackage.priceLabel
-                                                ? `${t('payment.button.paySimple')} ${selectedPackage.priceLabel}`
-                                                : t('payment.button.pay', {
-                                                    amount: selectedPackage.price,
-                                                    symbol: currencySymbol,
-                                                    method: t('payment.methods.stars')
-                                                })
-                                        )
-                                )}
+                                {loading
+                                    ? t('payment.button.processing')
+                                    : `${t('payment.button.paySimple')} ${getCurrentPriceLabel()}`
+                                }
                             </button>
 
                             {/* Bonus Purchase Button */}

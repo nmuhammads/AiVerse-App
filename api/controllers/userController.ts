@@ -364,9 +364,17 @@ export async function listGenerations(req: Request, res: Response) {
 export async function togglePublish(req: Request, res: Response) {
   try {
     const { generationId, isPublished, isPrivate } = req.body
+    const authUserId = Number((req as any).user?.id || 0)
     if (!generationId) return res.status(400).json({ error: 'generationId required' })
+    if (!authUserId) return res.status(401).json({ error: 'Unauthorized' })
 
     if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Supabase not configured' })
+
+    // Ensure user can only publish/unpublish own generation
+    const ownerCheck = await supaSelect('generations', `?id=eq.${generationId}&user_id=eq.${authUserId}&select=id`)
+    if (!ownerCheck.ok || !Array.isArray(ownerCheck.data) || ownerCheck.data.length === 0) {
+      return res.status(403).json({ error: 'Generation not found or not owned by user' })
+    }
 
     const patchPayload: Record<string, boolean> = { is_published: !!isPublished }
     if (typeof isPrivate === 'boolean') {

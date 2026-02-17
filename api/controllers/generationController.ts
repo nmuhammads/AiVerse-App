@@ -2036,9 +2036,14 @@ export async function togglePromptPrivacy(req: Request, res: Response) {
   try {
     const { id } = req.params
     const { is_prompt_private } = req.body
+    const authUserId = Number((req as any).user?.id || 0)
 
     if (!id) {
       return res.status(400).json({ error: 'Generation ID required' })
+    }
+
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Unauthorized' })
     }
 
     if (typeof is_prompt_private !== 'boolean') {
@@ -2047,6 +2052,12 @@ export async function togglePromptPrivacy(req: Request, res: Response) {
 
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    // Verify ownership first
+    const ownerCheck = await supaSelect('generations', `?id=eq.${id}&user_id=eq.${authUserId}&select=id`)
+    if (!ownerCheck.ok || !Array.isArray(ownerCheck.data) || ownerCheck.data.length === 0) {
+      return res.status(403).json({ error: 'Generation not found or not owned by user' })
     }
 
     // Update the privacy flag
@@ -2755,4 +2766,3 @@ export async function handlePiapiWebhook(req: Request, res: Response) {
     res.status(500).json({ error: 'Webhook processing failed' })
   }
 }
-
