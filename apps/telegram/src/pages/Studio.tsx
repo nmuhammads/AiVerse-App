@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { SEO } from '@/components/SEO'
 import { type ModelType } from '@/store/generationStore'
 import { DevModeBanner } from '@/components/DevModeBanner'
 import { ActiveGenerationsPanel } from '@/components/ActiveGenerationsPanel'
@@ -335,6 +336,11 @@ export default function Studio() {
       className={`bg-black flex flex-col min-h-0 min-h-dvh ${studioOffsetClass}`}
       style={{ paddingTop: studioPaddingTop }}
     >
+      <SEO
+        title="AI Studio - Generate Images & Videos"
+        description="Create stunning AI-generated images and videos. Use GPT Image, Kling, NanoBanana PRO and other models to bring your ideas to life."
+        path="/studio"
+      />
       <div className="mx-auto max-w-3xl w-full px-4 flex-1 min-h-0 flex flex-col gap-6 py-4">
         <StudioHeader
           t={t}

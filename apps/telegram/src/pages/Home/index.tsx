@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { SEO } from '@/components/SEO'
 import { useTranslation } from 'react-i18next'
 
 import { useTelegram } from '@/hooks/useTelegram'
@@ -96,6 +97,11 @@ export default function Home() {
 
     return (
         <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
+            <SEO
+                title="Community Feed - AI Art Gallery"
+                description="Explore AI-generated images and videos created by the AiVerse community. Get inspired, like and share creative AI art."
+                path="/home"
+            />
             <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
                 <div className="px-1">
                     {/* Header or Search */}

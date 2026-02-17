@@ -20,6 +20,7 @@ import Landing from "@/pages/Landing";
 import AuthCallback from "@/pages/AuthCallback";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import FAQ from "@/pages/FAQ";
 import { PaymentResult } from "@/pages/PaymentResult";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
@@ -222,7 +223,7 @@ function StartParamRouter() {
 // Main App Layout with Header and TabBar
 function AppLayout() {
   const location = useLocation();
-  const isLoginPage = location.pathname === '/login' || location.pathname === '/landing' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms';
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/landing' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/faq';
   const inTelegram = isInTelegramWebApp();
 
   // Initialize auth state
@@ -262,6 +263,7 @@ function AppLayout() {
           <Route path="/payment/fail" element={<PaymentResult />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/faq" element={<FAQ />} />
         </Routes>
       </div>
     );

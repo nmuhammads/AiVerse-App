@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, MessageCircle, Globe } from 'lucide-react'
 import { loginWithEmail, signupWithEmail, loginWithTelegram, loginWithGoogle, useAuthStore } from '../store/authStore'
+import { SEO } from '@/components/SEO'
 
 declare global {
     interface Window {
@@ -153,6 +154,12 @@ export default function Login() {
 
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">
+            <SEO
+                title="Login"
+                description="Login to AiVerse."
+                path="/login"
+                robots="noindex, nofollow"
+            />
             <div className="w-full max-w-md">
                 {/* Language Switcher */}
                 <div className="absolute top-4 right-4">
