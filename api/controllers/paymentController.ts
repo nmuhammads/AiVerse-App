@@ -6,6 +6,7 @@ import {
     buildStarsInvoicePayload,
     buildCustomStarsPayload,
     calculateStarsForTokens,
+    getCustomStarsBonus,
     MIN_CUSTOM_STARS_TOKENS,
     MAX_CUSTOM_STARS_TOKENS,
 } from '../config/starsPackages.js'
@@ -42,9 +43,10 @@ export const createStarsInvoice = async (req: AuthenticatedRequest, res: Respons
                     error: `Token count must be between ${MIN_CUSTOM_STARS_TOKENS} and ${MAX_CUSTOM_STARS_TOKENS}`,
                 })
             }
+            const bonus = getCustomStarsBonus(customTokens)
             tokens = customTokens
             starsAmount = stars
-            payload = buildCustomStarsPayload(tokens, starsAmount)
+            payload = buildCustomStarsPayload(tokens, starsAmount, bonus.bonusTokens)
         } else if (packageId) {
             // Predefined package
             const pkg = getStarsPackageById(packageId)

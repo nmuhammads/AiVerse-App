@@ -12,6 +12,7 @@ import {
   getStarsPackageById,
   parseStarsPayload,
   calculateTokensForStars,
+  getCustomStarsBonus,
 } from '../config/starsPackages.js'
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
@@ -736,9 +737,18 @@ export async function webhook(req: Request, res: Response) {
           })
           return res.json({ ok: true })
         }
-        baseTokens = derivedTokens
+        // Verify bonus matches server-side calculation
+        const expectedBonus = getCustomStarsBonus(derivedTokens)
+        const payloadBonus = parsed.bonusTokens || 0
+        if (payloadBonus !== expectedBonus.bonusTokens) {
+          console.error('[Payment] Custom bonus mismatch, skipping credit:', {
+            userId, starsPaid, payloadBonus, expectedBonus: expectedBonus.bonusTokens,
+          })
+          return res.json({ ok: true })
+        }
+        baseTokens = derivedTokens + expectedBonus.bonusTokens
         spinsToAdd = 0
-        paymentLabel = `custom(${starsPaid}stars)`
+        paymentLabel = `custom(${starsPaid}stars,bonus:${expectedBonus.bonusTokens})`
       } else {
         // Predefined package
         const packageFromPayload = parsed?.packageId ? getStarsPackageById(parsed.packageId) : null

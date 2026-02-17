@@ -66,6 +66,12 @@ function calculateStarsForTokens(tokens: number): number {
     return Math.ceil(tokens * STARS_PER_TOKEN)
 }
 
+function getCustomStarsBonus(tokens: number): { bonusTokens: number; label: string } {
+    if (tokens >= 1000) return { bonusTokens: 100, label: '+100 FREE' }
+    if (tokens >= 500) return { bonusTokens: 50, label: '+50 FREE' }
+    return { bonusTokens: 0, label: '' }
+}
+
 // Custom token pricing — Card
 const BASE_RATE_RUB = 200   // kopecks per token (2 RUB)
 const BASE_RATE_EUR = 2.2   // cents per token (€0.022)
@@ -794,9 +800,15 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                                     }
                                     if (activeMethod === 'stars') {
                                         const stars = calculateStarsForTokens(count)
+                                        const bonus = getCustomStarsBonus(count)
                                         return (
                                             <div className="flex items-center justify-center gap-2 mt-2">
                                                 <span className="text-sm text-white font-bold">{stars} ⭐</span>
+                                                {bonus.bonusTokens > 0 && (
+                                                    <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                                        {bonus.label}
+                                                    </span>
+                                                )}
                                             </div>
                                         )
                                     }

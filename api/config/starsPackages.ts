@@ -29,6 +29,17 @@ export const STARS_PER_TOKEN = 2
 export const MIN_CUSTOM_STARS_TOKENS = 10
 export const MAX_CUSTOM_STARS_TOKENS = 5000
 
+export interface CustomStarsBonus {
+    bonusTokens: number
+    label: string
+}
+
+export function getCustomStarsBonus(tokens: number): CustomStarsBonus {
+    if (tokens >= 1000) return { bonusTokens: 100, label: '+100 FREE' }
+    if (tokens >= 500) return { bonusTokens: 50, label: '+50 FREE' }
+    return { bonusTokens: 0, label: '' }
+}
+
 export function calculateStarsForTokens(tokens: number): number | null {
     if (!Number.isFinite(tokens) || tokens < MIN_CUSTOM_STARS_TOKENS || tokens > MAX_CUSTOM_STARS_TOKENS) return null
     return Math.ceil(tokens * STARS_PER_TOKEN)
@@ -45,8 +56,8 @@ export function buildStarsInvoicePayload(packageId: string): string {
     return `stars:${packageId}`
 }
 
-export function buildCustomStarsPayload(tokens: number, starsAmount: number): string {
-    return `custom:${tokens}:${starsAmount}`
+export function buildCustomStarsPayload(tokens: number, starsAmount: number, bonusTokens: number): string {
+    return `custom:${tokens}:${starsAmount}:${bonusTokens}`
 }
 
 export interface ParsedStarsPayload {
@@ -54,6 +65,7 @@ export interface ParsedStarsPayload {
     packageId?: string
     tokens?: number
     starsAmount?: number
+    bonusTokens?: number
 }
 
 export function parseStarsInvoicePayload(payloadRaw: string): string | null {
@@ -75,14 +87,15 @@ export function parseStarsInvoicePayload(payloadRaw: string): string | null {
 export function parseStarsPayload(payloadRaw: string): ParsedStarsPayload | null {
     if (!payloadRaw) return null
 
-    // Custom format: custom:<tokens>:<starsAmount>
+    // Custom format: custom:<tokens>:<starsAmount>:<bonusTokens>
     if (payloadRaw.startsWith('custom:')) {
         const parts = payloadRaw.split(':')
-        if (parts.length === 3) {
+        if (parts.length === 3 || parts.length === 4) {
             const tokens = Number(parts[1])
             const starsAmount = Number(parts[2])
-            if (Number.isFinite(tokens) && tokens > 0 && Number.isFinite(starsAmount) && starsAmount > 0) {
-                return { type: 'custom', tokens, starsAmount }
+            const bonusTokens = parts.length === 4 ? Number(parts[3]) : 0
+            if (Number.isFinite(tokens) && tokens > 0 && Number.isFinite(starsAmount) && starsAmount > 0 && Number.isFinite(bonusTokens) && bonusTokens >= 0) {
+                return { type: 'custom', tokens, starsAmount, bonusTokens }
             }
         }
         return null
