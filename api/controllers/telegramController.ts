@@ -1949,7 +1949,8 @@ export async function sendWithPrompt(req: Request, res: Response) {
     const txtPrompt = getTelegramMessage(userLang, 'prompt')
 
     // Format parts
-    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>`
+    const genIdTag = generationId ? `\n\n#${generationId}` : ''
+    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>${genIdTag}`
 
     // Build full caption to check length
     // HTML format: <blockquote expandable>text</blockquote>
@@ -2196,7 +2197,8 @@ export async function sendWithWatermark(req: Request, res: Response) {
     const txtPrompt = getTelegramMessage(userLang, 'prompt')
 
     // Format caption
-    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>`
+    const genIdTag = generationId ? `\n\n#${generationId}` : ''
+    const headerHtml = `${hashtag}\n\n${txtCreateSimilar}\n${txtInBot} - <a href="${botLink}">@${botName}</a>\n\n${txtRepeatInApp}\n<a href="${appLink}">${txtAppName}</a>${genIdTag}`
 
     const promptHtml = promptWithFingerprint
       ? `\n\n${txtPrompt}\n<blockquote expandable>${escapeHtml(promptWithFingerprint)}</blockquote>`
