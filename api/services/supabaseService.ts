@@ -39,10 +39,14 @@ export async function supaPost(table: string, body: unknown, params = '') {
     }
 }
 
-export async function supaPatch(table: string, filter: string, body: unknown) {
+export async function supaPatch(table: string, filter: string, body: unknown, preferReturnRepresentation = false) {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-        const r = await fetch(url, { method: 'PATCH', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        const headers: Record<string, string> = { ...supaHeaders(), 'Content-Type': 'application/json' }
+        if (preferReturnRepresentation) {
+            headers['Prefer'] = 'return=representation'
+        }
+        const r = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) })
         const data = await r.json().catch(() => null)
         return { ok: r.ok, data }
     } catch (e) {

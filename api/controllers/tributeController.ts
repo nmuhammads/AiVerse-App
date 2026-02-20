@@ -205,6 +205,18 @@ export async function checkOrderStatus(req: Request, res: Response): Promise<voi
  * Reconcile a pending order that was actually paid (webhook missed)
  */
 async function reconcilePayment(order: any): Promise<void> {
+    // ATOMIC CLAIM: Try to update the order to 'paid' where it is currently 'pending'
+    const claimResult = await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}&status=eq.pending`, {
+        status: 'paid',
+        paid_at: new Date().toISOString()
+    }, true)
+
+    // If no rows were returned, webhook already claimed it (race condition avoided)
+    if (!claimResult.ok || !Array.isArray(claimResult.data) || claimResult.data.length === 0) {
+        console.log(`[TributeController] Reconcile: Order ${order.uuid} already processed by webhook, skipping token credit.`)
+        return
+    }
+
     const userId = order.user_id
     const baseTokens = order.tokens
 
@@ -216,7 +228,6 @@ async function reconcilePayment(order: any): Promise<void> {
     const userResult = await supaSelect('users', `?user_id=eq.${userId}&select=balance,telegram_id,username,first_name,last_name`)
     if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
         console.error(`[TributeController] Reconcile: User not found: ${userId}`)
-        await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}`, { status: 'paid', paid_at: new Date().toISOString() })
         return
     }
 
@@ -244,9 +255,6 @@ async function reconcilePayment(order: any): Promise<void> {
         }
     })
     await processPartnerBonus(userId, order.amount, (order.currency || 'rub').toUpperCase())
-
-    // Update order status
-    await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}`, { status: 'paid', paid_at: new Date().toISOString() })
 
     console.log(`[TributeController] Reconciled: user ${userId} balance ${currentBalance} -> ${newBalance}`)
 
@@ -476,10 +484,14 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
         }
 
         if (finalStatus === 'success') {
-            // If webhook already processed this charge, avoid double-credit.
-            const orderStatusResult = await supaSelect('tribute_orders', `?uuid=eq.${charge.chargeUuid}&select=status`)
-            const orderStatus = (orderStatusResult.ok && Array.isArray(orderStatusResult.data) && orderStatusResult.data[0]?.status) || 'pending'
-            if (orderStatus === 'paid') {
+            // Atomic claim to prevent race condition with webhook
+            const claimResult = await supaPatch('tribute_orders', `?uuid=eq.${charge.chargeUuid}&status=eq.pending`, {
+                status: 'paid',
+                paid_at: new Date().toISOString()
+            }, true)
+
+            // If no rows returned, webhook already processed it
+            if (!claimResult.ok || !Array.isArray(claimResult.data) || claimResult.data.length === 0) {
                 res.json({ success: true, status: 'success', tokensAdded: 0 })
                 return
             }
@@ -492,10 +504,6 @@ export async function chargeWithSavedCard(req: AuthenticatedRequest, res: Respon
                 const newBalance = currentBalance + orderTokens
 
                 await supaPatch('users', `?user_id=eq.${userId}`, { balance: newBalance })
-                await supaPatch('tribute_orders', `?uuid=eq.${charge.chargeUuid}`, {
-                    status: 'paid',
-                    paid_at: new Date().toISOString()
-                })
 
                 await logBalanceChange({
                     userId: userId,

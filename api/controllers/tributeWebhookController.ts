@@ -117,20 +117,26 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
                     if (chargeOrderResult.ok && Array.isArray(chargeOrderResult.data) && chargeOrderResult.data.length > 0) {
                         const chargeOrder = chargeOrderResult.data[0]
 
-                        if (eventName === 'shopTokenChargeSuccess' && chargeOrder.status !== 'paid') {
-                            // Credit tokens if not already done by polling
-                            const userResult = await supaSelect('users', `?user_id=eq.${chargeOrder.user_id}&select=balance`)
-                            if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
-                                const currentBalance = userResult.data[0].balance || 0
-                                const newBalance = currentBalance + chargeOrder.tokens
-                                await supaPatch('users', `?user_id=eq.${chargeOrder.user_id}`, { balance: newBalance })
-                                await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}`, { status: 'paid', paid_at: new Date().toISOString() })
-                                await processPartnerBonus(
-                                    chargeOrder.user_id,
-                                    chargeOrder.amount,
-                                    (chargeOrder.currency || 'rub').toUpperCase()
-                                )
-                                console.log(`[TributeWebhook] Charge credited (fallback): user ${chargeOrder.user_id} balance ${currentBalance} -> ${newBalance}`)
+                        if (eventName === 'shopTokenChargeSuccess') {
+                            // Atomic claim to prevent race condition
+                            const updateResult = await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}&status=eq.pending`, { status: 'paid', paid_at: new Date().toISOString() }, true)
+
+                            if (updateResult.ok && Array.isArray(updateResult.data) && updateResult.data.length > 0) {
+                                // Credit tokens if successfully claimed
+                                const userResult = await supaSelect('users', `?user_id=eq.${chargeOrder.user_id}&select=balance`)
+                                if (userResult.ok && Array.isArray(userResult.data) && userResult.data.length > 0) {
+                                    const currentBalance = userResult.data[0].balance || 0
+                                    const newBalance = currentBalance + chargeOrder.tokens
+                                    await supaPatch('users', `?user_id=eq.${chargeOrder.user_id}`, { balance: newBalance })
+                                    await processPartnerBonus(
+                                        chargeOrder.user_id,
+                                        chargeOrder.amount,
+                                        (chargeOrder.currency || 'rub').toUpperCase()
+                                    )
+                                    console.log(`[TributeWebhook] Charge credited: user ${chargeOrder.user_id} balance ${currentBalance} -> ${newBalance}`)
+                                }
+                            } else {
+                                console.log(`[TributeWebhook] Charge ${chargeUuid} already processed by polling.`)
                             }
                         } else if (eventName === 'shopTokenChargeFailed' && chargeOrder.status !== 'failed') {
                             await supaPatch('tribute_orders', `?uuid=eq.${chargeUuid}`, { status: 'failed' })
@@ -213,6 +219,18 @@ export async function handleTributeWebhook(req: Request, res: Response): Promise
  * Process successful payment
  */
 async function processSuccessfulPayment(order: any, payload: TributeWebhookOrderPayload, skipNotifications: boolean = false): Promise<void> {
+    // ATOMIC CLAIM: Try to update the order to 'paid' where it is currently 'pending'
+    const claimResult = await supaPatch('tribute_orders', `?uuid=eq.${order.uuid}&status=eq.pending`, {
+        status: 'paid',
+        paid_at: new Date().toISOString()
+    }, true)
+
+    // If no rows were returned, another process already claimed it (race condition avoided)
+    if (!claimResult.ok || !Array.isArray(claimResult.data) || claimResult.data.length === 0) {
+        console.log(`[TributeWebhook] Order ${order.uuid} already processed or not pending, skipping token credit.`)
+        return
+    }
+
     const userId = order.user_id
     const baseTokens = order.tokens
 
@@ -228,8 +246,6 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookOrder
 
     if (!userResult.ok || !Array.isArray(userResult.data) || userResult.data.length === 0) {
         console.error(`[TributeWebhook] User not found: ${userId}`)
-        // Still mark order as paid to prevent duplicate processing
-        await updateOrderStatus(order.uuid, 'paid')
         return
     }
 
@@ -267,9 +283,6 @@ async function processSuccessfulPayment(order: any, payload: TributeWebhookOrder
 
     // Partner bonus accrual
     await processPartnerBonus(userId, order.amount, (order.currency || 'rub').toUpperCase())
-
-    // Update order status
-    await updateOrderStatus(order.uuid, 'paid')
 
     console.log(`[TributeWebhook] Payment processed: user ${userId} balance ${currentBalance} -> ${newBalance}`)
 
