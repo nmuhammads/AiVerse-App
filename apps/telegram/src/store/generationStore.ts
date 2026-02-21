@@ -49,7 +49,7 @@ export interface GenerationState {
   // Массив сгенерированных изображений (для множественной генерации)
   generatedImages: string[]
   // ID родительской генерации (для ремиксов)
-  parentGenerationId: number | null
+  parentGenerationId: number | string | null
   // Имя автора родительской генерации
   parentAuthorUsername: string | null
   // Флаг приватности промпта родительской генерации (для слепого ремикса)
@@ -124,7 +124,7 @@ export interface GenerationActions {
   // Переключить экран
   setCurrentScreen: (screen: 'form' | 'result') => void
   // Установить родительскую генерацию
-  setParentGeneration: (id: number | null, username: string | null, isPrivate?: boolean) => void
+  setParentGeneration: (id: number | string | null, username: string | null, isPrivate?: boolean) => void
 
   // === Actions для видео ===
   // Установить длительность видео
@@ -168,7 +168,7 @@ const initialState: GenerationState = {
   prompt: '',
   negativePrompt: '',
   uploadedImages: [],
-  aspectRatio: '1:1',
+  aspectRatio: '3:4',
   generationMode: 'text',
   generatedImage: null,
   generatedVideo: null,

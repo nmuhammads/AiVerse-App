@@ -53,7 +53,7 @@ export const SUPPORTED_RATIOS: Record<ModelType, AspectRatio[]> = {
 
 // Дефолтные соотношения для моделей
 const DEFAULT_RATIOS: Record<ModelType, AspectRatio> = {
-    'nanobanana-pro': 'Auto',
+    'nanobanana-pro': '3:4',
     seedream4: '3:4',
     nanobanana: 'Auto',
     'seedream4-5': '3:4',
@@ -155,7 +155,7 @@ export const useMultiGenerationStore = create<MultiGenerationState & MultiGenera
                 const newModel: ModelConfig = {
                     modelId,
                     aspectRatio: DEFAULT_RATIOS[modelId] || '1:1',
-                    resolution: modelId === 'nanobanana-pro' ? '4K' : undefined,
+                    resolution: modelId === 'nanobanana-pro' ? '2K' : undefined,
                     gptImageQuality: modelId === 'gpt-image-1.5' ? 'medium' : undefined,
                     status: 'idle',
                     result: null,

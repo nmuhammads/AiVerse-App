@@ -1157,28 +1157,44 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // Если prompt пустой, но есть parent_id — получить промпт из родительской генерации (слепой ремикс)
     if ((!prompt || typeof prompt !== 'string' || !prompt.trim()) && parent_id) {
       console.log('[API] Empty prompt with parent_id, fetching from parent generation:', parent_id)
-      const parentQuery = `?id=eq.${parent_id}&select=prompt,is_prompt_private,users(username)`
-      const parentResult = await supaSelect('generations', parentQuery)
 
-      if (parentResult.ok && Array.isArray(parentResult.data) && parentResult.data.length > 0) {
-        const parentData = parentResult.data[0]
-        const parentPrompt = parentData.prompt
-        const parentIsPrivate = parentData.is_prompt_private
-        const parentUsername = parentData.users?.username || 'Unknown'
+      const isAuthorPrompt = typeof parent_id === 'string' && (parent_id.startsWith('p') || parent_id.startsWith('P'))
 
-        if (parentPrompt) {
-          // Удалить метаданные из промпта [type=...; ratio=...; photos=...; avatars=...]
-          prompt = parentPrompt.replace(/\s*\[type=[^\]]+\]\s*$/, '').trim()
-          console.log('[API] Got prompt from parent generation:', prompt.slice(0, 50) + '...')
+      if (isAuthorPrompt) {
+        const numericId = parent_id.substring(1)
+        const parentQuery = `?id=eq.${numericId}&select=prompt_text,users(username)`
+        const parentResult = await supaSelect('author_prompts', parentQuery)
 
-          // Если родительский промпт приватный — это слепой ремикс
-          if (parentIsPrivate) {
-            isBlindRemix = true
-            blindRemixAuthorUsername = parentUsername
-            console.log(`[API] Blind remix detected, parent author: @${parentUsername}`)
+        if (parentResult.ok && Array.isArray(parentResult.data) && parentResult.data.length > 0) {
+          const parentData = parentResult.data[0]
+          prompt = parentData.prompt_text
+          // Author prompts are public, not a blind remix
+        }
+      } else {
+        const parentQuery = `?id=eq.${parent_id}&select=prompt,is_prompt_private,users(username)`
+        const parentResult = await supaSelect('generations', parentQuery)
+
+        if (parentResult.ok && Array.isArray(parentResult.data) && parentResult.data.length > 0) {
+          const parentData = parentResult.data[0]
+          const parentPrompt = parentData.prompt
+          const parentIsPrivate = parentData.is_prompt_private
+          const parentUsername = parentData.users?.username || 'Unknown'
+
+          if (parentPrompt) {
+            // Удалить метаданные из промпта [type=...; ratio=...; photos=...; avatars=...]
+            prompt = parentPrompt.replace(/\s*\[type=[^\]]+\]\s*$/, '').trim()
+            console.log('[API] Got prompt from parent generation:', prompt.slice(0, 50) + '...')
+
+            // Если родительский промпт приватный — это слепой ремикс
+            if (parentIsPrivate) {
+              isBlindRemix = true
+              blindRemixAuthorUsername = parentUsername
+              console.log(`[API] Blind remix detected, parent author: @${parentUsername}`)
+            }
           }
         }
-      }
+
+      } // close else block
 
       if (!prompt || !prompt.trim()) {
         return res.status(400).json({
@@ -1367,13 +1383,14 @@ export async function handleGenerateImage(req: Request, res: Response) {
       // Insert pending record
       // Для GPT Image 1.5 используем gptimage1.5 в БД
       const dbModel = model === 'gpt-image-1.5' ? 'gptimage1.5' : model
+      const dbParentId = (typeof parent_id === 'string' && (parent_id.startsWith('p') || parent_id.startsWith('P'))) ? null : parent_id;
       const genBody: any = {
         user_id: Number(user_id),
         prompt: promptWithMeta,
         model: dbModel,
         status: 'pending',
         input_images: r2Images.length > 0 ? r2Images : undefined,
-        parent_id: parent_id,
+        parent_id: dbParentId,
         // Для слепого ремикса сразу устанавливаем is_prompt_private
         is_prompt_private: isBlindRemix ? true : undefined,
         cost: cost,
@@ -1551,7 +1568,8 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // Первое изображение обрабатываем через completeGeneration (для основной записи в БД)
     if (successfulImages.length > 0 && generationId) {
       const firstImage = successfulImages[0]
-      await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, req.body.parent_id, req.body.contest_entry_id, r2Images, resolution, languageCode)
+      const dbParentId = (typeof req.body.parent_id === 'string' && (req.body.parent_id.startsWith('p') || req.body.parent_id.startsWith('P'))) ? null : req.body.parent_id;
+      await completeGeneration(generationId, Number(user_id), firstImage, model, cost / imageCount, dbParentId, req.body.contest_entry_id, r2Images, resolution, languageCode)
 
 
       // Fetch user settings once for all extra notifications
@@ -1822,6 +1840,31 @@ export async function getGenerationById(req: Request, res: Response) {
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       console.log('[getGenerationById] ERROR: Supabase not configured')
       return res.status(500).json({ error: 'Database not configured' })
+    }
+
+    if (typeof id === 'string' && (id.startsWith('p') || id.startsWith('P'))) {
+      const numericId = id.substring(1)
+      const query = `?id=eq.${numericId}&select=id,prompt_text,author_user_id,users(username,first_name)`
+      const result = await supaSelect('author_prompts', query)
+
+      if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
+        return res.status(404).json({ error: 'Author prompt not found' })
+      }
+
+      const promptData = result.data[0]
+      return res.json({
+        id,
+        prompt: promptData.prompt_text,
+        is_prompt_private: false,
+        model: 'nanobanana-pro',
+        input_images: [],
+        aspect_ratio: '1:1',
+        generation_type: 'text',
+        media_type: 'image',
+        users: promptData.users,
+        status: 'completed',
+        error_message: null
+      })
     }
 
     // Fetch generation - include video_url and video_input for video generations

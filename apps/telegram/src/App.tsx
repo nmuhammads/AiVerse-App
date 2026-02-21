@@ -191,7 +191,7 @@ function StartParamRouter() {
         return;
       }
       if (p.startsWith("ref-")) {
-        const match = p.match(/^ref-([^-]+)(?:-remix-(\d+))?$/);
+        const match = p.match(/^ref-([^-]+)(?:-remix-([a-zA-Z0-9]+))?$/);
         if (match) {
           const refValue = match[1];
           const generationId = match[2];

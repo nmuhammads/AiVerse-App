@@ -105,7 +105,7 @@ export function useStudio() {
     const [balance, setBalance] = useState<number | null>(null)
     const [isFullScreen, setIsFullScreen] = useState(false)
     const [isMuted, setIsMuted] = useState(true)
-    const [resolution, setResolution] = useState<'2K' | '4K'>('4K')
+    const [resolution, setResolution] = useState<'2K' | '4K'>('2K')
     const [searchParams] = useSearchParams()
     const [contestEntryId, setContestEntryId] = useState<number | null>(null)
     const [inputKey, setInputKey] = useState(0)
@@ -288,6 +288,9 @@ export function useStudio() {
                             // Standard remix handling
                             if (data.input_images && Array.isArray(data.input_images) && data.input_images.length > 0) {
                                 setUploadedImages(data.input_images)
+                                setGenerationMode('image')
+                            } else if (data.model === 'nanobanana-pro' || data.model === 'nanobanana') {
+                                // Default NanoBanana remixes to I2I even without images
                                 setGenerationMode('image')
                             }
                             if (data.media_type === 'video') {

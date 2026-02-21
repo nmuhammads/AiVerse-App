@@ -8,6 +8,7 @@ import { DescribeImageModal } from '@/components/DescribeImageModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { AIChatOverlay } from '@/components/AIChatOverlay'
 import { ChatOnboardingOverlay } from '@/components/ChatOnboardingOverlay'
+import { RemixOnboardingOverlay } from '@/components/RemixOnboardingOverlay'
 import { ChatModeExitOnboarding } from '@/components/ChatModeExitOnboarding'
 import { AuthModal } from '@/components/AuthModal'
 import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
@@ -562,6 +563,7 @@ export default function Studio() {
         onSuccess={() => setShowAuthModal(false)}
       />
       <ChatOnboardingOverlay />
+      <RemixOnboardingOverlay />
     </div>
   )
 }

@@ -14,7 +14,7 @@ type ImageUploaderProps = {
   generationMode: 'text' | 'image'
   selectedModel: ModelType
   uploadedImages: string[]
-  parentGenerationId: number | null
+  parentGenerationId: number | string | null
   maxImages: number
   isUploadingImage: boolean
   fileInputRef: RefObject<HTMLInputElement>
@@ -330,7 +330,7 @@ export function ImageUploader({
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div id="remix-upload-target" className="space-y-3 relative">
                 <div className="py-2 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400">
