@@ -168,7 +168,7 @@ const initialState: GenerationState = {
   prompt: '',
   negativePrompt: '',
   uploadedImages: [],
-  aspectRatio: '1:1',
+  aspectRatio: '3:4',
   generationMode: 'text',
   generatedImage: null,
   generatedVideo: null,
