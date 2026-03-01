@@ -74,8 +74,11 @@ export async function checkMyApiAvailability(): Promise<AvailabilityResponse> {
     throw new Error('MY_API_KEY is not configured')
   }
 
+  const baseUrl = getMyApiBaseUrl()
+  console.log(`[MyAPI][Availability] Request -> ${baseUrl}/api/v1/accounts/availability`)
+
   const response = await fetchWithTimeout(
-    `${getMyApiBaseUrl()}/api/v1/accounts/availability`,
+    `${baseUrl}/api/v1/accounts/availability`,
     {
       method: 'GET',
       headers: {
@@ -84,10 +87,24 @@ export async function checkMyApiAvailability(): Promise<AvailabilityResponse> {
     }
   )
 
-  const json = await response.json().catch(() => null) as AvailabilityResponse | null
+  const raw = await response.text().catch(() => '')
+  const json = (() => {
+    try {
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })() as AvailabilityResponse | null
+
   if (!response.ok || !json) {
-    throw new Error(`MyAPI availability failed with status ${response.status}`)
+    const details = (raw || '').slice(0, 400)
+    console.error(`[MyAPI][Availability] Failed: status=${response.status}, body=${details || 'empty'}`)
+    throw new Error(`MyAPI availability failed with status ${response.status}${details ? `: ${details}` : ''}`)
   }
+
+  console.log(
+    `[MyAPI][Availability] Response -> has_free_account_now=${json.has_free_account_now}, queue_slots_left=${json.queue_slots_left}, available_accounts_count=${json.available_accounts_count}`
+  )
 
   return json
 }
@@ -116,6 +133,11 @@ export async function generateWithMyApi(payload: GenerateWithMyApiPayload): Prom
     body.image_input = imageInput
   }
 
+  const promptPreview = String(body.prompt || '').replace(/\s+/g, ' ').slice(0, 140)
+  console.log(
+    `[MyAPI][Generate] Request -> model=${String(body.model)}, resolution=${String(body.resolution)}, aspect_ratio=${String(body.aspect_ratio || 'Auto')}, image_input_count=${imageInput.length}, prompt_length=${String(body.prompt || '').length}, prompt_preview="${promptPreview}"`
+  )
+
   const response = await fetchWithTimeout(
     `${getMyApiBaseUrl()}/api/v1/generate`,
     {
@@ -128,21 +150,37 @@ export async function generateWithMyApi(payload: GenerateWithMyApiPayload): Prom
     }
   )
 
-  const json = await response.json().catch(() => null) as {
+  const raw = await response.text().catch(() => '')
+  const json = (() => {
+    try {
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })() as {
     image_url?: string | null
     generated_model?: string | null
     actual_resolution?: string | null
     message?: string
+    error?: string
   } | null
 
   if (!response.ok || !json) {
-    throw new Error(`MyAPI generate failed with status ${response.status}`)
+    const details = (json?.message || json?.error || raw || '').slice(0, 600)
+    console.error(`[MyAPI][Generate] Failed: status=${response.status}, details=${details || 'empty'}`)
+    throw new Error(`MyAPI generate failed with status ${response.status}${details ? `: ${details}` : ''}`)
   }
 
   const imageUrl = typeof json.image_url === 'string' ? json.image_url : ''
   if (!imageUrl.startsWith('http')) {
+    const details = (json.message || raw || '').slice(0, 400)
+    console.error(`[MyAPI][Generate] Invalid image_url, details=${details || 'empty'}`)
     throw new Error(json.message || 'MyAPI did not return a valid image_url')
   }
+
+  console.log(
+    `[MyAPI][Generate] Success -> generated_model=${json.generated_model || 'unknown'}, actual_resolution=${json.actual_resolution || 'unknown'}, has_image_url=${imageUrl.startsWith('http')}`
+  )
 
   return {
     imageUrl,
