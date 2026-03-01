@@ -13,6 +13,7 @@ import { createPiapiTask, pollPiapiTask, checkPiapiTask } from '../services/piap
 import { getAppConfig, setAppConfig } from '../services/supabaseService.js'
 import { generateNanoGPTImage } from '../services/nanoImageService.js'
 import { logBalanceChange, safeRefund } from '../services/balanceAuditService.js'
+import { checkMyApiAvailability, generateWithMyApi, isMyApiConfigured } from '../services/myApiService.js'
 
 interface KieAIRequest {
   model: string
@@ -465,22 +466,23 @@ const MODEL_PRICES: Record<string, number> = {
 
 // ============ NanoBanana Pro API Provider Functions ============
 
-type ApiProvider = 'kie' | 'piapi'
+type ApiProvider = 'kie' | 'piapi' | 'myapi'
+type ProFallbackProvider = 'kie' | 'piapi'
 
 /**
  * Get current primary API provider for NanoBanana Pro from database
  */
-async function getNanobananaApiProvider(): Promise<ApiProvider> {
+async function getNanobananaApiProvider(): Promise<ProFallbackProvider> {
   const value = await getAppConfig('image_generation_primary_api')
-  return (value === 'piapi' ? 'piapi' : 'kie') as ApiProvider
+  return (value === 'piapi' ? 'piapi' : 'kie') as ProFallbackProvider
 }
 
 /**
  * Switch NanoBanana Pro API provider and persist to database
  */
-export async function switchNanobananaApiProvider(): Promise<ApiProvider> {
+export async function switchNanobananaApiProvider(): Promise<ProFallbackProvider> {
   const current = await getNanobananaApiProvider()
-  const next: ApiProvider = current === 'kie' ? 'piapi' : 'kie'
+  const next: ProFallbackProvider = current === 'kie' ? 'piapi' : 'kie'
   await setAppConfig('image_generation_primary_api', next)
   console.log(`[API Switch] NanoBanana Pro API switched: ${current} -> ${next}`)
   return next
@@ -876,10 +878,21 @@ async function generateImageWithKieAI(
       const modelId = isPro ? 'nano-banana-pro' : (isNb2 ? 'nano-banana-2' : (imageUrls.length > 0 ? 'google/nano-banana-edit' : 'google/nano-banana'))
 
       const res = (isPro || isNb2) ? (resolution || (isNb2 ? '1K' : '4K')) : undefined
+      const normalizedRes = typeof res === 'string' ? res.toUpperCase() : ''
+      const modelLabel = isPro ? 'nanobanana-pro' : (isNb2 ? 'nanobanana-2' : 'nanobanana')
 
       let image_size: string | undefined
       if (aspect_ratio !== 'Auto') {
         image_size = mapNanoBananaImageSize(aspect_ratio)
+      }
+
+      // Helper to update api_provider in DB
+      const updateApiProvider = async (provider: ApiProvider) => {
+        const genId = metaPayload?.meta?.generationId
+        if (genId) {
+          await supaPatch('generations', `?id=eq.${genId}`, { api_provider: provider })
+          console.log(`[${modelLabel}] Updated api_provider to ${provider} for gen ${genId}`)
+        }
       }
 
       // Non-Pro, Non-NB2 NanoBanana uses only Kie
@@ -897,9 +910,55 @@ async function generateImageWithKieAI(
         return { images: [url], inputImages: imageUrls }
       }
 
-      // ============ NanoBanana Pro with Fallback / NB2 direct ============
+      // Try MyAPI first for supported NB2/Pro combinations.
+      const myApiModelSupported = isPro || isNb2
+      const myApiResolutionSupported = isPro
+        ? normalizedRes === '2K'
+        : (isNb2 ? (normalizedRes === '1K' || normalizedRes === '2K') : false)
+      const myApiInputSupported = imageUrls.length <= 5
+
+      if (myApiModelSupported) {
+        if (!isMyApiConfigured()) {
+          console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: MY_API_KEY is not configured`)
+        } else if (!myApiResolutionSupported) {
+          console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: resolution ${normalizedRes || 'unknown'} is not supported`)
+        } else if (!myApiInputSupported) {
+          console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: image_input count ${imageUrls.length} > 5`)
+        } else {
+          try {
+            console.log(`[MyAPI][Availability] Checking capacity for ${modelLabel}, resolution=${normalizedRes}`)
+            const availability = await checkMyApiAvailability()
+            const hasFreeNow = availability.has_free_account_now === true
+            const queueSlotsLeft = Number(availability.queue_slots_left || 0)
+            const hasQueueSlot = queueSlotsLeft > 0
+
+            if (hasFreeNow && hasQueueSlot) {
+              console.log(`[MyAPI][RouteDecision] Using MyAPI for ${modelLabel}: has_free_account_now=true, queue_slots_left=${queueSlotsLeft}`)
+              try {
+                const myApiResult = await generateWithMyApi({
+                  prompt,
+                  model: model as 'nanobanana-pro' | 'nanobanana-2',
+                  resolution: normalizedRes as '1K' | '2K',
+                  aspectRatio: aspect_ratio,
+                  imageInput: imageUrls
+                })
+                await updateApiProvider('myapi')
+                console.log(`[MyAPI][Generate] Success for ${modelLabel}: generated_model=${myApiResult.generatedModel || 'unknown'}, actual_resolution=${myApiResult.actualResolution || 'unknown'}`)
+                return { images: [myApiResult.imageUrl], inputImages: imageUrls }
+              } catch (error) {
+                console.error(`[MyAPI][Fallback] Generate failed for ${modelLabel}, using current chain:`, error)
+              }
+            } else {
+              console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: has_free_account_now=${availability.has_free_account_now}, queue_slots_left=${queueSlotsLeft}`)
+            }
+          } catch (error) {
+            console.error(`[MyAPI][Fallback] Availability failed for ${modelLabel}, using current chain:`, error)
+          }
+        }
+      }
+
+      // ============ NanoBanana 2 fallback chain: Kie only ============
       if (isNb2) {
-        // NanoBanana 2 — only Kie, no piapi fallback
         const input: Record<string, unknown> = {
           prompt,
           output_format: 'png'
@@ -912,15 +971,16 @@ async function generateImageWithKieAI(
         const taskId = await createJobsTask(apiKey, 'nano-banana-2', input, onTaskCreated, metaPayload)
         const url = await pollJobsTask(apiKey, taskId)
         if (url === 'TIMEOUT') return { timeout: true, inputImages: imageUrls }
+        await updateApiProvider('kie')
         return { images: [url], inputImages: imageUrls }
       }
 
-      // NanoBanana Pro with fallback
+      // ============ NanoBanana Pro fallback chain: Kie <-> PiAPI ============
       const primaryProvider = await getNanobananaApiProvider()
       console.log(`[NanoBanana Pro] Using primary provider: ${primaryProvider}`)
 
       // Helper to generate via specific provider
-      const generateWithProvider = async (provider: ApiProvider): Promise<{ url: string; taskId: string; provider: ApiProvider }> => {
+      const generateWithProvider = async (provider: ProFallbackProvider): Promise<{ url: string; taskId: string; provider: ProFallbackProvider }> => {
         if (provider === 'piapi') {
           // PiAPI uses image_urls (not image_input)
           const piapiInput = {
@@ -955,15 +1015,6 @@ async function generateImageWithKieAI(
         }
       }
 
-      // Helper to update api_provider in DB
-      const updateApiProvider = async (provider: ApiProvider) => {
-        const genId = metaPayload?.meta?.generationId
-        if (genId) {
-          await supaPatch('generations', `?id=eq.${genId}`, { api_provider: provider })
-          console.log(`[NanoBanana Pro] Updated api_provider to ${provider} for gen ${genId}`)
-        }
-      }
-
       // Try primary, fallback to backup on service errors
       try {
         const result = await generateWithProvider(primaryProvider)
@@ -972,7 +1023,7 @@ async function generateImageWithKieAI(
         return { images: [result.url], inputImages: imageUrls }
       } catch (error) {
         if (isServiceUnavailableError(error)) {
-          const backupProvider: ApiProvider = primaryProvider === 'kie' ? 'piapi' : 'kie'
+          const backupProvider: ProFallbackProvider = primaryProvider === 'kie' ? 'piapi' : 'kie'
           console.log(`[NanoBanana Pro Fallback] ${primaryProvider} failed, trying ${backupProvider}:`, (error as Error).message)
 
           try {
