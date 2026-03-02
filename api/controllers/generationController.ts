@@ -13,7 +13,7 @@ import { createPiapiTask, pollPiapiTask, checkPiapiTask } from '../services/piap
 import { getAppConfig, setAppConfig } from '../services/supabaseService.js'
 import { generateNanoGPTImage } from '../services/nanoImageService.js'
 import { logBalanceChange, safeRefund } from '../services/balanceAuditService.js'
-import { checkMyApiAvailability, generateWithMyApi, isMyApiConfigured } from '../services/myApiService.js'
+import { checkMyApiAvailability, generateWithMyApi, isMyApiConfigured, isMyApiEnabledForModel } from '../services/myApiService.js'
 
 interface KieAIRequest {
   model: string
@@ -912,13 +912,16 @@ async function generateImageWithKieAI(
 
       // Try MyAPI first for supported NB2/Pro combinations.
       const myApiModelSupported = isPro || isNb2
+      const myApiFeatureEnabled = isMyApiEnabledForModel(model as 'nanobanana-pro' | 'nanobanana-2')
       const myApiResolutionSupported = isPro
         ? normalizedRes === '2K'
         : (isNb2 ? (normalizedRes === '1K' || normalizedRes === '2K') : false)
       const myApiInputSupported = imageUrls.length <= 5
 
       if (myApiModelSupported) {
-        if (!isMyApiConfigured()) {
+        if (!myApiFeatureEnabled) {
+          console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: disabled by env flag`)
+        } else if (!isMyApiConfigured()) {
           console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: MY_API_KEY is not configured`)
         } else if (!myApiResolutionSupported) {
           console.log(`[MyAPI][RouteDecision] Skip for ${modelLabel}: resolution ${normalizedRes || 'unknown'} is not supported`)

@@ -143,6 +143,11 @@ cp .env.example .env
 ```env
 # AI API
 PIAPI_KEY=your_piapi_key
+MY_API_BASE_URL=https://gemini-auto-manager-production.up.railway.app
+MY_API_KEY=your_my_api_key
+# MyAPI routing flags (missing/invalid => false)
+MY_API_ENABLED_NANOBANANA_2=false
+MY_API_ENABLED_NANOBANANA_PRO=false
 
 # Supabase
 SUPABASE_URL=https://xxx.supabase.co

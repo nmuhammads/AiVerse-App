@@ -1,4 +1,5 @@
 const DEFAULT_MY_API_BASE_URL = 'https://gemini-auto-manager-production.up.railway.app'
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on'])
 const DEFAULT_TIMEOUT_MS = (() => {
   const value = Number(process.env.MY_API_TIMEOUT_MS || 0)
   return Number.isFinite(value) && value > 0 ? value : 45000
@@ -45,6 +46,18 @@ function getMyApiKey(): string {
 
 export function isMyApiConfigured(): boolean {
   return Boolean(getMyApiKey())
+}
+
+function isEnvFlagEnabled(rawValue: string | undefined): boolean {
+  if (!rawValue) return false
+  return TRUE_VALUES.has(rawValue.trim().toLowerCase())
+}
+
+export function isMyApiEnabledForModel(model: MyApiModel): boolean {
+  if (model === 'nanobanana-pro') {
+    return isEnvFlagEnabled(process.env.MY_API_ENABLED_NANOBANANA_PRO)
+  }
+  return isEnvFlagEnabled(process.env.MY_API_ENABLED_NANOBANANA_2)
 }
 
 function mapModel(model: MyApiModel): string {
