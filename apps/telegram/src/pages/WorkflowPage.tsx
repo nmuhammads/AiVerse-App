@@ -631,6 +631,7 @@ export default function WorkflowPage() {
 
   useEffect(() => {
     if (isGraphSyncingRef.current) return
+    if (nodes.some((node) => node.dragging)) return
     const nextGraph = flowToGraph(nodes, edges)
     if (JSON.stringify(nextGraph) === JSON.stringify(graph)) return
     setGraph(nextGraph)
@@ -999,8 +1000,8 @@ export default function WorkflowPage() {
   const activeTemplateLabel = activeTemplateId ? `Workflow #${activeTemplateId}` : 'Draft'
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100">
-      <div className="mx-auto w-full max-w-[1540px] px-3 py-4 sm:px-6 sm:py-6">
+    <div className="min-h-full bg-black pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[calc(env(safe-area-inset-top)+74px)] text-zinc-100 lg:pb-6 lg:pt-4">
+      <div className="mx-auto w-full max-w-[1540px] px-3 py-3 sm:px-6 sm:py-6">
         <header className="rounded-2xl border border-white/10 bg-black/55 px-4 py-3 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-[260px]">
@@ -1194,6 +1195,10 @@ export default function WorkflowPage() {
               fitView
               minZoom={0.03}
               maxZoom={2}
+              panOnDrag={!isMobileViewport}
+              selectionOnDrag={!isMobileViewport}
+              zoomOnScroll={!isMobileViewport}
+              preventScrolling={false}
               fitViewOptions={{ padding: 0.2, maxZoom: 1.05 }}
               defaultEdgeOptions={{
                 type: 'smoothstep',
