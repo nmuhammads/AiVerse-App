@@ -9,7 +9,6 @@ import {
   archiveWorkflowTemplate,
   updateWorkflowTemplate,
 } from '../services/workflowRepository.js'
-import { validateWorkflowGraph } from '../services/workflowValidationService.js'
 import { executeWorkflowRun } from '../services/workflowExecutorService.js'
 import type { AuthenticatedRequest } from '../middleware/authMiddleware.js'
 import type { WorkflowGraph } from '../types/workflow.js'
@@ -29,11 +28,6 @@ export async function createWorkflow(req: AuthenticatedRequest, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
   if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
   if (!graph) return res.status(400).json({ error: 'graph is required' })
-
-  const validation = validateWorkflowGraph(graph)
-  if (!validation.ok) {
-    return res.status(400).json({ error: 'Invalid workflow graph', details: validation.errors })
-  }
 
   const created = await createWorkflowTemplate({
     userId,
@@ -74,13 +68,6 @@ export async function patchWorkflow(req: AuthenticatedRequest, res: Response) {
 
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
   if (!id) return res.status(400).json({ error: 'Invalid workflow id' })
-
-  if (graph) {
-    const validation = validateWorkflowGraph(graph)
-    if (!validation.ok) {
-      return res.status(400).json({ error: 'Invalid workflow graph', details: validation.errors })
-    }
-  }
 
   const updated = await updateWorkflowTemplate(id, userId, {
     name: typeof name === 'string' ? name.trim() : undefined,

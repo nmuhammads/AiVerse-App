@@ -219,12 +219,12 @@ function deriveNodeParamsText(node: WorkflowNode, graph: WorkflowGraph): string 
 
   if (node.type === 'prompt') {
     const text = String(node.data?.text || '').trim()
-    return text ? shortText(text) : 'text is empty'
+    return text ? shortText(text) : 'текст пуст'
   }
 
   const incomingIds = getIncomingSourceIds(graph, node.id)
   if (node.type === 'video.concat') {
-    return `inputs ${incomingIds.length} • соединить видео в один`
+    return `входов ${incomingIds.length} • соединить видео в один`
   }
 
   const rawRefSource = getRefSource(node)
@@ -234,26 +234,26 @@ function deriveNodeParamsText(node: WorkflowNode, graph: WorkflowGraph): string 
   const selectedEndId = getSelectedEndUpstreamNodeId(node)
   const uploadedCount = Array.isArray(node.data?.ref_images) ? node.data.ref_images.length : 0
   const sourceLabel = (() => {
-    if (refSource === 'upload') return `src upload (${uploadedCount})`
-    if (refSource === 'mixed') return `src mixed (${uploadedCount}+prev)`
+    if (refSource === 'upload') return `источник: загрузка (${uploadedCount})`
+    if (refSource === 'mixed') return `источник: смешанный (${uploadedCount}+пред.)`
 
     const isSeedanceI2V = node.type === 'video.generate'
       && String(node.data?.model || 'seedance-1.5-pro') === 'seedance-1.5-pro'
       && String(node.data?.mode || 'i2v') === 'i2v'
       && hasExplicitSeedanceFrameSelection(node)
     if (isSeedanceI2V) {
-      return `src prev start:${selectedStartId === 'auto' ? 'auto' : nameById(selectedStartId)}${selectedEndId !== 'none' ? ` end:${nameById(selectedEndId)}` : ''}`
+      return `источник: пред. старт:${selectedStartId === 'auto' ? 'авто' : nameById(selectedStartId)}${selectedEndId !== 'none' ? ` финал:${nameById(selectedEndId)}` : ''}`
     }
-    return `src prev${selectedId !== 'all' ? `:${nameById(selectedId)}` : ''}`
+    return `источник: пред.${selectedId !== 'all' ? `:${nameById(selectedId)}` : ''}`
   })()
 
   if (node.type === 'image.generate') {
     const prompt = String(node.data?.prompt || '').trim()
     const ratio = String(node.data?.aspect_ratio || '3:4')
     const count = Number(node.data?.image_count || 1)
-    const parts = [sourceLabel, `ratio ${ratio}`, `count ${count}`]
-    if (prompt) parts.unshift(`prompt: ${shortText(prompt, 28)}`)
-    if (incomingIds.length > 0 && refSource !== 'upload') parts.push(`prev ${shortText(incomingIds.map(nameById).join(','), 18)}`)
+    const parts = [sourceLabel, `формат ${ratio}`, `кол-во ${count}`]
+    if (prompt) parts.unshift(`промпт: ${shortText(prompt, 28)}`)
+    if (incomingIds.length > 0 && refSource !== 'upload') parts.push(`пред.: ${shortText(incomingIds.map(nameById).join(','), 18)}`)
     return parts.join(' • ')
   }
 
@@ -262,8 +262,8 @@ function deriveNodeParamsText(node: WorkflowNode, graph: WorkflowGraph): string 
   const duration = String(node.data?.video_duration || '-')
   const resolution = String(node.data?.video_resolution || '-')
   const parts = [sourceLabel, `${mode}`, `${duration}s`, resolution]
-  if (prompt) parts.unshift(`prompt: ${shortText(prompt, 28)}`)
-  if (incomingIds.length > 0 && refSource !== 'upload') parts.push(`prev ${shortText(incomingIds.map(nameById).join(','), 18)}`)
+  if (prompt) parts.unshift(`промпт: ${shortText(prompt, 28)}`)
+  if (incomingIds.length > 0 && refSource !== 'upload') parts.push(`пред.: ${shortText(incomingIds.map(nameById).join(','), 18)}`)
   return parts.join(' • ')
 }
 
@@ -516,11 +516,11 @@ const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) => {
         ) : nodeData.status === 'running' ? (
           <CircleDashed className="h-4 w-4 animate-spin text-cyan-200" />
         ) : nodeData.status === 'failed' ? (
-          <span className="text-[10px] text-red-200">failed</span>
+          <span className="text-[10px] text-red-200">ошибка</span>
         ) : nodeData.status === 'skipped' ? (
-          <span className="text-[10px] text-zinc-400">skipped</span>
+          <span className="text-[10px] text-zinc-400">пропуск</span>
         ) : (
-          <span className={`text-[10px] ${tone.label}`}>idle</span>
+          <span className={`text-[10px] ${tone.label}`}>ожидание</span>
         )}
       </div>
 
@@ -571,7 +571,7 @@ export default function WorkflowPage() {
   const [uploadingNodeId, setUploadingNodeId] = useState<string | null>(null)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showInspector, setShowInspector] = useState(false)
-  const [workflowName, setWorkflowName] = useState('Photo To Video Pipeline')
+  const [workflowName, setWorkflowName] = useState('Пайплайн фото в видео')
   const [isMobileViewport, setIsMobileViewport] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1024 : false))
 
   const isGraphSyncingRef = useRef(false)
@@ -603,7 +603,7 @@ export default function WorkflowPage() {
       } else {
         setActiveTemplateId(null)
         setGraph(getDefaultWorkflowGraph())
-        setWorkflowName('Photo To Video Pipeline')
+        setWorkflowName('Пайплайн фото в видео')
         setDirty(true)
       }
     } catch (error) {
@@ -925,7 +925,7 @@ export default function WorkflowPage() {
     try {
       if (activeTemplateId) {
         const updated = await patchWorkflowTemplate(activeTemplateId, {
-          name: workflowName.trim() || 'Workflow',
+          name: workflowName.trim() || 'Сценарий',
           graph,
         })
 
@@ -936,7 +936,7 @@ export default function WorkflowPage() {
       }
 
       const created = await createWorkflowTemplate({
-        name: workflowName.trim() || 'Workflow',
+        name: workflowName.trim() || 'Сценарий',
         graph,
       })
       setTemplates([created, ...templates])
@@ -977,7 +977,7 @@ export default function WorkflowPage() {
       const runStart = await startWorkflowRun(workflowId)
       setRun(null)
       setActiveRun(runStart.run_id, runStart.status)
-      toast.success(`Run #${runStart.run_id} запущен`)
+      toast.success(`Запуск #${runStart.run_id} создан`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Не удалось запустить workflow')
       setIsRunningAction(false)
@@ -997,7 +997,7 @@ export default function WorkflowPage() {
     setActiveRun(null, null)
   }
 
-  const activeTemplateLabel = activeTemplateId ? `Workflow #${activeTemplateId}` : 'Draft'
+  const activeTemplateLabel = activeTemplateId ? `Сценарий #${activeTemplateId}` : 'Черновик'
 
   return (
     <div className="min-h-full bg-black pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[calc(env(safe-area-inset-top)+74px)] text-zinc-100 lg:pb-6 lg:pt-4">
@@ -1005,7 +1005,7 @@ export default function WorkflowPage() {
         <header className="rounded-2xl border border-white/10 bg-black/55 px-4 py-3 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-[260px]">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">Workflow Builder</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">Конструктор сценариев</p>
               <input
                 value={workflowName}
                 onChange={(event) => {
@@ -1013,11 +1013,11 @@ export default function WorkflowPage() {
                   setDirty(true)
                 }}
                 className="mt-1 w-full max-w-[520px] border-none bg-transparent p-0 text-lg font-semibold text-white outline-none sm:text-xl"
-                placeholder="Workflow name"
+                placeholder="Название сценария"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                 <span>{activeTemplateLabel}</span>
-                {dirty ? <span className="text-amber-300">unsaved changes</span> : null}
+                {dirty ? <span className="text-amber-300">есть несохраненные изменения</span> : null}
                 {templates.length > 0 ? (
                   <select
                     value={activeTemplateId ?? ''}
@@ -1055,7 +1055,7 @@ export default function WorkflowPage() {
                 onClick={handleToggleInspector}
               >
                 <PanelRight className="h-3.5 w-3.5" />
-                Settings
+                Настройки
               </button>
               <button
                 className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/75 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-60"
@@ -1063,7 +1063,7 @@ export default function WorkflowPage() {
                 disabled={isSaving || isLoading}
               >
                 <Save className="h-3.5 w-3.5" />
-                Save
+                Сохранить
               </button>
               <button
                 className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/75 bg-cyan-500/20 px-3 py-2 text-xs font-semibold text-cyan-100 disabled:opacity-60"
@@ -1071,7 +1071,7 @@ export default function WorkflowPage() {
                 disabled={isRunningAction || isLoading}
               >
                 {isRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                {isRunning ? 'Running' : 'Run'}
+                {isRunning ? 'Выполняется' : 'Запустить'}
               </button>
             </div>
           </div>
@@ -1100,7 +1100,7 @@ export default function WorkflowPage() {
 
         {showInspector ? (
           <section className="mt-3 rounded-2xl border border-white/10 bg-black/55 p-3 lg:hidden backdrop-blur-xl">
-            <p className="text-sm font-semibold text-white">Settings</p>
+            <p className="text-sm font-semibold text-white">Настройки</p>
             {selectedNode ? (
               <NodeSettings
                 node={selectedNode}
@@ -1140,7 +1140,7 @@ export default function WorkflowPage() {
               </div>
 
               <div className="mt-4 rounded-xl border border-white/10 bg-zinc-900/70 p-2.5 text-[11px] text-zinc-500">
-                V1: image.generate, video.generate, video.concat. Fan-in запускает ноду после готовности всех входов.
+                V1: генерация фото/видео и инструменты. Нода запускается, когда готовы все её входы.
               </div>
             </div>
           </aside>
@@ -1149,16 +1149,16 @@ export default function WorkflowPage() {
             <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2 rounded-xl border border-white/10 bg-black/80 px-3 py-2 text-[11px] backdrop-blur-xl">
               <span className="font-semibold text-zinc-200">{activeTemplateLabel}</span>
               <span className="text-zinc-500">|</span>
-              <span className="text-zinc-400">nodes {graph.nodes.length}</span>
+              <span className="text-zinc-400">нод {graph.nodes.length}</span>
             </div>
 
             <div className="pointer-events-none absolute left-3 right-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/80 p-2.5 backdrop-blur-xl">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="inline-flex items-center gap-1 text-zinc-300">
                   <Clock3 className="h-3.5 w-3.5" />
-                  Execution
+                  Выполнение
                 </span>
-                <span className="text-zinc-500">{run?.status || 'idle'}</span>
+                <span className="text-zinc-500">{run?.status || 'ожидание'}</span>
               </div>
               <div className="mt-2 h-1.5 rounded-full bg-zinc-800">
                 <div
@@ -1179,7 +1179,7 @@ export default function WorkflowPage() {
 
             {isLoading ? (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 text-sm text-zinc-300">
-                Loading workflow...
+                Загрузка сценария...
               </div>
             ) : null}
 
@@ -1213,7 +1213,7 @@ export default function WorkflowPage() {
 
           <aside className={`${showInspector ? 'hidden w-[320px] shrink-0 lg:block' : 'hidden'}`}>
             <div className="h-full rounded-2xl border border-white/10 bg-black/55 p-3 backdrop-blur-xl">
-              <h2 className="text-sm font-semibold text-white">Node Settings</h2>
+              <h2 className="text-sm font-semibold text-white">Настройки ноды</h2>
 
               {selectedNode ? (
                 <NodeSettings
@@ -1311,7 +1311,7 @@ function NodeSettings(props: {
 
       {node.type === 'prompt' ? (
         <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-          <p className="text-zinc-500">Prompt text</p>
+          <p className="text-zinc-500">Текст промпта</p>
           <textarea
             className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
             value={String(node.data?.text || '')}
@@ -1490,7 +1490,7 @@ function NodeSettings(props: {
       {node.type === 'image.generate' ? (
         <>
           <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-            <p className="text-zinc-500">Model</p>
+            <p className="text-zinc-500">Модель</p>
             <select
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
               value={String(node.data?.model || 'gpt-image-1.5')}
@@ -1503,7 +1503,7 @@ function NodeSettings(props: {
           </label>
 
           <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-            <p className="text-zinc-500">Prompt</p>
+            <p className="text-zinc-500">Промпт</p>
             <textarea
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
               value={String(node.data?.prompt || '')}
@@ -1514,7 +1514,7 @@ function NodeSettings(props: {
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Aspect</p>
+              <p className="text-zinc-500">Формат</p>
               <select
                 className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
                 value={String(node.data?.aspect_ratio || '3:4')}
@@ -1529,7 +1529,7 @@ function NodeSettings(props: {
             </label>
 
             <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Count</p>
+              <p className="text-zinc-500">Количество</p>
               <input
                 type="number"
                 min={1}
@@ -1546,7 +1546,7 @@ function NodeSettings(props: {
       {node.type === 'video.generate' ? (
         <>
           <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-            <p className="text-zinc-500">Model</p>
+            <p className="text-zinc-500">Модель</p>
             <select
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
               value={videoModel}
@@ -1566,7 +1566,7 @@ function NodeSettings(props: {
 
           {videoModel === 'seedance-1.5-pro' ? (
             <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Mode</p>
+              <p className="text-zinc-500">Режим</p>
               <select
                 className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
                 value={videoMode}
@@ -1579,7 +1579,7 @@ function NodeSettings(props: {
           ) : null}
 
           <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-            <p className="text-zinc-500">Prompt</p>
+            <p className="text-zinc-500">Промпт</p>
             <textarea
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
               value={String(node.data?.prompt || '')}
@@ -1590,7 +1590,7 @@ function NodeSettings(props: {
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Duration</p>
+              <p className="text-zinc-500">Длительность</p>
               <select
                 className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
                 value={String(node.data?.video_duration || '8')}
@@ -1603,7 +1603,7 @@ function NodeSettings(props: {
             </label>
 
             <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Resolution</p>
+              <p className="text-zinc-500">Разрешение</p>
               <select
                 className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
                 value={String(node.data?.video_resolution || '720p')}
@@ -1625,7 +1625,7 @@ function NodeSettings(props: {
         <p className="text-zinc-500">Оценка стоимости</p>
         <p className="mt-0.5 inline-flex items-center gap-1 text-zinc-200">
           <Coins className="h-3.5 w-3.5 text-yellow-400" />
-          зависит от модели
+          зависит от выбранных моделей
         </p>
       </div>
 

@@ -286,6 +286,22 @@ body {
   fill: #dbe6f5 !important;
 }
 
+@media (max-width: 1023px) {
+  .workflow-flow .react-flow__handle {
+    width: 16px !important;
+    height: 16px !important;
+    border-width: 2px !important;
+  }
+
+  .workflow-flow .react-flow__handle-left {
+    left: -8px !important;
+  }
+
+  .workflow-flow .react-flow__handle-right {
+    right: -8px !important;
+  }
+}
+
 /* Chat container - fills space between header and tabbar dynamically */
 /* StudioHeader height: ~40px buttons + py-4 (32px) = ~72px, using 80px for safety */
 .chat-container-ios {
