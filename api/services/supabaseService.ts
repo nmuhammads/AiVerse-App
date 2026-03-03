@@ -8,17 +8,33 @@ const SUPABASE_URL = stripQuotes(process.env.SUPABASE_URL || '')
 const SUPABASE_KEY = stripQuotes(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '')
 const SUPABASE_BUCKET = stripQuotes(process.env.SUPABASE_USER_AVATARS_BUCKET || 'avatars')
 
-export function supaHeaders() {
+function withSchemaHeaders(base: Record<string, string>, schema = 'public') {
+    if (!schema || schema === 'public') return base
     return {
+        ...base,
+        'Accept-Profile': schema,
+        'Content-Profile': schema,
+    }
+}
+
+export function supaHeaders(schema = 'public') {
+    const headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
     } as Record<string, string>
+    return withSchemaHeaders(headers, schema)
 }
 
-export async function supaSelect(table: string, query: string) {
+export async function supaSelect(table: string, query: string, schema = 'public') {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
-        const r = await fetch(url, { headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'count=exact' } })
+        const r = await fetch(url, {
+            headers: {
+                ...supaHeaders(schema),
+                'Content-Type': 'application/json',
+                'Prefer': 'count=exact',
+            }
+        })
         const data = await r.json().catch(() => null)
         return { ok: r.ok, data, headers: Object.fromEntries(r.headers.entries()) }
     } catch (e) {
@@ -27,10 +43,18 @@ export async function supaSelect(table: string, query: string) {
     }
 }
 
-export async function supaPost(table: string, body: unknown, params = '') {
+export async function supaPost(table: string, body: unknown, params = '', schema = 'public') {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}${params}`
-        const r = await fetch(url, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body) })
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...supaHeaders(schema),
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates,return=representation'
+            },
+            body: JSON.stringify(body)
+        })
         const data = await r.json().catch(() => null)
         return { ok: r.ok, data }
     } catch (e) {
@@ -39,10 +63,16 @@ export async function supaPost(table: string, body: unknown, params = '') {
     }
 }
 
-export async function supaPatch(table: string, filter: string, body: unknown, preferReturnRepresentation = false) {
+export async function supaPatch(
+    table: string,
+    filter: string,
+    body: unknown,
+    preferReturnRepresentation = false,
+    schema = 'public'
+) {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-        const headers: Record<string, string> = { ...supaHeaders(), 'Content-Type': 'application/json' }
+        const headers: Record<string, string> = { ...supaHeaders(schema), 'Content-Type': 'application/json' }
         if (preferReturnRepresentation) {
             headers['Prefer'] = 'return=representation'
         }
@@ -73,10 +103,13 @@ export async function supaStorageUpload(pathname: string, buf: Buffer, contentTy
     }
 }
 
-export async function supaDelete(table: string, filter: string) {
+export async function supaDelete(table: string, filter: string, schema = 'public') {
     try {
         const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`
-        const r = await fetch(url, { method: 'DELETE', headers: { ...supaHeaders(), 'Content-Type': 'application/json' } })
+        const r = await fetch(url, {
+            method: 'DELETE',
+            headers: { ...supaHeaders(schema), 'Content-Type': 'application/json' }
+        })
         return { ok: r.ok }
     } catch (e) {
         console.error(`[SupaBase] Delete error (${table}):`, e)
@@ -171,4 +204,3 @@ export async function setAppConfig(key: string, value: string): Promise<boolean>
 }
 
 export { SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET }
-

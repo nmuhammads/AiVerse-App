@@ -258,6 +258,34 @@ body {
   padding-bottom: calc(var(--tabbar-offset-android) + var(--generate-btn-space));
 }
 
+/* WorkflowDraft: dark controls for React Flow */
+.workflow-flow .react-flow__controls {
+  border: 1px solid rgba(63, 74, 94, 0.9) !important;
+  background: rgba(8, 12, 18, 0.9) !important;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35) !important;
+}
+
+.workflow-flow .react-flow__controls-button {
+  width: 28px !important;
+  height: 28px !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(63, 74, 94, 0.9) !important;
+  background: rgba(13, 20, 31, 0.96) !important;
+  color: #dbe6f5 !important;
+}
+
+.workflow-flow .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.workflow-flow .react-flow__controls-button:hover {
+  background: rgba(24, 35, 50, 0.98) !important;
+}
+
+.workflow-flow .react-flow__controls-button svg {
+  fill: #dbe6f5 !important;
+}
+
 /* Chat container - fills space between header and tabbar dynamically */
 /* StudioHeader height: ~40px buttons + py-4 (32px) = ~72px, using 80px for safety */
 .chat-container-ios {

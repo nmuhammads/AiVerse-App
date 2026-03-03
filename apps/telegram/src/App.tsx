@@ -21,6 +21,8 @@ import AuthCallback from "@/pages/AuthCallback";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import FAQ from "@/pages/FAQ";
+import WorkflowDraft from "@/pages/WorkflowDraft";
+import WorkflowPage from "@/pages/WorkflowPage";
 import { PaymentResult } from "@/pages/PaymentResult";
 import { Header } from "@/components/layout/Header";
 import { TabBar } from "@/components/layout/TabBar";
@@ -123,6 +125,10 @@ function StartParamRouter() {
     const timer = setTimeout(() => {
       if (p === "generate" || p === "studio") {
         navigate("/studio", { replace: true, state: { fromDeepLink: true } });
+        return;
+      }
+      if (p === "workflow") {
+        navigate("/workflow", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "chat") {
@@ -300,6 +306,8 @@ function AppLayout() {
           <Route path="/multi-generation" element={<RequireAuth><PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary></RequireAuth>} />
           <Route path="/subscriptions" element={<RequireAuth><PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary></RequireAuth>} />
           <Route path="/watermark" element={<RequireAuth><PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/workflow" element={<RequireAuth><PageErrorBoundary pageName="Workflow"><WorkflowPage /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/workflow-draft" element={<WorkflowDraft />} />
 
           {/* Login route */}
           <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />

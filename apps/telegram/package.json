@@ -13,6 +13,7 @@
         "@aiverse/shared": "file:../../packages/shared",
         "@telegram-apps/sdk": "^3.11.8",
         "@twa-dev/sdk": "^8.0.2",
+        "@xyflow/react": "^12.10.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "i18next": "^25.7.3",

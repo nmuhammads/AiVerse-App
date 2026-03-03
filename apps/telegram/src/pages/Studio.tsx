@@ -14,7 +14,7 @@ import { AuthModal } from '@/components/AuthModal'
 import { useActiveGenerationsStore } from '@/store/activeGenerationsStore'
 import { useAuthStore } from '@aiverse/shared/stores/authStore'
 import { useTranslation } from 'react-i18next'
-import { Zap, Pencil } from 'lucide-react'
+import { Zap, Pencil, GitBranch } from 'lucide-react'
 import WebApp from '@twa-dev/sdk'
 
 // Components
@@ -46,10 +46,11 @@ type StudioHeaderProps = {
   t: TranslationFn
   balance: number | null
   onOpenEditor: () => void
+  onOpenWorkflow: () => void
   onOpenPayment: () => void
 }
 
-function StudioHeader({ t, balance, onOpenEditor, onOpenPayment }: StudioHeaderProps) {
+function StudioHeader({ t, balance, onOpenEditor, onOpenWorkflow, onOpenPayment }: StudioHeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center">
@@ -62,6 +63,13 @@ function StudioHeader({ t, balance, onOpenEditor, onOpenPayment }: StudioHeaderP
         >
           <Pencil size={14} className="text-cyan-400" />
           <span className="text-xs font-bold text-cyan-300">{t('editor.title')}</span>
+        </button>
+        <button
+          onClick={onOpenWorkflow}
+          className="px-3 py-1.5 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center gap-1.5 active:scale-95 transition-transform"
+        >
+          <GitBranch size={14} className="text-indigo-300" />
+          <span className="text-xs font-bold text-indigo-200">Workflow</span>
         </button>
         <button
           onClick={onOpenPayment}
@@ -294,6 +302,7 @@ export default function Studio() {
             t={t}
             balance={balance}
             onOpenEditor={() => { impact('light'); navigate('/editor') }}
+            onOpenWorkflow={() => { impact('light'); navigate('/workflow') }}
             onOpenPayment={() => { impact('light'); setIsPaymentModalOpen(true) }}
           />
         </div>
@@ -349,6 +358,7 @@ export default function Studio() {
           t={t}
           balance={balance}
           onOpenEditor={() => { impact('light'); navigate('/editor') }}
+          onOpenWorkflow={() => { impact('light'); navigate('/workflow') }}
           onOpenPayment={() => { impact('light'); setIsPaymentModalOpen(true) }}
         />
 

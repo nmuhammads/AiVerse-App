@@ -14,6 +14,7 @@ const r2Configured = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID &
 console.log('R2 Storage Configured:', r2Configured ? 'Yes' : 'No (Check environment variables)')
 
 import { registerBotCommands, setupMenuButton, setupWebhook, logBotInfo } from './controllers/telegramController.js';
+import { markStaleWorkflowRunsAsFailed } from './services/workflowExecutorService.js';
 
 // Initialize Telegram bot with retry logic
 async function initTelegramBot(retries = 3, delayMs = 5000) {
@@ -43,6 +44,17 @@ async function initTelegramBot(retries = 3, delayMs = 5000) {
 initTelegramBot().catch(err => {
   console.error('[TelegramInit] Unhandled error:', err);
 });
+
+markStaleWorkflowRunsAsFailed()
+  .then((count) => {
+    if (count > 0) {
+      console.log(`[WorkflowInit] Marked ${count} stale workflow runs as failed`);
+    }
+  })
+  .catch((err) => {
+    console.error('[WorkflowInit] Failed to mark stale runs:', err);
+  });
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server ready on port ${PORT}`);
   console.log(`Health check available at: http://0.0.0.0:${PORT}/api/health`);

@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflow Draft</title>
+  <style>
+    :root {
+      --bg-1: #04050b;
+      --bg-2: #0f2f38;
+      --panel: rgba(10, 14, 19, 0.86);
+      --border: rgba(120, 130, 150, 0.45);
+      --text: #f5f7fa;
+      --muted: #9da9b9;
+      --cyan: #56d7f0;
+      --lime: #9bfa8a;
+      --ok: #5de9a7;
+      --idle: #5f6e84;
+      --phone-w: 390px;
+      --phone-h: 740px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Manrope", "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 0% 0%, rgba(29, 111, 131, 0.45), transparent 40%),
+        radial-gradient(900px 600px at 100% 20%, rgba(88, 167, 118, 0.18), transparent 45%),
+        var(--bg-1);
+      padding: 22px;
+    }
+
+    .layout {
+      max-width: 1240px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: linear-gradient(160deg, rgba(7, 10, 16, 0.9), rgba(6, 12, 15, 0.75));
+      box-shadow: 0 26px 80px rgba(0, 0, 0, 0.45);
+      padding: 16px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      font-size: 11px;
+      color: rgba(96, 216, 239, 0.9);
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      font-size: 26px;
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(13, 18, 26, 0.86);
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn.run {
+      border-color: rgba(86, 215, 240, 0.8);
+      background: rgba(86, 215, 240, 0.18);
+      color: #d9fcff;
+    }
+
+    .state-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(13, 18, 26, 0.86);
+      color: #b9c5d4;
+      padding: 7px 11px;
+      font-size: 11px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .pill.active {
+      border-color: rgba(86, 215, 240, 0.75);
+      color: #dffcff;
+      background: rgba(86, 215, 240, 0.18);
+    }
+
+    .content {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 290px minmax(0, 1fr);
+    }
+
+    .side {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--panel);
+      padding: 12px;
+    }
+
+    .side h2 {
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .side p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .chips {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(10, 13, 18, 0.85);
+      padding: 8px;
+      font-size: 11px;
+      color: #d5deea;
+      text-align: center;
+    }
+
+    .rule {
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: rgba(8, 11, 15, 0.85);
+      padding: 9px;
+      font-size: 11px;
+      color: #9fb0c4;
+    }
+
+    .stage {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: rgba(9, 13, 18, 0.75);
+      padding: 12px;
+      display: grid;
+      place-items: center;
+    }
+
+    .phone {
+      width: 100%;
+      max-width: var(--phone-w);
+      border-radius: 32px;
+      border: 1px solid rgba(120, 140, 170, 0.6);
+      background: linear-gradient(165deg, #090f16 0%, #08141a 60%, #092126 100%);
+      padding: 12px;
+      box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55);
+      position: relative;
+    }
+
+    .phone-head {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(7, 9, 13, 0.92);
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 10px;
+      color: #d4dce7;
+    }
+
+    .canvas {
+      position: relative;
+      height: var(--phone-h);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background:
+        radial-gradient(380px 260px at 10% 12%, rgba(52, 133, 160, 0.34), transparent 45%),
+        linear-gradient(180deg, #0e1419 0%, #090c12 100%);
+    }
+
+    .line {
+      position: absolute;
+      height: 2px;
+      background: rgba(147, 164, 184, 0.65);
+      transform-origin: left center;
+      border-radius: 4px;
+    }
+
+    .line.run {
+      background: linear-gradient(90deg, var(--cyan), var(--lime));
+      box-shadow: 0 0 11px rgba(86, 215, 240, 0.5);
+    }
+
+    .node {
+      position: absolute;
+      width: 166px;
+      border-radius: 12px;
+      border: 1px solid;
+      padding: 9px;
+      background: rgba(11, 14, 20, 0.9);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
+    }
+
+    .node .head {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      font-size: 11px;
+      color: #d9e2ee;
+    }
+
+    .node h3 {
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+
+    .node p {
+      font-size: 11px;
+      color: #95a7be;
+      margin-bottom: 7px;
+    }
+
+    .node .model {
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(4, 8, 12, 0.56);
+      padding: 5px 6px;
+      font-size: 10px;
+      color: #b6c2d3;
+    }
+
+    .node.idle {
+      border-color: rgba(95, 110, 132, 0.7);
+    }
+
+    .node.run {
+      border-color: rgba(86, 215, 240, 0.75);
+      background: rgba(12, 36, 45, 0.92);
+    }
+
+    .node.done {
+      border-color: rgba(93, 233, 167, 0.8);
+      background: rgba(18, 44, 37, 0.92);
+    }
+
+    .status {
+      font-size: 10px;
+      color: #98a8bc;
+    }
+
+    .status.run {
+      color: #a6f1ff;
+    }
+
+    .status.done {
+      color: #adffd5;
+    }
+
+    .log {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: rgba(8, 10, 14, 0.95);
+      padding: 9px;
+    }
+
+    .log-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 7px;
+      color: #b9c7d9;
+    }
+
+    .bar {
+      height: 6px;
+      border-radius: 999px;
+      background: #222d3c;
+      overflow: hidden;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      width: 21%;
+      background: linear-gradient(90deg, var(--cyan), var(--lime));
+      transition: width .35s ease;
+    }
+
+    .inspect {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 70px;
+      border-radius: 14px;
+      border: 1px solid rgba(86, 215, 240, 0.75);
+      background: rgba(7, 11, 16, 0.96);
+      padding: 10px;
+      display: none;
+    }
+
+    .inspect h4 {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: #c8f8ff;
+    }
+
+    .inspect-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .inspect-grid div {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 10px;
+      padding: 6px;
+      color: #ced7e3;
+      background: rgba(10, 14, 18, 0.8);
+    }
+
+    @media (max-width: 920px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .side {
+        order: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Workflow Studio Draft</div>
+        <h1>Photo → Video Node Board</h1>
+      </div>
+      <div class="actions">
+        <button class="btn">Save</button>
+        <button class="btn run">Run</button>
+      </div>
+    </header>
+
+    <nav class="state-nav">
+      <a class="pill" data-state-link="compose" href="?state=compose">Compose</a>
+      <a class="pill" data-state-link="running" href="?state=running">Run Preview</a>
+      <a class="pill" data-state-link="inspect" href="?state=inspect">Node Settings</a>
+    </nav>
+
+    <section class="content">
+      <aside class="side">
+        <h2>Node Library</h2>
+        <p>Mobile-first структура, после адаптация под web-панели.</p>
+        <div class="chips">
+          <div class="chip">Input</div>
+          <div class="chip">Image Gen</div>
+          <div class="chip">Video Gen</div>
+          <div class="chip">Motion</div>
+          <div class="chip">Upscale</div>
+          <div class="chip">Audio</div>
+          <div class="chip">Overlay</div>
+          <div class="chip">Export</div>
+        </div>
+        <div class="rule">Проверка связей: только совместимые типы (`image`, `video`, `audio`, `mask`).</div>
+      </aside>
+
+      <div class="stage">
+        <div class="phone">
+          <div class="phone-head"><span>Workflow #12</span><span>credits: 13.2</span></div>
+
+          <div class="canvas" id="canvas">
+            <div class="line" data-line="1" style="left:150px; top:87px; width:82px; transform: rotate(28deg);"></div>
+            <div class="line" data-line="2" style="left:179px; top:208px; width:90px; transform: rotate(36deg);"></div>
+            <div class="line" data-line="3" style="left:118px; top:407px; width:111px; transform: rotate(-22deg);"></div>
+            <div class="line" data-line="4" style="left:246px; top:509px; width:28px; transform: rotate(86deg);"></div>
+
+            <article class="node done" style="left:16px; top:22px;">
+              <div class="head"><span>✨ Prompt</span><span class="status done">done</span></div>
+              <h3>Prompt Input</h3>
+              <p>Text + refs</p>
+              <div class="model">Prompt Guard</div>
+            </article>
+
+            <article class="node" id="node-image" style="left:24px; top:146px;">
+              <div class="head"><span>🖼 Image</span><span class="status" id="status-image">idle</span></div>
+              <h3>Image Gen</h3>
+              <p>Hero Frame</p>
+              <div class="model">gpt-image-1.5</div>
+            </article>
+
+            <article class="node" id="node-motion" style="left:184px; top:268px;">
+              <div class="head"><span>🎬 Motion</span><span class="status" id="status-motion">idle</span></div>
+              <h3>Motion</h3>
+              <p>Camera + action</p>
+              <div class="model">kling-2.1</div>
+            </article>
+
+            <article class="node idle" style="left:42px; top:384px;">
+              <div class="head"><span>🧩 Upscale</span><span class="status">idle</span></div>
+              <h3>Upscale</h3>
+              <p>Clean details</p>
+              <div class="model">waifu-v2</div>
+            </article>
+
+            <article class="node idle" style="left:186px; top:496px;">
+              <div class="head"><span>📦 Export</span><span class="status">idle</span></div>
+              <h3>Export</h3>
+              <p>mp4 + cover</p>
+              <div class="model">H.264</div>
+            </article>
+
+            <section class="inspect" id="inspect-panel">
+              <h4>Image Gen Settings</h4>
+              <div class="inspect-grid">
+                <div>Model: gpt-image-1.5</div>
+                <div>Aspect: 9:16</div>
+                <div>Quality: High</div>
+                <div>Seed: 2048</div>
+              </div>
+            </section>
+
+            <div class="log">
+              <div class="log-head"><span>Execution log</span><span id="eta">ETA 00:56</span></div>
+              <div class="bar"><span id="progress"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = new URLSearchParams(window.location.search).get('state') || 'compose';
+    const imageNode = document.getElementById('node-image');
+    const motionNode = document.getElementById('node-motion');
+    const imageStatus = document.getElementById('status-image');
+    const motionStatus = document.getElementById('status-motion');
+    const progress = document.getElementById('progress');
+    const eta = document.getElementById('eta');
+    const inspect = document.getElementById('inspect-panel');
+    const links = document.querySelectorAll('[data-state-link]');
+    const lines = document.querySelectorAll('[data-line]');
+
+    links.forEach((link) => {
+      if (link.dataset.stateLink === state) link.classList.add('active');
+    });
+
+    const setIdle = () => {
+      imageNode.className = 'node idle';
+      motionNode.className = 'node idle';
+      imageStatus.className = 'status';
+      motionStatus.className = 'status';
+      imageStatus.textContent = 'idle';
+      motionStatus.textContent = 'idle';
+      progress.style.width = '21%';
+      eta.textContent = 'ETA 00:56';
+      inspect.style.display = 'none';
+      lines.forEach((line) => line.classList.remove('run'));
+    };
+
+    setIdle();
+
+    if (state === 'running') {
+      imageNode.className = 'node done';
+      motionNode.className = 'node run';
+      imageStatus.className = 'status done';
+      motionStatus.className = 'status run';
+      imageStatus.textContent = 'done';
+      motionStatus.textContent = 'running';
+      progress.style.width = '58%';
+      eta.textContent = 'ETA 00:31';
+      lines.forEach((line) => line.classList.add('run'));
+    }
+
+    if (state === 'inspect') {
+      imageNode.className = 'node run';
+      imageStatus.className = 'status run';
+      imageStatus.textContent = 'selected';
+      progress.style.width = '34%';
+      eta.textContent = 'ETA 00:48';
+      inspect.style.display = 'block';
+      lines.forEach((line) => line.classList.add('run'));
+    }
+  </script>
+</body>
+</html>

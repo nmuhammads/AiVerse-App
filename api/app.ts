@@ -29,6 +29,7 @@ import promptRoutes from './routes/prompt.js'
 import chatRoutes from './routes/chat.js'
 import tributeRoutes from './routes/tribute.js'
 import avatarRoutes from './routes/avatars.js'
+import workflowsRoutes from './routes/workflows.js'
 
 
 // load env
@@ -105,6 +106,7 @@ app.use('/api/prompt', promptRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/tribute', tributeRoutes)
 app.use('/api/avatars', avatarRoutes)
+app.use('/api/workflows', workflowsRoutes)
 
 // PiAPI Webhook (direct import to avoid circular dependency)
 import { handlePiapiWebhook } from './controllers/generationController.js'
@@ -154,4 +156,3 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
 })
 
 export default app
-
