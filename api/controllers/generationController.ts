@@ -739,10 +739,12 @@ async function completeGeneration(
     // 4. Generate Thumbnail (Async, don't block response)
     // For videos: use first input image as thumbnail (more efficient than extracting from video)
     // For images: use the generated image itself
-    const isVideoModel = model === 'seedance-1.5-pro'
+    const isVideoModel = getMediaType(model) === 'video'
     const thumbnailSource = isVideoModel && inputImages && inputImages.length > 0
       ? inputImages[0]  // Use first input frame for video thumbnail
-      : imageUrl        // Use generated image for image thumbnail
+      : isVideoModel
+        ? null           // Video without input images — skip thumbnail (Sharp can't process .mp4)
+        : imageUrl       // Use generated image for image thumbnail
 
     if (thumbnailSource) {
       createThumbnail(thumbnailSource, thumbnailSource, `gen_${generationId}_thumb.jpg`).catch(err => {
@@ -751,6 +753,8 @@ async function completeGeneration(
       if (isVideoModel) {
         console.log(`[Thumbnail] Creating video thumbnail from input image for ${generationId}`)
       }
+    } else if (isVideoModel) {
+      console.log(`[Thumbnail] Skipping thumbnail for video gen ${generationId} — no input images available`)
     }
 
   } catch (e) {

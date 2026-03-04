@@ -674,15 +674,28 @@ export function useStudio() {
 
                 } catch (e) {
                     let msg = t('studio.errors.generationError')
+                    let isConnectionLost = false
                     if (e instanceof Error) {
                         if (e.name === 'AbortError') {
+                            isConnectionLost = true
                             msg = currentParams.mediaType === 'video' ? t('studio.errors.videoTimeout') : t('studio.errors.timeout')
                         } else if (e.message === 'Failed to fetch' || e.message.includes('Load failed')) {
+                            isConnectionLost = true
                             msg = t('studio.errors.network')
                         } else {
                             msg = e.message
                         }
                     }
+
+                    // For video generations: if connection was lost (abort/network error),
+                    // don't show error — generation is still running on server.
+                    // PendingIndicator will pick it up via check-status API.
+                    if (isConnectionLost && currentParams.mediaType === 'video') {
+                        removeGeneration(generationId)
+                        toast(t('studio.generation.backgroundRunning', 'Генерация продолжается в фоне. Результат появится в профиле.'), { duration: 5000 })
+                        return
+                    }
+
                     updateGeneration(generationId, { status: 'error', error: msg })
                     notify('error')
                 } finally {
