@@ -45,12 +45,13 @@ type TranslationFn = ReturnType<typeof useTranslation>['t']
 type StudioHeaderProps = {
   t: TranslationFn
   balance: number | null
+  workflowEnabled: boolean
   onOpenEditor: () => void
   onOpenWorkflow: () => void
   onOpenPayment: () => void
 }
 
-function StudioHeader({ t, balance, onOpenEditor, onOpenWorkflow, onOpenPayment }: StudioHeaderProps) {
+function StudioHeader({ t, balance, workflowEnabled, onOpenEditor, onOpenWorkflow, onOpenPayment }: StudioHeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center">
@@ -64,13 +65,15 @@ function StudioHeader({ t, balance, onOpenEditor, onOpenWorkflow, onOpenPayment 
           <Pencil size={14} className="text-cyan-400" />
           <span className="text-xs font-bold text-cyan-300">{t('editor.title')}</span>
         </button>
-        <button
-          onClick={onOpenWorkflow}
-          className="px-3 py-1.5 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center gap-1.5 active:scale-95 transition-transform"
-        >
-          <GitBranch size={14} className="text-indigo-300" />
-          <span className="text-xs font-bold text-indigo-200">Workflow</span>
-        </button>
+        {workflowEnabled && (
+          <button
+            onClick={onOpenWorkflow}
+            className="px-3 py-1.5 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center gap-1.5 active:scale-95 transition-transform"
+          >
+            <GitBranch size={14} className="text-indigo-300" />
+            <span className="text-xs font-bold text-indigo-200">Workflow</span>
+          </button>
+        )}
         <button
           onClick={onOpenPayment}
           className="px-3 py-1.5 rounded-full bg-zinc-900 border border-white/10 flex items-center gap-1.5 active:scale-95 transition-transform"
@@ -87,7 +90,7 @@ function StudioHeader({ t, balance, onOpenEditor, onOpenWorkflow, onOpenPayment 
   )
 }
 
-export default function Studio() {
+export default function Studio({ workflowEnabled = true }: { workflowEnabled?: boolean }) {
   const activeGens = useActiveGenerationsStore(state => state.generations)
   const hasActiveGens = activeGens.length > 0
   const location = useLocation()
@@ -301,6 +304,7 @@ export default function Studio() {
           <StudioHeader
             t={t}
             balance={balance}
+            workflowEnabled={workflowEnabled}
             onOpenEditor={() => { impact('light'); navigate('/editor') }}
             onOpenWorkflow={() => { impact('light'); navigate('/workflow') }}
             onOpenPayment={() => { impact('light'); setIsPaymentModalOpen(true) }}
@@ -357,6 +361,7 @@ export default function Studio() {
         <StudioHeader
           t={t}
           balance={balance}
+          workflowEnabled={workflowEnabled}
           onOpenEditor={() => { impact('light'); navigate('/editor') }}
           onOpenWorkflow={() => { impact('light'); navigate('/workflow') }}
           onOpenPayment={() => { impact('light'); setIsPaymentModalOpen(true) }}

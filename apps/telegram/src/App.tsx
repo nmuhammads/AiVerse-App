@@ -36,6 +36,7 @@ import { DebugOverlay } from "@/components/DebugOverlay";
 import { AIChatOverlay } from "@/components/AIChatOverlay";
 import { AIFloatingButton } from "@/components/AIFloatingButton";
 import { useAuthStore } from "@/store/authStore";
+import { useState } from "react";
 
 // Check if running inside Telegram WebApp
 function isInTelegramWebApp(): boolean {
@@ -89,7 +90,7 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function StartParamRouter() {
+function StartParamRouter({ workflowEnabled }: { workflowEnabled: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const processedRef = useRef(false);
@@ -128,7 +129,7 @@ function StartParamRouter() {
         return;
       }
       if (p === "workflow") {
-        navigate("/workflow", { replace: true, state: { fromDeepLink: true } });
+        navigate(workflowEnabled ? "/workflow" : "/studio", { replace: true, state: { fromDeepLink: true } });
         return;
       }
       if (p === "chat") {
@@ -222,7 +223,7 @@ function StartParamRouter() {
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [location.search, navigate]);
+  }, [location.search, navigate, workflowEnabled]);
   return null;
 }
 
@@ -231,6 +232,7 @@ function AppLayout() {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login' || location.pathname === '/landing' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/faq';
   const inTelegram = isInTelegramWebApp();
+  const [workflowEnabled, setWorkflowEnabled] = useState(true);
 
   // Initialize auth state
   useEffect(() => {
@@ -252,6 +254,28 @@ function AppLayout() {
       }
     }
   }, [inTelegram]);
+
+  useEffect(() => {
+    let isMounted = true
+    const loadPublicConfig = async () => {
+      try {
+        const response = await fetch('/api/app-config/public')
+        if (!response.ok) return
+        const data = await response.json().catch(() => null) as { workflow_screen_enabled?: boolean } | null
+        if (isMounted && typeof data?.workflow_screen_enabled === 'boolean') {
+          setWorkflowEnabled(data.workflow_screen_enabled)
+        }
+      } catch {
+        // Keep default enabled=true on network errors.
+      }
+    }
+
+    void loadPublicConfig()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Check for payment result pages
   const isPaymentResultPage = location.pathname.startsWith('/payment/');
@@ -283,13 +307,13 @@ function AppLayout() {
   return (
     <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : ''} h-dvh flex flex-col overflow-hidden`}>
       <Header />
-      <StartParamRouter />
+      <StartParamRouter workflowEnabled={workflowEnabled} />
       <div id="app-scroll-container" className="flex-1 overflow-y-auto">
         <Routes>
           {/* Public routes (viewable without auth, but need auth for actions) */}
-          <Route path="/" element={<RequireAuth><PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary></RequireAuth>} />
+          <Route path="/" element={<RequireAuth><PageErrorBoundary pageName="Студия"><Studio workflowEnabled={workflowEnabled} /></PageErrorBoundary></RequireAuth>} />
           <Route path="/home" element={<PageErrorBoundary pageName="Лента"><Home /></PageErrorBoundary>} />
-          <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary>} />
+          <Route path="/studio" element={<PageErrorBoundary pageName="Студия"><Studio workflowEnabled={workflowEnabled} /></PageErrorBoundary>} />
           <Route path="/top" element={<PageErrorBoundary pageName="Рейтинг"><Leaderboard /></PageErrorBoundary>} />
           <Route path="/profile/:userId" element={<PageErrorBoundary pageName="Профиль"><PublicProfile /></PageErrorBoundary>} />
           <Route path="/contests/:id" element={<PageErrorBoundary pageName="Конкурс"><ContestDetail /></PageErrorBoundary>} />
@@ -306,8 +330,14 @@ function AppLayout() {
           <Route path="/multi-generation" element={<RequireAuth><PageErrorBoundary pageName="Мульти-генерация"><MultiGeneration /></PageErrorBoundary></RequireAuth>} />
           <Route path="/subscriptions" element={<RequireAuth><PageErrorBoundary pageName="Подписки"><SubscriptionsPage /></PageErrorBoundary></RequireAuth>} />
           <Route path="/watermark" element={<RequireAuth><PageErrorBoundary pageName="Водяной знак"><WatermarkEditor /></PageErrorBoundary></RequireAuth>} />
-          <Route path="/workflow" element={<RequireAuth><PageErrorBoundary pageName="Workflow"><WorkflowPage /></PageErrorBoundary></RequireAuth>} />
-          <Route path="/workflow-draft" element={<WorkflowDraft />} />
+          <Route
+            path="/workflow"
+            element={workflowEnabled
+              ? <RequireAuth><PageErrorBoundary pageName="Workflow"><WorkflowPage /></PageErrorBoundary></RequireAuth>
+              : <Navigate to="/studio" replace />
+            }
+          />
+          <Route path="/workflow-draft" element={workflowEnabled ? <WorkflowDraft /> : <Navigate to="/studio" replace />} />
 
           {/* Login route */}
           <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
@@ -361,4 +391,3 @@ export default function App() {
     </CloudflareProxyProvider>
   );
 }
-
