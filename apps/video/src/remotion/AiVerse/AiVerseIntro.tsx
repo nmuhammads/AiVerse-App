@@ -34,6 +34,99 @@ loadFont("normal", {
 
 const FPS = 30;
 const FADE_DURATION = 15;
+const VOICEOVER_INTRO_DURATION_FRAMES = Math.round(0.966531 * FPS);
+type Locale = "en" | "ru";
+const LOCALE: Locale = "ru";
+const VOICEOVER_LANGUAGE: Locale = LOCALE;
+const VOICEOVER_INTRO_FILE = "sfx/voiceover-intro-en.mp3"; // shared intro
+const VOICEOVER_MAIN_FILE =
+  VOICEOVER_LANGUAGE === "en" ? "sfx/voiceover-en.mp3" : "sfx/voiceover-ru.mp3";
+
+type FeatureCopy = {
+  title: string;
+  description: string;
+  badge: string;
+  image?: string;
+  video?: string;
+};
+
+type LocalizedCopy = {
+  tagline: string;
+  features: FeatureCopy[];
+  cta: string;
+  promptLabel: string;
+  promptText: string;
+  stats: { value: string; label: string }[];
+};
+
+const LOCALIZED_COPY: Record<Locale, LocalizedCopy> = {
+  en: {
+    tagline: "Create anything\nwith AI",
+    features: [
+      {
+        title: "AI Generation",
+        description: "SeeDream, Kling AI, GPT Image — top models in one app",
+        badge: "",
+      },
+      {
+        title: "AI Video",
+        description:
+          "Text-to-Video and Image-to-Video with Kling AI and Seedance Pro",
+        image: "feature-2.png",
+        badge: "Video AI",
+      },
+      {
+        title: "Community Feed",
+        description: "Browse community creations, like, and remix",
+        image: "feature-3.png",
+        video: "record-2.MP4",
+        badge: "100K+ creations",
+      },
+    ],
+    cta: "Try it for free",
+    promptLabel: "Prompt",
+    promptText:
+      "This photo captures a woman in an elegant, minimal look taking a selfie while relaxing at a cafe....",
+    stats: [
+      { value: "10K+", label: "users" },
+      { value: "100K+", label: "creations made" },
+    ],
+  },
+  ru: {
+    tagline: "Создай что угодно\nс помощью AI",
+    features: [
+      {
+        title: "AI Генерация",
+        description:
+          "SeeDream, Kling AI, GPT Image — лучшие модели в одном приложении",
+        badge: "",
+      },
+      {
+        title: "AI Видео",
+        description:
+          "Text-to-Video и Image-to-Video через Kling AI и Seedance Pro",
+        image: "feature-2.png",
+        badge: "Video AI",
+      },
+      {
+        title: "Лента работ",
+        description: "Смотри работы сообщества, ставь лайки и создавай ремиксы",
+        image: "feature-3.png",
+        video: "record-2.MP4",
+        badge: "100K+ работ",
+      },
+    ],
+    cta: "Попробуй бесплатно",
+    promptLabel: "Промпт",
+    promptText:
+      "На этой фотографии запечатлена девушка в элегантном и сдержанном образе, сделавшая селфи во время отдыха в заведении....",
+    stats: [
+      { value: "10K+", label: "пользователей" },
+      { value: "100K+", label: "работ создано" },
+    ],
+  },
+};
+const COPY = LOCALIZED_COPY[LOCALE];
 
 // ============================================
 // CONFIG
@@ -41,31 +134,9 @@ const FADE_DURATION = 15;
 
 const CONFIG = {
   productName: "AiVerse",
-  tagline: "Создай что угодно\nс помощью AI",
-  features: [
-    {
-      title: "AI Генерация",
-      description:
-        "SeeDream, Kling AI, GPT Image — лучшие модели в одном приложении",
-      badge: "",
-    },
-    {
-      title: "AI Видео",
-      description:
-        "Text-to-Video и Image-to-Video через Kling AI и Seedance Pro",
-      image: "feature-2.png",
-      badge: "Video AI",
-    },
-    {
-      title: "Лента работ",
-      description:
-        "Смотри работы сообщества, ставь лайки и создавай ремиксы",
-      image: "feature-3.png",
-      video: "record-2.MP4",
-      badge: "100K+ работ",
-    },
-  ],
-  cta: "Попробуй бесплатно",
+  tagline: COPY.tagline,
+  features: COPY.features,
+  cta: COPY.cta,
   url: "aiverseapp.net",
   mockupVideo: "record-1.MP4",
   accent: "#a855f7",
@@ -93,7 +164,7 @@ const SCENES = [
   { id: "feature0", duration: Math.round(4 * FPS) },
   { id: "feature1", duration: Math.round(3.5 * FPS) },
   { id: "feature2", duration: Math.round(3.5 * FPS) },
-  { id: "outro", duration: Math.round(3 * FPS) },
+  { id: "outro", duration: Math.round(5 * FPS) },
   { id: "cta", duration: Math.round(3.5 * FPS) },
 ];
 
@@ -468,8 +539,7 @@ const RevealScene: React.FC<{ dur: number }> = ({ dur }) => {
 const ConceptScene: React.FC<{ dur: number }> = ({ dur }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const PROMPT_TEXT =
-    "На этой фотографии запечатлена девушка в элегантном и сдержанном образе, сделавшая селфи во время отдыха в заведении....";
+  const PROMPT_TEXT = COPY.promptText;
 
   const cardProgress = spring({
     frame,
@@ -576,7 +646,7 @@ const ConceptScene: React.FC<{ dur: number }> = ({ dur }) => {
                 letterSpacing: 2,
               }}
             >
-              Промпт
+              {COPY.promptLabel}
             </div>
             <TypewriterText
               text={PROMPT_TEXT}
@@ -876,7 +946,161 @@ const ModelIconsScene: React.FC<{
 // SCENE 5: VIDEO FEATURE (Feature 2 - AI Video)
 // ============================================
 
+const VIDEO_GENS = [
+  "video-gens/video-gen-1.MOV",
+  "video-gens/video-gen-2.MP4",
+  "video-gens/video-gen-3.MOV",
+];
+
 const VideoFeatureScene: React.FC<{
+  title: string;
+  description: string;
+  badge: string;
+  dur: number;
+}> = ({ title, description, badge, dur }) => {
+  const frame = useCurrentFrame();
+
+  return (
+    <SceneFade durationInFrames={dur}>
+      <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
+        <AbsoluteFill
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            gap: 40,
+            paddingTop: 80,
+          }}
+        >
+          {/* Text at top */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
+              maxWidth: 960,
+            }}
+          >
+            <FadeUp delay={0}>
+              <div
+                style={{
+                  fontFamily,
+                  fontSize: 28,
+                  fontWeight: 600,
+                  color: CONFIG.accent,
+                  backgroundColor: CONFIG.accentBg,
+                  padding: "12px 28px",
+                  borderRadius: 28,
+                  letterSpacing: 0.5,
+                }}
+              >
+                {badge}
+              </div>
+            </FadeUp>
+            <FadeUp delay={8}>
+              <div
+                style={{
+                  fontFamily,
+                  fontSize: 72,
+                  fontWeight: 800,
+                  color: "#fff",
+                  lineHeight: 1.1,
+                  letterSpacing: -1,
+                  textAlign: "center",
+                }}
+              >
+                {title}
+              </div>
+            </FadeUp>
+            <FadeUp delay={16}>
+              <div
+                style={{
+                  fontFamily,
+                  fontSize: 34,
+                  fontWeight: 400,
+                  color: "rgba(255,255,255,0.55)",
+                  lineHeight: 1.4,
+                  textAlign: "center",
+                  padding: "0 40px",
+                }}
+              >
+                {description}
+              </div>
+            </FadeUp>
+          </div>
+
+          {/* Video examples — staggered zigzag layout */}
+          <div
+            style={{
+              position: "relative",
+              width: 680,
+              height: 900,
+            }}
+          >
+            {VIDEO_GENS.map((vid, i) => {
+              const appearDelay = 15 + i * 12;
+              const vidOpacity = interpolate(
+                frame - appearDelay,
+                [0, 12],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              );
+              const vidScale = interpolate(
+                frame - appearDelay,
+                [0, 12],
+                [0.8, 1],
+                {
+                  extrapolateLeft: "clamp",
+                  extrapolateRight: "clamp",
+                  easing: Easing.out(Easing.back(1.5)),
+                }
+              );
+              // Zigzag: left, right, left
+              const left = i % 2 === 0 ? 0 : 360;
+              const top = i * 280;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    left,
+                    top,
+                    opacity: vidOpacity,
+                    transform: `scale(${vidScale})`,
+                    width: 420,
+                    height: 550,
+                    borderRadius: 24,
+                    overflow: "hidden",
+                    border: "2px solid rgba(255,255,255,0.1)",
+                    boxShadow: `0 0 40px rgba(168,85,247,${vidOpacity * 0.2})`,
+                  }}
+                >
+                  <OffthreadVideo
+                    src={staticFile(vid)}
+                    volume={0}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </AbsoluteFill>
+      </AbsoluteFill>
+    </SceneFade>
+  );
+};
+
+// ============================================
+// SCENE 6: FEED FEATURE (Feature 3 - Feed with video in device)
+// ============================================
+
+const FeedFeatureScene: React.FC<{
   title: string;
   description: string;
   video: string;
@@ -977,18 +1201,21 @@ const VideoFeatureScene: React.FC<{
 };
 
 // ============================================
-// SCENE 6: IMAGE FEATURE (Feature 3 - Feed)
+// SCENE 7: STATS / OUTRO
 // ============================================
 
-const ImageFeatureScene: React.FC<{
-  title: string;
-  description: string;
-  image: string;
-  badge: string;
-  dur: number;
-}> = ({ title, description, image, badge, dur }) => {
+const PACK_IMAGES = [
+  "pack/photo00001.jpeg",
+  "pack/photo00002.jpeg",
+  "pack/photo00003.jpeg",
+  "pack/photo00004.jpeg",
+  "pack/photo00005.jpeg",
+  "pack/photo00006.jpeg",
+];
+
+const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
   const frame = useCurrentFrame();
-  const floatY = Math.sin(frame / 20) * 5;
+  const stats = COPY.stats;
 
   return (
     <SceneFade durationInFrames={dur}>
@@ -999,132 +1226,20 @@ const ImageFeatureScene: React.FC<{
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "flex-start",
-            gap: 36,
-            paddingTop: 80,
+            paddingTop: 100,
+            gap: 60,
           }}
         >
-          <ScaleIn delay={5}>
-            <div style={{ transform: `translateY(${floatY}px)` }}>
-              <PhoneMockup scale={1}>
-                <Img
-                  src={staticFile(image)}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              </PhoneMockup>
-            </div>
-          </ScaleIn>
-
+          {/* Stats row at top */}
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
+              gap: 80,
               alignItems: "center",
-              gap: 20,
-              maxWidth: 960,
-            }}
-          >
-            <FadeUp delay={8}>
-              <div
-                style={{
-                  fontFamily,
-                  fontSize: 28,
-                  fontWeight: 600,
-                  color: CONFIG.accent,
-                  backgroundColor: CONFIG.accentBg,
-                  padding: "12px 28px",
-                  borderRadius: 28,
-                  letterSpacing: 0.5,
-                }}
-              >
-                {badge}
-              </div>
-            </FadeUp>
-            <FadeUp delay={16}>
-              <div
-                style={{
-                  fontFamily,
-                  fontSize: 72,
-                  fontWeight: 800,
-                  color: "#fff",
-                  lineHeight: 1.1,
-                  letterSpacing: -1,
-                  textAlign: "center",
-                }}
-              >
-                {title}
-              </div>
-            </FadeUp>
-            <FadeUp delay={26}>
-              <div
-                style={{
-                  fontFamily,
-                  fontSize: 34,
-                  fontWeight: 400,
-                  color: "rgba(255,255,255,0.55)",
-                  lineHeight: 1.4,
-                  textAlign: "center",
-                  padding: "0 40px",
-                }}
-              >
-                {description}
-              </div>
-            </FadeUp>
-          </div>
-        </AbsoluteFill>
-      </AbsoluteFill>
-    </SceneFade>
-  );
-};
-
-// ============================================
-// SCENE 7: STATS / OUTRO
-// ============================================
-
-const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
-  const stats = [
-    { value: "10K+", label: "пользователей" },
-    { value: "100K+", label: "работ создано" },
-    { value: "10+", label: "AI моделей" },
-  ];
-
-  return (
-    <SceneFade durationInFrames={dur}>
-      <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
-        <AbsoluteFill
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 48,
-          }}
-        >
-          <ScaleIn delay={0}>
-            <div
-              style={{
-                fontFamily,
-                fontSize: 88,
-                fontWeight: 800,
-                color: "#fff",
-                letterSpacing: -3,
-              }}
-            >
-              {CONFIG.productName}
-            </div>
-          </ScaleIn>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 56,
             }}
           >
             {stats.map((stat, i) => (
-              <FadeUp key={i} delay={10 + i * 10}>
+              <FadeUp key={i} delay={5 + i * 8}>
                 <div
                   style={{
                     display: "flex",
@@ -1135,10 +1250,10 @@ const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
                 >
                   <AnimatedCounter
                     value={stat.value}
-                    delay={10 + i * 10}
+                    delay={5 + i * 8}
                     style={{
                       fontFamily,
-                      fontSize: 56,
+                      fontSize: 72,
                       fontWeight: 800,
                       color: CONFIG.accent,
                       letterSpacing: -1,
@@ -1147,7 +1262,7 @@ const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
                   <div
                     style={{
                       fontFamily,
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: 400,
                       color: "rgba(255,255,255,0.4)",
                     }}
@@ -1157,6 +1272,59 @@ const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
                 </div>
               </FadeUp>
             ))}
+          </div>
+
+          {/* Photo gallery 3x2 grid (3 columns, 2 rows), 3:4 aspect ratio */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 20,
+              width: 750,
+            }}
+          >
+            {PACK_IMAGES.map((img, i) => {
+              const appearDelay = 20 + i * 8;
+              const imgOpacity = interpolate(
+                frame - appearDelay,
+                [0, 12],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              );
+              const imgScale = interpolate(
+                frame - appearDelay,
+                [0, 12],
+                [0.8, 1],
+                {
+                  extrapolateLeft: "clamp",
+                  extrapolateRight: "clamp",
+                  easing: Easing.out(Easing.back(1.5)),
+                }
+              );
+              return (
+                <div
+                  key={i}
+                  style={{
+                    opacity: imgOpacity,
+                    transform: `scale(${imgScale})`,
+                    aspectRatio: "3 / 4",
+                    borderRadius: 18,
+                    overflow: "hidden",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    boxShadow: `0 0 30px rgba(168,85,247,${imgOpacity * 0.15})`,
+                  }}
+                >
+                  <Img
+                    src={staticFile(img)}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              );
+            })}
           </div>
         </AbsoluteFill>
       </AbsoluteFill>
@@ -1168,8 +1336,37 @@ const OutroScene: React.FC<{ dur: number }> = ({ dur }) => {
 // SCENE 8: CTA
 // ============================================
 
-const CTAScene: React.FC<{ dur: number }> = ({ dur }) => {
+const TelegramIcon: React.FC<{ size?: number }> = ({ size = 40 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 240 240"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle cx="120" cy="120" r="120" fill="url(#tg-grad)" />
+    <path
+      d="M98 175c-3.6 0-3-1.4-4.2-4.8L82 131.5l89-53"
+      fill="#C8DAEA"
+    />
+    <path
+      d="M98 175c2.8 0 4-1.3 5.6-2.8l15-14.6-18.8-11.3"
+      fill="#A9C9DD"
+    />
+    <path
+      d="M99.8 146.3l45.4 33.5c5.2 2.9 8.9 1.4 10.2-4.8l18.4-86.8c1.9-7.5-2.9-10.9-7.8-8.7l-108 41.6c-7.3 2.9-7.2 7-1.3 8.8l27.7 8.6 64.2-40.5c3-1.8 5.8-.8 3.5 1.2"
+      fill="#fff"
+    />
+    <defs>
+      <linearGradient id="tg-grad" x1="120" y1="0" x2="120" y2="240">
+        <stop stopColor="#2AABEE" />
+        <stop offset="1" stopColor="#229ED9" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
 
+const CTAScene: React.FC<{ dur: number }> = ({ dur }) => {
   return (
     <SceneFade durationInFrames={dur}>
       <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
@@ -1177,7 +1374,7 @@ const CTAScene: React.FC<{ dur: number }> = ({ dur }) => {
         <AbsoluteFill
           style={{
             background:
-              "radial-gradient(ellipse 600px 400px at 50% 60%, rgba(168,85,247,0.15) 0%, transparent 70%)",
+              "radial-gradient(ellipse 600px 400px at 50% 30%, rgba(168,85,247,0.15) 0%, transparent 70%), radial-gradient(ellipse 600px 400px at 50% 75%, rgba(39,160,228,0.1) 0%, transparent 70%)",
           }}
         />
         <AbsoluteFill
@@ -1186,147 +1383,144 @@ const CTAScene: React.FC<{ dur: number }> = ({ dur }) => {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: 40,
+            gap: 0,
           }}
         >
-          <FadeUp delay={0} duration={15}>
+          {/* Top: Web App QR */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 20,
+              paddingBottom: 50,
+            }}
+          >
+            <FadeUp delay={0} duration={18}>
+              <div
+                style={{
+                  fontFamily,
+                  fontSize: 48,
+                  fontWeight: 800,
+                  color: "#fff",
+                  textAlign: "center",
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                  padding: "16px 40px",
+                  borderRadius: 20,
+                  background:
+                    "linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(168,85,247,0.08) 100%)",
+                  border: "1px solid rgba(168,85,247,0.35)",
+                  boxShadow:
+                    "0 0 40px rgba(168,85,247,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
+                }}
+              >
+                {CONFIG.url}
+              </div>
+            </FadeUp>
+            <ScaleIn delay={8}>
+              <div
+                style={{
+                  padding: 18,
+                  backgroundColor: "#fff",
+                  borderRadius: 24,
+                  boxShadow:
+                    "0 0 60px rgba(168,85,247,0.25), 0 0 120px rgba(168,85,247,0.1)",
+                }}
+              >
+                <QRCode
+                  value={`https://${CONFIG.url}`}
+                  size={220}
+                  bgColor="#ffffff"
+                  fgColor="#0a0a0a"
+                />
+              </div>
+            </ScaleIn>
+            <FadeUp delay={14} duration={15}>
+              <div
+                style={{
+                  fontFamily,
+                  fontSize: 28,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.4)",
+                  textAlign: "center",
+                }}
+              >
+                Web App
+              </div>
+            </FadeUp>
+          </div>
+
+          {/* Divider line */}
+          <FadeUp delay={16} duration={20}>
             <div
               style={{
-                fontFamily,
-                fontSize: 72,
-                fontWeight: 800,
-                color: "#fff",
-                textAlign: "center",
-                letterSpacing: -1,
+                width: 500,
+                height: 2,
+                background:
+                  "linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.6) 30%, rgba(168,85,247,0.6) 70%, transparent 100%)",
               }}
-            >
-              {CONFIG.cta}
-            </div>
+            />
           </FadeUp>
 
-          {/* QR codes row — aligned side by side */}
-          <ScaleIn delay={10}>
-            <div
-              style={{
-                display: "flex",
-                gap: 48,
-                alignItems: "flex-start",
-              }}
-            >
-              {/* Website QR */}
+          {/* Bottom: Telegram QR */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 20,
+              paddingTop: 50,
+            }}
+          >
+            <ScaleIn delay={18}>
               <div
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 20,
+                  padding: 18,
+                  backgroundColor: "#fff",
+                  borderRadius: 24,
+                  boxShadow:
+                    "0 0 60px rgba(39,160,228,0.25), 0 0 120px rgba(39,160,228,0.1)",
                 }}
               >
-                <div
-                  style={{
-                    padding: 20,
-                    backgroundColor: "#fff",
-                    borderRadius: 28,
-                    boxShadow:
-                      "0 0 60px rgba(168,85,247,0.25), 0 0 120px rgba(168,85,247,0.1)",
-                  }}
-                >
-                  <QRCode
-                    value={`https://${CONFIG.url}`}
-                    size={260}
-                    bgColor="#ffffff"
-                    fgColor="#0a0a0a"
-                  />
-                </div>
-                <div
-                  style={{
-                    fontFamily,
-                    fontSize: 34,
-                    fontWeight: 700,
-                    color: "#fff",
-                    textAlign: "center",
-                  }}
-                >
-                  🌐 Web App
-                </div>
-                <div
-                  style={{
-                    fontFamily,
-                    fontSize: 24,
-                    fontWeight: 500,
-                    color: "rgba(168,85,247,0.8)",
-                    textAlign: "center",
-                  }}
-                >
-                  {CONFIG.url}
-                </div>
+                <QRCode
+                  value="https://t.me/aiverse_hub_bot"
+                  size={220}
+                  bgColor="#ffffff"
+                  fgColor="#0a0a0a"
+                />
               </div>
-
-              {/* Telegram Bot QR */}
+            </ScaleIn>
+            <FadeUp delay={24} duration={15}>
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
-                  gap: 20,
+                  gap: 16,
+                  padding: "16px 36px",
+                  borderRadius: 20,
+                  background:
+                    "linear-gradient(135deg, rgba(39,160,228,0.25) 0%, rgba(39,160,228,0.08) 100%)",
+                  border: "1px solid rgba(39,160,228,0.35)",
+                  boxShadow:
+                    "0 0 40px rgba(39,160,228,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
                 }}
               >
-                <div
-                  style={{
-                    padding: 20,
-                    backgroundColor: "#fff",
-                    borderRadius: 28,
-                    boxShadow:
-                      "0 0 60px rgba(39,160,228,0.25), 0 0 120px rgba(39,160,228,0.1)",
-                  }}
-                >
-                  <QRCode
-                    value="https://t.me/aiverse_hub_bot"
-                    size={260}
-                    bgColor="#ffffff"
-                    fgColor="#0a0a0a"
-                  />
-                </div>
+                <TelegramIcon size={44} />
                 <div
                   style={{
                     fontFamily,
-                    fontSize: 34,
+                    fontSize: 42,
                     fontWeight: 700,
                     color: "#fff",
-                    textAlign: "center",
-                  }}
-                >
-                  ✈️ Telegram Bot
-                </div>
-                <div
-                  style={{
-                    fontFamily,
-                    fontSize: 24,
-                    fontWeight: 500,
-                    color: "rgba(39,160,228,0.8)",
-                    textAlign: "center",
+                    letterSpacing: 0.5,
                   }}
                 >
                   @aiverse_hub_bot
                 </div>
               </div>
-            </div>
-          </ScaleIn>
-
-          <FadeUp delay={28}>
-            <div
-              style={{
-                fontFamily,
-                fontSize: 30,
-                fontWeight: 500,
-                color: "rgba(255,255,255,0.35)",
-                letterSpacing: 2,
-                textTransform: "uppercase",
-              }}
-            >
-              Telegram Mini App · Web App
-            </div>
-          </FadeUp>
+            </FadeUp>
+          </div>
         </AbsoluteFill>
       </AbsoluteFill>
     </SceneFade>
@@ -1365,12 +1559,11 @@ export const AiVerseIntro: React.FC = () => {
         />
       </Sequence>
 
-      {/* 5. Feature 2 - AI Video (image in device) */}
+      {/* 5. Feature 2 - AI Video (video examples) */}
       <Sequence from={sceneStarts[4]} durationInFrames={SCENES[4].duration}>
-        <ImageFeatureScene
+        <VideoFeatureScene
           title={CONFIG.features[1].title}
           description={CONFIG.features[1].description}
-          image={CONFIG.features[1].image!}
           badge={CONFIG.features[1].badge}
           dur={SCENES[4].duration}
         />
@@ -1378,7 +1571,7 @@ export const AiVerseIntro: React.FC = () => {
 
       {/* 6. Feature 3 - Feed (video in device) */}
       <Sequence from={sceneStarts[5]} durationInFrames={SCENES[5].duration}>
-        <VideoFeatureScene
+        <FeedFeatureScene
           title={CONFIG.features[2].title}
           description={CONFIG.features[2].description}
           video={CONFIG.features[2].video!}
@@ -1399,32 +1592,33 @@ export const AiVerseIntro: React.FC = () => {
 
       {/* ===== AUDIO / SFX ===== */}
 
-      {/* Ambient background loop — full duration, low volume */}
+      {/* Voiceover narration: intro first, then main body */}
+      <Audio src={staticFile(VOICEOVER_INTRO_FILE)} volume={0.85} />
+      <Sequence from={VOICEOVER_INTRO_DURATION_FRAMES}>
+        <Audio src={staticFile(VOICEOVER_MAIN_FILE)} volume={0.85} />
+      </Sequence>
+
+      {/* Ambient background loop — under voiceover, very low */}
       <Audio
         src={staticFile("sfx/ambient-loop.mp3")}
-        volume={0.15}
+        volume={0.08}
         loop
       />
 
-      {/* Scene 1: Reveal — shine + whoosh */}
+      {/* Scene 1: Reveal — shine */}
       <Sequence from={sceneStarts[0]} durationInFrames={SCENES[0].duration}>
-        <Audio src={staticFile("sfx/shine.mp3")} volume={0.5} />
+        <Audio src={staticFile("sfx/shine.mp3")} volume={0.25} />
       </Sequence>
 
       {/* Scene 2: Concept — typing then magic ding */}
       <Sequence from={sceneStarts[1]} durationInFrames={SCENES[1].duration}>
-        <Audio src={staticFile("sfx/typing.mp3")} volume={0.35} />
+        <Audio src={staticFile("sfx/typing.mp3")} volume={0.2} />
       </Sequence>
       <Sequence
         from={sceneStarts[1] + Math.round(3.5 * FPS)}
         durationInFrames={Math.round(1.5 * FPS)}
       >
-        <Audio src={staticFile("sfx/magic-ding.mp3")} volume={0.5} />
-      </Sequence>
-
-      {/* Scene 3: Mockups — whoosh */}
-      <Sequence from={sceneStarts[2]} durationInFrames={SCENES[2].duration}>
-        <Audio src={staticFile("sfx/whoosh.mp3")} volume={0.4} />
+        <Audio src={staticFile("sfx/magic-ding.mp3")} volume={0.3} />
       </Sequence>
 
       {/* Scene 4: Model Icons — pop sounds staggered */}
@@ -1434,28 +1628,18 @@ export const AiVerseIntro: React.FC = () => {
           from={sceneStarts[3] + Math.round(0.4 * FPS) + i * 4}
           durationInFrames={Math.round(0.5 * FPS)}
         >
-          <Audio src={staticFile("sfx/pop.mp3")} volume={0.3} />
+          <Audio src={staticFile("sfx/pop.mp3")} volume={0.15} />
         </Sequence>
       ))}
 
-      {/* Scene 5: AI Video — whoosh */}
-      <Sequence from={sceneStarts[4]} durationInFrames={SCENES[4].duration}>
-        <Audio src={staticFile("sfx/whoosh.mp3")} volume={0.4} />
-      </Sequence>
-
-      {/* Scene 6: Feed — whoosh */}
-      <Sequence from={sceneStarts[5]} durationInFrames={SCENES[5].duration}>
-        <Audio src={staticFile("sfx/whoosh.mp3")} volume={0.4} />
-      </Sequence>
-
       {/* Scene 7: Outro — counter tick */}
       <Sequence from={sceneStarts[6]} durationInFrames={SCENES[6].duration}>
-        <Audio src={staticFile("sfx/counter.mp3")} volume={0.35} />
+        <Audio src={staticFile("sfx/counter.mp3")} volume={0.2} />
       </Sequence>
 
       {/* Scene 8: CTA — shine reveal */}
       <Sequence from={sceneStarts[7]} durationInFrames={SCENES[7].duration}>
-        <Audio src={staticFile("sfx/shine.mp3")} volume={0.5} />
+        <Audio src={staticFile("sfx/shine.mp3")} volume={0.25} />
       </Sequence>
     </AbsoluteFill>
   );
