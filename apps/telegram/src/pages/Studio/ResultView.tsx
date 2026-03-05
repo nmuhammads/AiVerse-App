@@ -47,8 +47,24 @@ export function ResultView({
   onEdit,
   onClose,
 }: ResultViewProps) {
-  const paddingTopResult = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 10px)' : 'calc(env(safe-area-inset-top) + 50px)'
-  const paddingBottomResult = platform === 'ios' ? 'calc(env(safe-area-inset-bottom) + 96px)' : '120px'
+  const isDesktop = platform !== 'ios' && platform !== 'android'
+  const paddingTopResult = platform === 'ios'
+    ? 'calc(env(safe-area-inset-top) + 10px)'
+    : platform === 'android'
+      ? 'calc(env(safe-area-inset-top) + 50px)'
+      : '24px'
+
+  const paddingBottomResult = platform === 'ios'
+    ? 'calc(env(safe-area-inset-bottom) + 96px)'
+    : platform === 'android'
+      ? '120px'
+      : '84px'
+
+  const fullscreenCloseOffsetClass = platform === 'android'
+    ? 'pt-[calc(5rem+env(safe-area-inset-top))]'
+    : platform === 'ios'
+      ? 'pt-[calc(3rem+env(safe-area-inset-top))]'
+      : 'pt-4'
 
   return (
     <div className="min-h-dvh bg-black flex flex-col justify-end px-4" style={{ paddingTop: paddingTopResult, paddingBottom: paddingBottomResult }}>
@@ -107,7 +123,7 @@ export function ResultView({
               <button
                 onClick={onOpenFullScreen}
                 className="absolute right-4 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
-                style={{ top: 'calc(env(safe-area-inset-top) + 60px)' }}
+                style={{ top: isDesktop ? '16px' : 'calc(env(safe-area-inset-top) + 60px)' }}
               >
                 <Maximize2 size={18} />
               </button>
@@ -162,7 +178,7 @@ export function ResultView({
 
       {isFullScreen && (
         <div className="fixed inset-0 z-[200] bg-black flex flex-col">
-          <div className="absolute top-0 right-0 z-50 p-4 pt-[calc(3rem+env(safe-area-inset-top))]">
+          <div className={`absolute top-0 right-0 z-50 p-4 ${fullscreenCloseOffsetClass}`}>
             <button
               onClick={onCloseFullScreen}
               className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
@@ -193,3 +209,4 @@ export function ResultView({
     </div>
   )
 }
+

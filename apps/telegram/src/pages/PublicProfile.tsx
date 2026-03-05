@@ -8,6 +8,7 @@ import { FeedImage, type FeedItem } from '@/components/FeedImage'
 import { FeedDetailModal } from '@/components/FeedDetailModal'
 import { useGenerationStore, type ModelType } from '@/store/generationStore'
 import { FeedSkeletonGrid } from '@/components/ui/skeleton'
+import { useFeedColumns } from '@/lib/feedLayout'
 
 export default function PublicProfile() {
     const { t } = useTranslation()
@@ -277,11 +278,17 @@ export default function PublicProfile() {
         { label: t('publicProfile.stats.remixes'), value: profileUser?.remix_count || 0 },
     ]
 
-    const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 60px)' : 'calc(env(safe-area-inset-top) + 50px)'
+    const feedColumns = useFeedColumns('standard')
+
+    const paddingTop = platform === 'ios'
+        ? 'calc(env(safe-area-inset-top) + 60px)'
+        : platform === 'android'
+            ? 'calc(env(safe-area-inset-top) + 50px)'
+            : '64px'
 
     return (
         <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
-            <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
+            <div className="mx-auto w-full max-w-[1760px] px-4 lg:px-6 xl:px-8 py-4 space-y-6">
 
                 <div
                     className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl mt-12 transition-all duration-500"
@@ -368,16 +375,13 @@ export default function PublicProfile() {
                     ) : (
                         <>
                             <div className="flex gap-4 items-start">
-                                <div className="flex-1 min-w-0 space-y-4">
-                                    {items.filter((_, i) => i % 2 === 0).map(item => (
-                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={handleSelectItem} />
-                                    ))}
-                                </div>
-                                <div className="flex-1 min-w-0 space-y-4">
-                                    {items.filter((_, i) => i % 2 !== 0).map(item => (
-                                        <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={handleSelectItem} />
-                                    ))}
-                                </div>
+                                {Array.from({ length: feedColumns }).map((_, colIndex) => (
+                                    <div key={colIndex} className="flex-1 min-w-0 space-y-4">
+                                        {items.filter((_, i) => i % feedColumns === colIndex).map(item => (
+                                            <FeedImage key={item.id} item={item} priority={true} handleRemix={handleRemix} onClick={handleSelectItem} />
+                                        ))}
+                                    </div>
+                                ))}
                             </div>
 
                             {items.length > 0 && (
@@ -405,3 +409,4 @@ export default function PublicProfile() {
         </div>
     )
 }
+

@@ -7,6 +7,7 @@ interface UseFeedOptions {
     modelFilter: string
     viewMode: 'standard' | 'compact'
     feedFilter: 'all' | 'following'
+    scrollContainerId?: string
 }
 
 interface UseFeedReturn {
@@ -19,13 +20,15 @@ interface UseFeedReturn {
 
 const LIMIT_INITIAL = 6
 const LIMIT_MORE = 4
+const SCROLL_THRESHOLD = 500
 
 export function useFeed({
     userId,
     sort,
     modelFilter,
     viewMode,
-    feedFilter
+    feedFilter,
+    scrollContainerId
 }: UseFeedOptions): UseFeedReturn {
     const [items, setItems] = useState<FeedItem[]>([])
     const [loading, setLoading] = useState(true)
@@ -108,18 +111,48 @@ export function useFeed({
         fetchFeed(true)
     }, [sort, userId, modelFilter, feedFilter])
 
-    // Infinite scroll handler
+    // Infinite scroll handler (prefers app scroll container, falls back to window)
     useEffect(() => {
-        const handleScroll = () => {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
-                if (!loading && !isFetchingMore && hasMore) {
-                    fetchFeed(false)
-                }
+        const canFetchMore = () => !loading && !isFetchingMore && hasMore
+
+        const fetchIfNeeded = () => {
+            if (canFetchMore()) {
+                fetchFeed(false)
             }
         }
-        window.addEventListener('scroll', handleScroll)
-        return () => window.removeEventListener('scroll', handleScroll)
-    }, [loading, isFetchingMore, hasMore, fetchFeed])
+
+        const scrollContainer = scrollContainerId
+            ? document.getElementById(scrollContainerId)
+            : null
+
+        if (scrollContainer) {
+            const handleContainerScroll = () => {
+                const reachedBottom = scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - SCROLL_THRESHOLD
+                if (reachedBottom) {
+                    fetchIfNeeded()
+                }
+            }
+
+            scrollContainer.addEventListener('scroll', handleContainerScroll, { passive: true })
+            handleContainerScroll()
+
+            return () => {
+                scrollContainer.removeEventListener('scroll', handleContainerScroll)
+            }
+        }
+
+        const handleWindowScroll = () => {
+            const reachedBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_THRESHOLD
+            if (reachedBottom) {
+                fetchIfNeeded()
+            }
+        }
+
+        window.addEventListener('scroll', handleWindowScroll, { passive: true })
+        return () => {
+            window.removeEventListener('scroll', handleWindowScroll)
+        }
+    }, [loading, isFetchingMore, hasMore, fetchFeed, scrollContainerId])
 
     return {
         items,
@@ -129,3 +162,4 @@ export function useFeed({
         setItems
     }
 }
+

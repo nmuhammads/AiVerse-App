@@ -152,19 +152,25 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
 
     // Check for mobile platforms (iOS or Android)
     const isMobile = platform === 'ios' || platform === 'android'
+    const isDesktop = !isMobile
     const isMobile9_16 = is9_16 && isMobile
+    const fullscreenCloseOffsetClass = platform === 'android'
+        ? 'pt-[calc(5rem+env(safe-area-inset-top))]'
+        : platform === 'ios'
+            ? 'pt-[calc(3rem+env(safe-area-inset-top))]'
+            : 'pt-4'
 
     return (
         <div
             className={`fixed inset-0 z-[100] bg-black flex ${isMobile9_16 ? 'items-end' : 'items-center'} justify-center animate-in fade-in duration-200`}
             style={{
                 top: 0, left: 0, right: 0, bottom: 0, margin: 0,
-                padding: isMobile9_16 ? '0 16px 30px 16px' : '0 16px'
+                padding: isMobile9_16 ? '0 16px 30px 16px' : (isDesktop ? '16px 24px' : '0 16px')
             }}
             onClick={onClose}
         >
             <div
-                className={`w-full max-w-2xl flex flex-col gap-4 transition-transform ${is9_16 && !isMobile9_16 ? 'translate-y-8' : ''}`}
+                className={`w-full max-w-2xl flex flex-col gap-4 transition-transform max-h-[calc(100dvh-2rem)] overflow-y-auto ${is9_16 && !isMobile9_16 ? 'translate-y-8' : ''}`}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -367,7 +373,7 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
 
             {isFullScreen && (
                 <div className="fixed inset-0 z-[200] bg-black flex flex-col" onClick={(e) => e.stopPropagation()}>
-                    <div className={`absolute top-0 right-0 z-50 p-4 ${platform === 'android' ? 'pt-[calc(5rem+env(safe-area-inset-top))]' : 'pt-[calc(3rem+env(safe-area-inset-top))]'}`}>
+                    <div className={`absolute top-0 right-0 z-50 p-4 ${fullscreenCloseOffsetClass}`}>
                         <button
                             onClick={() => setIsFullScreen(false)}
                             className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md border border-white/10"
@@ -399,3 +405,4 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
         </div >
     )
 }
+

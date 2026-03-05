@@ -284,7 +284,7 @@ function AppLayout() {
     <div className={`${resolvedPlatform === 'android' ? 'pt-[calc(env(safe-area-inset-top)+24px)]' : ''} h-dvh flex flex-col overflow-hidden`}>
       <Header />
       <StartParamRouter />
-      <div className="flex-1 overflow-y-auto">
+      <div id="app-scroll-container" className="flex-1 overflow-y-auto">
         <Routes>
           {/* Public routes (viewable without auth, but need auth for actions) */}
           <Route path="/" element={<RequireAuth><PageErrorBoundary pageName="Студия"><Studio /></PageErrorBoundary></RequireAuth>} />
@@ -361,3 +361,4 @@ export default function App() {
     </CloudflareProxyProvider>
   );
 }
+

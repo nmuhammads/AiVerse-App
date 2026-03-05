@@ -1,6 +1,7 @@
 import React from 'react'
 import { FeedImage, type FeedItem } from '@/components/FeedImage'
 import { useTranslation } from 'react-i18next'
+import { useFeedColumns } from '@/lib/feedLayout'
 
 interface FeedGridProps {
     items: FeedItem[]
@@ -16,7 +17,7 @@ export const FeedGrid = React.memo(function FeedGrid({
     onRemix
 }: FeedGridProps) {
     const { t } = useTranslation()
-    const columns = viewMode === 'standard' ? 2 : 3
+    const columns = useFeedColumns(viewMode)
 
     if (items.length === 0) {
         return (
@@ -45,3 +46,4 @@ export const FeedGrid = React.memo(function FeedGrid({
         </div>
     )
 })
+
