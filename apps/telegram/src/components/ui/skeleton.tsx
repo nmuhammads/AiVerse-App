@@ -1,4 +1,5 @@
 import React from 'react'
+import { useFeedColumns } from '@/lib/feedLayout'
 
 interface SkeletonProps {
     className?: string
@@ -59,8 +60,8 @@ export const FeedImageSkeleton: React.FC<{ isCompact?: boolean }> = ({ isCompact
 
 // Grid of skeleton items for loading state
 export const FeedSkeletonGrid: React.FC<{ viewMode: 'standard' | 'compact' }> = ({ viewMode }) => {
-    const columns = viewMode === 'standard' ? 2 : 3
-    const itemsPerColumn = viewMode === 'standard' ? 3 : 3
+    const columns = useFeedColumns(viewMode)
+    const itemsPerColumn = 3
 
     return (
         <div className={`flex items-start ${viewMode === 'standard' ? 'gap-4' : 'gap-2'}`}>
@@ -100,10 +101,12 @@ export const ProfileImageSkeleton: React.FC = () => {
 // Grid of skeleton items for profile page (2 columns, 1:1 ratio)
 export const ProfileSkeletonGrid: React.FC<{ count?: number }> = ({ count = 6 }) => {
     return (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
             {Array.from({ length: count }).map((_, index) => (
                 <ProfileImageSkeleton key={index} />
             ))}
         </div>
     )
 }
+
+

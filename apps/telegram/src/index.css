@@ -204,6 +204,12 @@ body {
   padding-bottom: calc(8.5rem + env(safe-area-inset-bottom));
 }
 
+@media (min-width: 1024px) {
+  .safe-bottom-tabbar {
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Skeleton Shimmer Animation */
 @keyframes shimmer {
   0% {
@@ -319,3 +325,4 @@ body {
   left: 0;
   right: 0;
 }
+
