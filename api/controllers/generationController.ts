@@ -739,10 +739,12 @@ async function completeGeneration(
     // 4. Generate Thumbnail (Async, don't block response)
     // For videos: use first input image as thumbnail (more efficient than extracting from video)
     // For images: use the generated image itself
-    const isVideoModel = model === 'seedance-1.5-pro'
+    const isVideoModel = getMediaType(model) === 'video'
     const thumbnailSource = isVideoModel && inputImages && inputImages.length > 0
       ? inputImages[0]  // Use first input frame for video thumbnail
-      : imageUrl        // Use generated image for image thumbnail
+      : isVideoModel
+        ? null           // Video without input images — skip thumbnail (Sharp can't process .mp4)
+        : imageUrl       // Use generated image for image thumbnail
 
     if (thumbnailSource) {
       createThumbnail(thumbnailSource, thumbnailSource, `gen_${generationId}_thumb.jpg`).catch(err => {
@@ -751,6 +753,8 @@ async function completeGeneration(
       if (isVideoModel) {
         console.log(`[Thumbnail] Creating video thumbnail from input image for ${generationId}`)
       }
+    } else if (isVideoModel) {
+      console.log(`[Thumbnail] Skipping thumbnail for video gen ${generationId} — no input images available`)
     }
 
   } catch (e) {
@@ -1300,6 +1304,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
       await new Promise(resolve => setTimeout(resolve, 10000)) // Simulate delay
 
       const mockImage = 'https://placehold.co/1024x1024/png?text=Test+Generation'
+      const mediaType = getMediaType(model)
 
       // Simulate Telegram Notification
       if (user_id) {
@@ -1314,8 +1319,12 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
       return res.json({
         image: mockImage,
+        images: [mockImage],
         prompt: prompt,
-        model: model
+        model: model,
+        generation_ids: [],
+        primary_generation_id: null,
+        media_type: mediaType,
       })
     }
 
@@ -1432,6 +1441,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
 
     // Create Pending Generation Record
     let generationId = 0
+    const createdGenerationIds: number[] = []
     let r2Images: string[] = []
 
     if (user_id && Number(user_id)) {
@@ -1483,6 +1493,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
       const genRes = await supaPost('generations', genBody)
       if (genRes.ok && Array.isArray(genRes.data) && genRes.data.length > 0) {
         generationId = genRes.data[0].id
+        createdGenerationIds.push(generationId)
         console.log('[DB] Pending generation created, ID:', generationId)
 
         // Register prompt for authorship tracking (async, don't wait)
@@ -1612,9 +1623,13 @@ export async function handleGenerateImage(req: Request, res: Response) {
     // Если все запросы завершились таймаутом
     if (successfulImages.length === 0 && hasTimeout) {
       console.log('[API] All generations timed out, generationId:', generationId)
+      const mediaType = getMediaType(model)
       return res.json({
         status: 'pending',
         generationId: generationId,
+        generation_ids: createdGenerationIds,
+        primary_generation_id: generationId || createdGenerationIds[0] || null,
+        media_type: mediaType,
         message: 'Генерация занимает больше времени. Результат будет в профиле или токены вернутся.'
       })
     }
@@ -1686,6 +1701,7 @@ export async function handleGenerateImage(req: Request, res: Response) {
         let extraGenId = 0
         if (extraGenRes.ok && Array.isArray(extraGenRes.data) && extraGenRes.data.length > 0) {
           extraGenId = extraGenRes.data[0].id
+          createdGenerationIds.push(extraGenId)
         }
         console.log(`[DB] Created extra generation record for image ${i + 1}`)
 
@@ -1731,7 +1747,10 @@ export async function handleGenerateImage(req: Request, res: Response) {
       image: successfulImages[0], // Обратная совместимость
       images: successfulImages,   // Новый формат для множественной генерации
       prompt: prompt,
-      model: model
+      model: model,
+      generation_ids: createdGenerationIds,
+      primary_generation_id: generationId || createdGenerationIds[0] || null,
+      media_type: getMediaType(model),
     })
 
   } catch (error) {

@@ -42,7 +42,8 @@ export default function Home() {
         sort,
         modelFilter: selectedModelFilter,
         viewMode,
-        feedFilter
+        feedFilter,
+        scrollContainerId: 'app-scroll-container'
     })
 
     const { results: userSearchResults, isSearching } = useUserSearch(
@@ -93,7 +94,11 @@ export default function Home() {
         navigate(`/profile/${userId}`)
     }
 
-    const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 60px)' : 'calc(env(safe-area-inset-top) + 50px)'
+    const paddingTop = platform === 'ios'
+        ? 'calc(env(safe-area-inset-top) + 60px)'
+        : platform === 'android'
+            ? 'calc(env(safe-area-inset-top) + 50px)'
+            : '64px'
 
     return (
         <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
@@ -102,7 +107,7 @@ export default function Home() {
                 description="Explore AI-generated images and videos created by the AiVerse community. Get inspired, like and share creative AI art."
                 path="/home"
             />
-            <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
+            <div className="mx-auto w-full max-w-[1760px] px-4 lg:px-6 xl:px-8 py-4 space-y-4">
                 <div className="px-1">
                     {/* Header or Search */}
                     {!isSearchOpen ? (
@@ -133,7 +138,7 @@ export default function Home() {
 
                     {/* Content */}
                     {isSearchOpen && searchMode === 'users' ? (
-                        <div className="pb-20">
+                        <div className="pb-20 lg:pb-16">
                             <UserSearchResults
                                 results={userSearchResults}
                                 isSearching={isSearching}
@@ -142,11 +147,11 @@ export default function Home() {
                             />
                         </div>
                     ) : loading ? (
-                        <div className="pb-20">
+                        <div className="pb-20 lg:pb-16">
                             <FeedSkeletonGrid viewMode={viewMode} />
                         </div>
                     ) : (
-                        <div className="pb-20">
+                        <div className="pb-20 lg:pb-16">
                             <FeedGrid
                                 items={filteredItems}
                                 viewMode={viewMode}
@@ -175,3 +180,4 @@ export default function Home() {
         </div>
     )
 }
+

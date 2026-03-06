@@ -5,15 +5,28 @@ import app from './app.js';
  * start server with port
  */
 const PORT = parseInt(process.env.PORT || '3001', 10);
+const NODE_ENV = (process.env.NODE_ENV || 'development').toLowerCase();
+
+function parseBooleanEnv(value: string | undefined): boolean | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return null;
+}
+
+const webhookOnStartOverride = parseBooleanEnv(process.env.TELEGRAM_WEBHOOK_ON_START);
+const shouldSetupWebhookOnStartup = webhookOnStartOverride ?? (NODE_ENV !== 'development');
 
 console.log(`Starting server on port ${PORT}...`);
-console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`Environment: ${NODE_ENV}`);
 console.log('Loaded Env Vars:', Object.keys(process.env).filter(k => !k.startsWith('npm_')));
 
 const r2Configured = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME && process.env.R2_PUBLIC_URL
 console.log('R2 Storage Configured:', r2Configured ? 'Yes' : 'No (Check environment variables)')
 
 import { registerBotCommands, setupMenuButton, setupWebhook, logBotInfo } from './controllers/telegramController.js';
+import { markStaleWorkflowRunsAsFailed } from './services/workflowExecutorService.js';
 
 // Initialize Telegram bot with retry logic
 async function initTelegramBot(retries = 3, delayMs = 5000) {
@@ -21,7 +34,11 @@ async function initTelegramBot(retries = 3, delayMs = 5000) {
     try {
       console.log(`[TelegramInit] Attempt ${attempt}/${retries}...`);
       await registerBotCommands();
-      await setupWebhook();
+      if (shouldSetupWebhookOnStartup) {
+        await setupWebhook();
+      } else {
+        console.log('[TelegramInit] Skipping webhook setup on startup (local dev mode).');
+      }
       await setupMenuButton();
       await logBotInfo();
       console.log('[TelegramInit] Successfully initialized Telegram bot');
@@ -43,6 +60,17 @@ async function initTelegramBot(retries = 3, delayMs = 5000) {
 initTelegramBot().catch(err => {
   console.error('[TelegramInit] Unhandled error:', err);
 });
+
+markStaleWorkflowRunsAsFailed()
+  .then((count) => {
+    if (count > 0) {
+      console.log(`[WorkflowInit] Marked ${count} stale workflow runs as failed`);
+    }
+  })
+  .catch((err) => {
+    console.error('[WorkflowInit] Failed to mark stale runs:', err);
+  });
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server ready on port ${PORT}`);
   console.log(`Health check available at: http://0.0.0.0:${PORT}/api/health`);

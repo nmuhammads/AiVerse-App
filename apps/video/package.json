@@ -1,0 +1,27 @@
+{
+  "name": "@aiverse/video",
+  "version": "1.0.0",
+  "description": "AiVerse promotional video made with Remotion",
+  "remotion": {
+    "entryPoint": "src/index.ts"
+  },
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "build": "remotion render src/index.ts AiVerseIntro out/aiverse-intro.mp4",
+    "render": "remotion render src/index.ts AiVerseIntro out/aiverse-intro.mp4"
+  },
+  "dependencies": {
+    "@remotion/google-fonts": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-qr-code": "^2.0.18",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -17,3 +17,5 @@ export interface Generation {
     model: string;
     created_at: string;
 }
+
+export * from './workflow'

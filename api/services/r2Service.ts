@@ -400,6 +400,44 @@ export async function uploadVideoFromBase64(
     }
 }
 
+export async function uploadVideoBuffer(
+    buffer: Buffer,
+    options: {
+        folder?: string
+        fileName?: string
+        bucket?: string
+        publicUrl?: string
+        contentType?: string
+    } = {}
+): Promise<string> {
+    const {
+        folder = '',
+        fileName,
+        bucket,
+        publicUrl: customUrl,
+        contentType = 'video/mp4',
+    } = options
+    const R2_BUCKET_NAME = bucket || process.env.R2_BUCKET_VIDEO_REFS
+    const R2_PUBLIC_URL = customUrl || process.env.R2_PUBLIC_URL_VIDEO_REFS
+    const client = getVideoS3Client()
+
+    if (!client || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
+        throw new Error('R2 Video configuration missing for buffer upload')
+    }
+
+    const generatedName = fileName || `${crypto.randomBytes(16).toString('hex')}.mp4`
+    const key = folder ? `${folder}/${generatedName}` : generatedName
+
+    await client.send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+    }))
+
+    return `${R2_PUBLIC_URL}/${key}`
+}
+
 export async function uploadImageToVideoBucket(
     base64Data: string,
     folder: string = '',

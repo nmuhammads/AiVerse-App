@@ -297,6 +297,20 @@ export default function Profile() {
 
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [scale, setScale] = useState(1)
+  const [previewMediaAspect, setPreviewMediaAspect] = useState<number | null>(null)
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 0 : window.innerWidth
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const onResize = () => setViewportWidth(window.innerWidth)
+    onResize()
+    window.addEventListener('resize', onResize)
+
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // Reset scale when closing fullscreen
   useEffect(() => {
@@ -306,6 +320,7 @@ export default function Profile() {
   // Reset showPrompt when preview changes
   useEffect(() => {
     setShowPrompt(false)
+    setPreviewMediaAspect(null)
   }, [preview])
 
   // Reload data when filters change
@@ -562,7 +577,26 @@ export default function Profile() {
     { label: t('profile.stats.likes'), value: likes },
     { label: t('profile.stats.remixes'), value: remixCount },
   ]
-  const paddingTop = platform === 'ios' ? 'calc(env(safe-area-inset-top) + 60px)' : 'calc(env(safe-area-inset-top) + 50px)'
+  const isMobile = platform === 'ios' || platform === 'android'
+  const isDesktop = !isMobile
+  const isCompactViewport = viewportWidth > 0 && viewportWidth < 1024
+  const isMobileLayout = isMobile || isCompactViewport
+  const isTallPreviewRatioFromPrompt = !!preview && (
+    /ratio\s*=\s*9:(16|21)/.test(preview.prompt || '') ||
+    /portrait_16_9|portrait_21_9/.test(preview.prompt || '')
+  )
+  const isTallPreviewRatioFromMedia = previewMediaAspect !== null && previewMediaAspect < 0.72
+  const useTallRatioPillarbox = isMobileLayout && (isTallPreviewRatioFromPrompt || isTallPreviewRatioFromMedia)
+  const paddingTop = platform === 'ios'
+    ? 'calc(env(safe-area-inset-top) + 60px)'
+    : platform === 'android'
+      ? 'calc(env(safe-area-inset-top) + 50px)'
+      : '64px'
+  const fullscreenCloseOffsetClass = platform === 'android'
+    ? 'pt-[calc(5rem+env(safe-area-inset-top))]'
+    : platform === 'ios'
+      ? 'pt-[calc(3rem+env(safe-area-inset-top))]'
+      : 'pt-4'
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [showRemixShareConfirm, setShowRemixShareConfirm] = useState(false)
@@ -726,7 +760,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-dvh bg-black safe-bottom-tabbar" style={{ paddingTop }}>
-      <div className="mx-auto max-w-3xl px-4 py-4 space-y-6">
+      <div className="mx-auto w-full max-w-[1760px] px-4 lg:px-6 xl:px-8 py-4 space-y-6">
 
         <div
           className="relative overflow-hidden rounded-[2rem] bg-zinc-900/90 border border-white/5 p-5 shadow-2xl transition-all duration-500"
@@ -1140,7 +1174,7 @@ export default function Profile() {
           ) : (
             <>
               <div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                   {items.filter(h => !!(h.image_url || h.video_url || (h.media_type === 'video' && h.input_images && h.input_images.length > 0))).map((h, idx) => (
                     <div key={h.id} className="group relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
                       <button onClick={() => { setCurrentGenerationIndex(idx); setPreviewIndex(0); setPreview({ id: h.id, image_url: h.image_url || '', video_url: h.video_url, prompt: h.prompt, is_published: h.is_published, is_prompt_private: h.is_prompt_private, model: h.model, edit_variants: h.edit_variants, media_type: h.media_type, input_images: h.input_images }) }} className="block w-full">
@@ -1183,11 +1217,11 @@ export default function Profile() {
                 )}
               </div>
               {preview && (
-                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={(e) => { if (e.target === e.currentTarget) { setPreview(null); setCurrentGenerationIndex(null) } }}>
-                  <div className={`relative w-full max-w-3xl ${platform === 'ios' ? 'mt-16' : ''}`}>
+                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-start lg:items-center justify-center overflow-y-auto p-2 min-[590px]:p-4 lg:p-6" onClick={(e) => { if (e.target === e.currentTarget) { setPreview(null); setCurrentGenerationIndex(null) } }}>
+                  <div className={`relative w-full ${isDesktop ? 'max-w-6xl' : 'max-w-3xl'} ${platform === 'ios' ? 'mt-16' : ''} max-h-[calc(100dvh-0.75rem)] min-[590px]:max-h-[calc(100dvh-1.5rem)] overflow-y-auto`}>
                     {/* Top buttons outside modal for video - positioned above the modal */}
                     {preview.media_type === 'video' && (
-                      <div className="flex justify-between items-center px-2 pb-3">
+                      <div className="flex justify-between items-center px-2 pb-3 lg:px-4">
                         <button
                           onClick={() => {
                             impact('light')
@@ -1224,14 +1258,20 @@ export default function Profile() {
                         </button>
                         <button
                           onClick={() => { setPreview(null); setCurrentGenerationIndex(null) }}
-                          className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white shadow-lg border border-white/10"
+                          className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white shadow-lg border border-white/10 lg:hidden"
                         >
                           <X size={20} />
                         </button>
                       </div>
                     )}
-                    <div className="bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden">
-                      <div className="relative w-full aspect-square bg-black">
+                    <div className="relative bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:max-h-[calc(100dvh-2rem)]">
+                      <button
+                        onClick={() => { setPreview(null); setCurrentGenerationIndex(null) }}
+                        className="hidden lg:flex absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 items-center justify-center text-white shadow-lg border border-white/10"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className={`relative w-full bg-black flex-shrink-0 ${isMobileLayout ? (useTallRatioPillarbox ? 'h-[42dvh] min-[590px]:h-[46dvh]' : 'h-[44dvh] min-[590px]:h-[50dvh]') : 'h-full'} lg:aspect-auto lg:h-full`}>
                         {/* Top buttons with better contrast - only for images */}
                         {preview.media_type !== 'video' && (
                           <div className="absolute top-0 left-0 right-0 px-2 pt-2 flex justify-between items-start z-20 pointer-events-none">
@@ -1372,43 +1412,57 @@ export default function Profile() {
                           <ChevronRight size={24} />
                         </button>
                         {/* Media content - video or image */}
-                        {preview.media_type === 'video' && preview.video_url ? (
-                          <>
-                            {console.log('[Profile Video]', { media_type: preview.media_type, video_url: preview.video_url })}
-                            <video
-                              src={preview.video_url}
-                              controls
-                              loop
-                              muted={isVideoMuted}
-                              playsInline
+                        <div className={`${useTallRatioPillarbox ? 'mx-auto h-full w-[64%] min-w-[180px] max-w-[320px] min-[590px]:w-[58%] min-[590px]:max-w-[360px]' : 'w-full h-full'}`}>
+                          {preview.media_type === 'video' && preview.video_url ? (
+                            <>
+                              {console.log('[Profile Video]', { media_type: preview.media_type, video_url: preview.video_url })}
+                              <video
+                                src={preview.video_url}
+                                controls
+                                loop
+                                muted={isVideoMuted}
+                                playsInline
+                                className="w-full h-full object-contain"
+                                onLoadedMetadata={(e) => {
+                                  const video = e.currentTarget
+                                  if (video.videoWidth && video.videoHeight) {
+                                    setPreviewMediaAspect(video.videoWidth / video.videoHeight)
+                                  }
+                                }}
+                                onLoadStart={() => console.log('[Profile Video] Load started, url:', preview.video_url)}
+                                onLoadedData={() => console.log('[Profile Video] Data loaded successfully')}
+                                onCanPlay={() => console.log('[Profile Video] Can play now')}
+                                onError={(e) => {
+                                  const video = e.currentTarget
+                                  console.error('[Profile Video] Error:', {
+                                    url: preview.video_url,
+                                    errorCode: video.error?.code,
+                                    errorMsg: video.error?.message,
+                                    networkState: video.networkState,
+                                    readyState: video.readyState
+                                  })
+                                }}
+                              />
+                            </>
+                          ) : (
+                            <img
+                              src={preview.edit_variants && preview.edit_variants.length > 0
+                                ? [preview.image_url, ...preview.edit_variants][previewIndex]
+                                : preview.image_url
+                              }
+                              alt="Preview"
                               className="w-full h-full object-contain"
-                              onLoadStart={() => console.log('[Profile Video] Load started, url:', preview.video_url)}
-                              onLoadedData={() => console.log('[Profile Video] Data loaded successfully')}
-                              onCanPlay={() => console.log('[Profile Video] Can play now')}
-                              onError={(e) => {
-                                const video = e.currentTarget
-                                console.error('[Profile Video] Error:', {
-                                  url: preview.video_url,
-                                  errorCode: video.error?.code,
-                                  errorMsg: video.error?.message,
-                                  networkState: video.networkState,
-                                  readyState: video.readyState
-                                })
+                              onLoad={(e) => {
+                                const img = e.currentTarget
+                                if (img.naturalWidth && img.naturalHeight) {
+                                  setPreviewMediaAspect(img.naturalWidth / img.naturalHeight)
+                                }
                               }}
                             />
-                          </>
-                        ) : (
-                          <img
-                            src={preview.edit_variants && preview.edit_variants.length > 0
-                              ? [preview.image_url, ...preview.edit_variants][previewIndex]
-                              : preview.image_url
-                            }
-                            alt="Preview"
-                            className="w-full h-full object-contain"
-                          />
-                        )}
+                          )}
+                        </div>
                       </div>
-                      <div className="p-4 flex flex-col gap-3">
+                      <div className={`p-4 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto ${isMobileLayout ? 'pb-[calc(env(safe-area-inset-bottom)+1rem)]' : 'lg:pb-4'}`}>
                         {/* Send to Chat Section */}
                         <div className="border border-white/10 rounded-xl p-3 space-y-2">
                           <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{t('profile.preview.sendToSection')}</h4>
@@ -1781,7 +1835,7 @@ export default function Profile() {
 
               {isFullScreen && preview && (
                 <div className="fixed inset-0 z-[200] bg-black flex flex-col">
-                  <div className={`absolute top-0 right-0 z-50 p-4 ${platform === 'android' ? 'pt-[calc(5rem+env(safe-area-inset-top))]' : 'pt-[calc(3rem+env(safe-area-inset-top))]'}`}>
+                  <div className={`absolute top-0 right-0 z-50 p-4 ${fullscreenCloseOffsetClass}`}>
                     <button
                       onClick={() => setIsFullScreen(false)}
                       className="w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
