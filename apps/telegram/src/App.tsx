@@ -36,11 +36,18 @@ import { DebugOverlay } from "@/components/DebugOverlay";
 import { AIChatOverlay } from "@/components/AIChatOverlay";
 import { AIFloatingButton } from "@/components/AIFloatingButton";
 import { useAuthStore } from "@/store/authStore";
-import { useState } from "react";
 
 // Check if running inside Telegram WebApp
 function isInTelegramWebApp(): boolean {
   return !!(WebApp.initData && WebApp.initDataUnsafe?.user);
+}
+
+function parseEnvBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (value == null) return defaultValue
+  const normalized = String(value).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+  return defaultValue
 }
 
 // Protected route component - redirects to login if not authenticated
@@ -232,7 +239,7 @@ function AppLayout() {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login' || location.pathname === '/landing' || location.pathname.startsWith('/auth/') || location.pathname.startsWith('/payment/') || location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/faq';
   const inTelegram = isInTelegramWebApp();
-  const [workflowEnabled, setWorkflowEnabled] = useState(true);
+  const workflowEnabled = parseEnvBoolean(import.meta.env.VITE_WORKFLOW_SCREEN_ENABLED, true)
 
   // Initialize auth state
   useEffect(() => {
@@ -254,28 +261,6 @@ function AppLayout() {
       }
     }
   }, [inTelegram]);
-
-  useEffect(() => {
-    let isMounted = true
-    const loadPublicConfig = async () => {
-      try {
-        const response = await fetch('/api/app-config/public')
-        if (!response.ok) return
-        const data = await response.json().catch(() => null) as { workflow_screen_enabled?: boolean } | null
-        if (isMounted && typeof data?.workflow_screen_enabled === 'boolean') {
-          setWorkflowEnabled(data.workflow_screen_enabled)
-        }
-      } catch {
-        // Keep default enabled=true on network errors.
-      }
-    }
-
-    void loadPublicConfig()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   // Check for payment result pages
   const isPaymentResultPage = location.pathname.startsWith('/payment/');

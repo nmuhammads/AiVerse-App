@@ -30,7 +30,6 @@ import chatRoutes from './routes/chat.js'
 import tributeRoutes from './routes/tribute.js'
 import avatarRoutes from './routes/avatars.js'
 import workflowsRoutes from './routes/workflows.js'
-import appConfigRoutes from './routes/app-config.js'
 
 
 // load env
@@ -108,7 +107,6 @@ app.use('/api/chat', chatRoutes)
 app.use('/api/tribute', tributeRoutes)
 app.use('/api/avatars', avatarRoutes)
 app.use('/api/workflows', workflowsRoutes)
-app.use('/api/app-config', appConfigRoutes)
 
 // PiAPI Webhook (direct import to avoid circular dependency)
 import { handlePiapiWebhook } from './controllers/generationController.js'
