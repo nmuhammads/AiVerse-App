@@ -44,7 +44,8 @@ function isInTelegramWebApp(): boolean {
 
 function parseEnvBoolean(value: unknown, defaultValue: boolean): boolean {
   if (value == null) return defaultValue
-  const normalized = String(value).trim().toLowerCase()
+  const raw = String(value).trim()
+  const normalized = raw.replace(/^['"]+|['"]+$/g, '').toLowerCase()
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false
   return defaultValue
