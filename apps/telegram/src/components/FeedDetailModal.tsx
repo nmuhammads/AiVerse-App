@@ -52,6 +52,7 @@ function getModelDisplayName(model: string | null): string {
         case 'nanobanana': return 'NanoBanana'
         case 'nanobanana-pro': return 'NanoBanana Pro'
         case 'nanobanana-2': return 'NanoBanana 2'
+        case 'gemini-3.1-flash-image-preview': return 'NanoBanana 2'
         case 'seedream4': return 'Seedream 4'
         case 'seedream4-5': return 'Seedream 4.5'
         case 'seedream4.5': return 'Seedream 4.5'
@@ -405,4 +406,3 @@ export function FeedDetailModal({ item, onClose, onRemix, onLike, onPrevGenerati
         </div >
     )
 }
-
