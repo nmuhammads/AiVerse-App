@@ -30,6 +30,7 @@ import type {
 } from '@aiverse/shared/types/workflow'
 import {
   createWorkflowTemplate,
+  deleteWorkflowTemplate,
   getWorkflowRun,
   listWorkflowTemplates,
   patchWorkflowTemplate,
@@ -48,6 +49,27 @@ import {
 } from '@/components/workflow/workflowUtils'
 import { WorkflowNodeCard } from '@/components/workflow/WorkflowNodeCard'
 import { NodeSettings } from '@/components/workflow/NodeSettings'
+import { BottomSheet } from '@/components/workflow/BottomSheet'
+import { MobileHeaderMenu } from '@/components/workflow/MobileHeaderMenu'
+import { resolvedPlatform } from '@/utils/platform'
+
+type MobileSheet = 'none' | 'library' | 'inspector' | 'templates' | 'rename'
+
+const DEFAULT_WORKFLOW_NAME = 'Пайплайн фото в видео'
+
+function cloneGraph(graph: WorkflowGraph): WorkflowGraph {
+  return {
+    nodes: graph.nodes.map((node) => ({
+      ...node,
+      position: node.position ? { ...node.position } : undefined,
+      data: node.data ? { ...node.data } : undefined,
+    })),
+    edges: graph.edges.map((edge) => ({
+      ...edge,
+      data: edge.data ? { ...edge.data } : undefined,
+    })),
+  }
+}
 
 export default function WorkflowPage() {
   const navigate = useNavigate()
@@ -78,11 +100,21 @@ export default function WorkflowPage() {
   const [uploadingNodeId, setUploadingNodeId] = useState<string | null>(null)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showInspector, setShowInspector] = useState(false)
-  const [workflowName, setWorkflowName] = useState('Пайплайн фото в видео')
+  const [activeMobileSheet, setActiveMobileSheet] = useState<MobileSheet>('none')
+  const [workflowName, setWorkflowName] = useState(DEFAULT_WORKFLOW_NAME)
   const [isMobileViewport, setIsMobileViewport] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1024 : false))
+  const [templateRenameId, setTemplateRenameId] = useState<number | null>(null)
+  const [templateRenameValue, setTemplateRenameValue] = useState('')
+  const [templateDeleteId, setTemplateDeleteId] = useState<number | null>(null)
+  const [isTemplateActionLoading, setIsTemplateActionLoading] = useState(false)
+  const [renameDraftValue, setRenameDraftValue] = useState('')
+  const [inspectorMaxHeight, setInspectorMaxHeight] = useState<number | null>(null)
 
   const isGraphSyncingRef = useRef(false)
+  const workflowCanvasRef = useRef<HTMLElement | null>(null)
   const isRunning = runStatus === 'running' || runStatus === 'queued'
+  const aboveTabbarClass = resolvedPlatform === 'android' ? 'above-tabbar-android' : 'above-tabbar-ios'
+  const tabbarOffsetVar = resolvedPlatform === 'android' ? 'var(--tabbar-offset-android)' : 'var(--tabbar-offset-ios)'
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>(
     graphToFlowNodes(graph, selectedNodeId, run)
@@ -95,6 +127,47 @@ export default function WorkflowPage() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  useEffect(() => {
+    if (!isMobileViewport) {
+      setActiveMobileSheet('none')
+    }
+  }, [isMobileViewport])
+
+  useEffect(() => {
+    if (!isMobileViewport) {
+      setInspectorMaxHeight(null)
+      return
+    }
+
+    const measureInspectorHeight = () => {
+      const canvas = workflowCanvasRef.current
+      if (!canvas) return
+
+      const canvasTop = Math.max(0, canvas.getBoundingClientRect().top)
+      const probe = document.createElement('div')
+      probe.className = aboveTabbarClass
+      probe.style.position = 'fixed'
+      probe.style.left = '0'
+      probe.style.bottom = '0'
+      probe.style.visibility = 'hidden'
+      probe.style.pointerEvents = 'none'
+      document.body.appendChild(probe)
+      const bottomOffset = Number.parseFloat(window.getComputedStyle(probe).bottom || '0') || 0
+      document.body.removeChild(probe)
+
+      const available = Math.round(window.innerHeight - canvasTop - bottomOffset)
+      setInspectorMaxHeight(Math.max(320, available))
+    }
+
+    measureInspectorHeight()
+    window.addEventListener('resize', measureInspectorHeight)
+    window.addEventListener('scroll', measureInspectorHeight, { passive: true })
+    return () => {
+      window.removeEventListener('resize', measureInspectorHeight)
+      window.removeEventListener('scroll', measureInspectorHeight)
+    }
+  }, [aboveTabbarClass, isMobileViewport])
+
   const loadTemplates = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -104,13 +177,16 @@ export default function WorkflowPage() {
       if (items.length > 0) {
         const first = items[0]
         setActiveTemplateId(first.id)
-        setGraph(first.graph)
+        setGraph(cloneGraph(first.graph))
         setWorkflowName(first.name)
+        setSelectedNodeId(first.graph.nodes[0]?.id || null)
         setDirty(false)
       } else {
+        const defaultGraph = cloneGraph(getDefaultWorkflowGraph())
         setActiveTemplateId(null)
-        setGraph(getDefaultWorkflowGraph())
-        setWorkflowName('Пайплайн фото в видео')
+        setGraph(defaultGraph)
+        setWorkflowName(DEFAULT_WORKFLOW_NAME)
+        setSelectedNodeId(defaultGraph.nodes[0]?.id || null)
         setDirty(true)
       }
     } catch (error) {
@@ -119,7 +195,7 @@ export default function WorkflowPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [setActiveTemplateId, setDirty, setGraph, setTemplates])
+  }, [setActiveTemplateId, setDirty, setGraph, setSelectedNodeId, setTemplates])
 
   useEffect(() => {
     void loadTemplates()
@@ -278,10 +354,11 @@ export default function WorkflowPage() {
   const handleNodeClick = useCallback(
     (_: unknown, node: Node<FlowNodeData>) => {
       setSelectedNodeId(node.id)
-      setShowInspector(true)
       if (isMobileViewport) {
-        setShowLibrary(false)
+        setActiveMobileSheet('inspector')
+        return
       }
+      setShowInspector(true)
     },
     [isMobileViewport, setSelectedNodeId]
   )
@@ -291,13 +368,19 @@ export default function WorkflowPage() {
   }, [setSelectedNodeId])
 
   const handleToggleLibrary = () => {
+    if (isMobileViewport) {
+      setActiveMobileSheet((value) => (value === 'library' ? 'none' : 'library'))
+      return
+    }
     setShowLibrary((value) => !value)
-    if (isMobileViewport) setShowInspector(false)
   }
 
   const handleToggleInspector = () => {
+    if (isMobileViewport) {
+      setActiveMobileSheet((value) => (value === 'inspector' ? 'none' : 'inspector'))
+      return
+    }
     setShowInspector((value) => !value)
-    if (isMobileViewport) setShowLibrary(false)
   }
 
   const handleAddNode = (type: WorkflowNode['type']) => {
@@ -347,8 +430,11 @@ export default function WorkflowPage() {
     setGraph(nextGraph)
     setSelectedNodeId(nodeId)
     setDirty(true)
-    setShowInspector(true)
-    if (isMobileViewport) setShowLibrary(false)
+    if (isMobileViewport) {
+      setActiveMobileSheet('inspector')
+    } else {
+      setShowInspector(true)
+    }
   }
 
   const handleDeleteSelectedNode = () => {
@@ -427,6 +513,103 @@ export default function WorkflowPage() {
     [updateNodeData]
   )
 
+  const closeMobileSheet = useCallback(() => {
+    setActiveMobileSheet('none')
+    setTemplateRenameId(null)
+    setTemplateRenameValue('')
+    setTemplateDeleteId(null)
+  }, [])
+
+  const createNewDraft = useCallback(() => {
+    const nextGraph = cloneGraph(getDefaultWorkflowGraph())
+    setGraph(nextGraph)
+    setActiveTemplateId(null)
+    setWorkflowName(DEFAULT_WORKFLOW_NAME)
+    setDirty(true)
+    setRun(null)
+    setActiveRun(null, null)
+    setSelectedNodeId(nextGraph.nodes[0]?.id || null)
+  }, [setActiveRun, setActiveTemplateId, setDirty, setGraph, setRun, setSelectedNodeId])
+
+  const handleCreateTemplateDraft = useCallback(() => {
+    createNewDraft()
+    toast.success('Создан новый черновик')
+  }, [createNewDraft])
+
+  const handleStartTemplateRename = useCallback((templateId: number, currentName: string) => {
+    setTemplateRenameId(templateId)
+    setTemplateRenameValue(currentName)
+  }, [])
+
+  const handleSubmitTemplateRename = useCallback(async (templateId: number) => {
+    const nextName = templateRenameValue.trim()
+    if (!nextName) {
+      toast.error('Введите название шаблона')
+      return
+    }
+
+    setIsTemplateActionLoading(true)
+    try {
+      const updated = await patchWorkflowTemplate(templateId, { name: nextName })
+      setTemplates(templates.map((item) => (item.id === updated.id ? updated : item)))
+      if (activeTemplateId === updated.id) {
+        setWorkflowName(updated.name)
+      }
+      setTemplateRenameId(null)
+      setTemplateRenameValue('')
+      toast.success('Шаблон переименован')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось переименовать шаблон')
+    } finally {
+      setIsTemplateActionLoading(false)
+    }
+  }, [activeTemplateId, setTemplates, templateRenameValue, templates])
+
+  const handleDeleteTemplate = useCallback(async (templateId: number) => {
+    setIsTemplateActionLoading(true)
+    try {
+      await deleteWorkflowTemplate(templateId)
+      const remaining = templates.filter((item) => item.id !== templateId)
+      setTemplates(remaining)
+      setTemplateDeleteId(null)
+
+      if (remaining.length === 0) {
+        createNewDraft()
+      } else if (activeTemplateId === templateId) {
+        const first = remaining[0]
+        setActiveTemplateId(first.id)
+        setGraph(cloneGraph(first.graph))
+        setWorkflowName(first.name)
+        setDirty(false)
+        setRun(null)
+        setActiveRun(null, null)
+        setSelectedNodeId(first.graph.nodes[0]?.id || null)
+      }
+
+      toast.success('Шаблон удален')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось удалить шаблон')
+    } finally {
+      setIsTemplateActionLoading(false)
+    }
+  }, [activeTemplateId, createNewDraft, setActiveRun, setActiveTemplateId, setDirty, setGraph, setRun, setSelectedNodeId, setTemplates, templates])
+
+  const handleOpenRenameSheet = useCallback(() => {
+    setRenameDraftValue(workflowName)
+    setActiveMobileSheet('rename')
+  }, [workflowName])
+
+  const handleApplyLocalRename = useCallback(() => {
+    const nextName = renameDraftValue.trim()
+    if (!nextName) {
+      toast.error('Введите название сценария')
+      return
+    }
+    setWorkflowName(nextName)
+    setDirty(true)
+    closeMobileSheet()
+  }, [closeMobileSheet, renameDraftValue, setDirty])
+
   const saveCurrentTemplate = useCallback(async (): Promise<number | null> => {
     setIsSaving(true)
     try {
@@ -497,11 +680,12 @@ export default function WorkflowPage() {
     if (!selectedTemplate) return
 
     setActiveTemplateId(selectedTemplate.id)
-    setGraph(selectedTemplate.graph)
+    setGraph(cloneGraph(selectedTemplate.graph))
     setWorkflowName(selectedTemplate.name)
     setDirty(false)
     setRun(null)
     setActiveRun(null, null)
+    setSelectedNodeId(selectedTemplate.graph.nodes[0]?.id || null)
   }
 
   const activeTemplateLabel = activeTemplateId ? `Сценарий #${activeTemplateId}` : 'Черновик'
@@ -509,121 +693,112 @@ export default function WorkflowPage() {
   return (
     <div className="min-h-full bg-black pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[calc(env(safe-area-inset-top)+74px)] text-zinc-100 lg:pb-6 lg:pt-4">
       <div className="mx-auto w-full max-w-[1540px] px-3 py-3 sm:px-6 sm:py-6">
-        <header className="rounded-2xl border border-white/10 bg-black/55 px-4 py-3 backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-[260px]">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">Конструктор сценариев</p>
-              <input
-                value={workflowName}
-                onChange={(event) => {
-                  setWorkflowName(event.target.value)
-                  setDirty(true)
-                }}
-                className="mt-1 w-full max-w-[520px] border-none bg-transparent p-0 text-lg font-semibold text-white outline-none sm:text-xl"
-                placeholder="Название сценария"
-              />
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                <span>{activeTemplateLabel}</span>
-                {dirty ? <span className="text-amber-300">есть несохраненные изменения</span> : null}
-                {templates.length > 0 ? (
-                  <select
-                    value={activeTemplateId ?? ''}
-                    onChange={(event) => handleSelectTemplate(event.target.value)}
-                    className="rounded-lg border border-white/10 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200"
-                  >
-                    {templates.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-              </div>
-            </div>
-
+        {isMobileViewport ? (
+          <header className="relative z-[70] rounded-2xl border border-white/10 bg-black/55 px-3 py-2.5 backdrop-blur-xl">
             <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-white">{workflowName || DEFAULT_WORKFLOW_NAME}</p>
+                <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+                  {activeTemplateLabel}
+                  {dirty ? ' • несохранено' : ''}
+                </p>
+              </div>
               <button
-                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                  showLibrary
-                    ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
-                    : 'border-white/10 bg-zinc-900/75 text-zinc-200 hover:bg-zinc-900'
-                }`}
-                onClick={handleToggleLibrary}
-              >
-                <PanelLeft className="h-3.5 w-3.5" />
-                Ноды
-              </button>
-              <button
-                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                  showInspector
-                    ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
-                    : 'border-white/10 bg-zinc-900/75 text-zinc-200 hover:bg-zinc-900'
-                }`}
-                onClick={handleToggleInspector}
-              >
-                <PanelRight className="h-3.5 w-3.5" />
-                Настройки
-              </button>
-              <button
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/75 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-60"
-                onClick={handleSave}
-                disabled={isSaving || isLoading}
-              >
-                <Save className="h-3.5 w-3.5" />
-                Сохранить
-              </button>
-              <button
-                className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/75 bg-cyan-500/20 px-3 py-2 text-xs font-semibold text-cyan-100 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-400/75 bg-cyan-500/20 px-3 py-2 text-xs font-semibold text-cyan-100 disabled:opacity-60"
                 onClick={isRunning ? undefined : handleRun}
                 disabled={isRunningAction || isLoading}
               >
                 {isRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                {isRunning ? 'Выполняется' : 'Запустить'}
+                {isRunning ? 'Выполняется' : 'Run'}
               </button>
-            </div>
-          </div>
-        </header>
-
-        {showLibrary ? (
-          <section className="mt-3 rounded-2xl border border-white/10 bg-black/55 p-3 lg:hidden backdrop-blur-xl">
-            <p className="text-sm font-semibold text-white">Ноды</p>
-            <p className="mt-1 text-xs text-zinc-500">Выберите тип ноды и добавьте в граф</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              {NODE_LIBRARY.map((item) => (
-                <button
-                  key={`mobile-${item.type}`}
-                  className="rounded-lg border border-white/10 bg-zinc-900/80 px-2 py-2 text-left font-medium text-zinc-200"
-                  onClick={() => handleAddNode(item.type)}
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Plus className="h-3.5 w-3.5 text-cyan-300" />
-                    {item.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {showInspector ? (
-          <section className="mt-3 rounded-2xl border border-white/10 bg-black/55 p-3 lg:hidden backdrop-blur-xl">
-            <p className="text-sm font-semibold text-white">Настройки</p>
-            {selectedNode ? (
-              <NodeSettings
-                node={selectedNode}
-                incomingOptions={selectedNodeIncomingOptions}
-                onPatch={updateNodeData}
-                onUpdateInputOrder={handleUpdateInputOrder}
-                onDelete={handleDeleteSelectedNode}
-                onUploadRefs={handleUploadNodeRefs}
-                onRemoveRef={handleRemoveNodeRef}
-                isUploading={uploadingNodeId === selectedNode.id}
+              <MobileHeaderMenu
+                onSave={() => {
+                  void handleSave()
+                }}
+                onOpenLibrary={() => setActiveMobileSheet('library')}
+                onOpenInspector={() => setActiveMobileSheet('inspector')}
+                onOpenTemplates={() => setActiveMobileSheet('templates')}
+                onOpenRename={handleOpenRenameSheet}
+                disabled={isLoading || isSaving || isRunningAction || isTemplateActionLoading}
               />
-            ) : (
-              <p className="mt-2 text-xs text-zinc-500">Нажмите на ноду, чтобы открыть её настройки</p>
-            )}
-          </section>
-        ) : null}
+            </div>
+          </header>
+        ) : (
+          <header className="rounded-2xl border border-white/10 bg-black/55 px-4 py-3 backdrop-blur-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-[260px]">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">Конструктор сценариев</p>
+                <input
+                  value={workflowName}
+                  onChange={(event) => {
+                    setWorkflowName(event.target.value)
+                    setDirty(true)
+                  }}
+                  className="mt-1 w-full max-w-[520px] border-none bg-transparent p-0 text-lg font-semibold text-white outline-none sm:text-xl"
+                  placeholder="Название сценария"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                  <span>{activeTemplateLabel}</span>
+                  {dirty ? <span className="text-amber-300">есть несохраненные изменения</span> : null}
+                  {templates.length > 0 ? (
+                    <select
+                      value={activeTemplateId ?? ''}
+                      onChange={(event) => handleSelectTemplate(event.target.value)}
+                      className="rounded-lg border border-white/10 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200"
+                    >
+                      {templates.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                    showLibrary
+                      ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
+                      : 'border-white/10 bg-zinc-900/75 text-zinc-200 hover:bg-zinc-900'
+                  }`}
+                  onClick={handleToggleLibrary}
+                >
+                  <PanelLeft className="h-3.5 w-3.5" />
+                  Ноды
+                </button>
+                <button
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                    showInspector
+                      ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
+                      : 'border-white/10 bg-zinc-900/75 text-zinc-200 hover:bg-zinc-900'
+                  }`}
+                  onClick={handleToggleInspector}
+                >
+                  <PanelRight className="h-3.5 w-3.5" />
+                  Настройки
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/75 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-60"
+                  onClick={handleSave}
+                  disabled={isSaving || isLoading}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  Сохранить
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/75 bg-cyan-500/20 px-3 py-2 text-xs font-semibold text-cyan-100 disabled:opacity-60"
+                  onClick={isRunning ? undefined : handleRun}
+                  disabled={isRunningAction || isLoading}
+                >
+                  {isRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                  {isRunning ? 'Выполняется' : 'Запустить'}
+                </button>
+              </div>
+            </div>
+          </header>
+        )}
 
         <div className="mt-3 flex gap-3">
           <aside className={`${showLibrary ? 'hidden w-60 shrink-0 lg:block' : 'hidden'}`}>
@@ -652,37 +827,42 @@ export default function WorkflowPage() {
             </div>
           </aside>
 
-          <section className="relative min-h-[72vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#05070b]">
+          <section
+            ref={workflowCanvasRef}
+            className="relative min-h-[72vh] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#05070b]"
+          >
             <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2 rounded-xl border border-white/10 bg-black/80 px-3 py-2 text-[11px] backdrop-blur-xl">
               <span className="font-semibold text-zinc-200">{activeTemplateLabel}</span>
               <span className="text-zinc-500">|</span>
               <span className="text-zinc-400">нод {graph.nodes.length}</span>
             </div>
 
-            <div className="pointer-events-none absolute left-3 right-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/80 p-2.5 backdrop-blur-xl">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="inline-flex items-center gap-1 text-zinc-300">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Выполнение
-                </span>
-                <span className="text-zinc-500">{run?.status || 'ожидание'}</span>
+            {!isMobileViewport ? (
+              <div className="pointer-events-none absolute left-3 right-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/80 p-2.5 backdrop-blur-xl">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="inline-flex items-center gap-1 text-zinc-300">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    Выполнение
+                  </span>
+                  <span className="text-zinc-500">{run?.status || 'ожидание'}</span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-zinc-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                    style={{ width: `${progressValue}%` }}
+                  />
+                </div>
+                {runError ? <p className="mt-2 text-[11px] text-red-300">{runError}</p> : null}
+                {terminalRun && runGenerationId ? (
+                  <button
+                    className="pointer-events-auto mt-2 inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1 text-[11px] text-cyan-200"
+                    onClick={() => navigate(`/profile?gen=${runGenerationId}`)}
+                  >
+                    Открыть результат
+                  </button>
+                ) : null}
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-zinc-800">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                  style={{ width: `${progressValue}%` }}
-                />
-              </div>
-              {runError ? <p className="mt-2 text-[11px] text-red-300">{runError}</p> : null}
-              {terminalRun && runGenerationId ? (
-                <button
-                  className="pointer-events-auto mt-2 inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1 text-[11px] text-cyan-200"
-                  onClick={() => navigate(`/profile?gen=${runGenerationId}`)}
-                >
-                  Открыть результат
-                </button>
-              ) : null}
-            </div>
+            ) : null}
 
             {isLoading ? (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 text-sm text-zinc-300">
@@ -703,8 +883,11 @@ export default function WorkflowPage() {
               minZoom={0.03}
               maxZoom={2}
               panOnDrag={!isMobileViewport}
-              selectionOnDrag={!isMobileViewport}
+              panOnScroll={isMobileViewport ? true : undefined}
+              selectionOnDrag={isMobileViewport ? false : !isMobileViewport}
               zoomOnScroll={!isMobileViewport}
+              zoomOnPinch={isMobileViewport ? true : undefined}
+              zoomOnDoubleClick={isMobileViewport ? true : undefined}
               preventScrolling={false}
               fitViewOptions={{ padding: 0.2, maxZoom: 1.05 }}
               defaultEdgeOptions={{
@@ -742,6 +925,251 @@ export default function WorkflowPage() {
           </aside>
         </div>
       </div>
+
+      {isMobileViewport ? (
+        <div className={`fixed left-0 right-0 ${aboveTabbarClass} z-40 px-3`}>
+          <div className="mx-auto w-full max-w-[760px] rounded-xl border border-white/10 bg-black/80 px-3 py-2 backdrop-blur-xl">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="inline-flex items-center gap-1 text-zinc-300">
+                <Clock3 className="h-3.5 w-3.5" />
+                Выполнение
+              </span>
+              <span className="text-zinc-500">{run?.status || 'ожидание'}</span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                style={{ width: `${progressValue}%` }}
+              />
+            </div>
+            {runError ? <p className="mt-1.5 text-[11px] text-red-300">{runError}</p> : null}
+            {terminalRun && runGenerationId ? (
+              <button
+                className="mt-2 inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1 text-[11px] text-cyan-200"
+                onClick={() => navigate(`/profile?gen=${runGenerationId}`)}
+              >
+                Открыть результат
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <BottomSheet
+        open={isMobileViewport && activeMobileSheet === 'library'}
+        onClose={closeMobileSheet}
+        title="Ноды"
+        initialSnap="half"
+        allowCollapsed
+        bottomClassName={aboveTabbarClass}
+      >
+        <p className="text-xs text-zinc-500">Выберите тип ноды и добавьте в граф</p>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          {NODE_LIBRARY.map((item) => (
+            <button
+              key={`mobile-sheet-${item.type}`}
+              className="rounded-lg border border-white/10 bg-zinc-900/80 px-2 py-2 text-left font-medium text-zinc-200"
+              onClick={() => handleAddNode(item.type)}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Plus className="h-3.5 w-3.5 text-cyan-300" />
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={isMobileViewport && activeMobileSheet === 'inspector'}
+        onClose={closeMobileSheet}
+        title="Настройки"
+        initialSnap="full"
+        bottomClassName={aboveTabbarClass}
+        contentBottomOffset={tabbarOffsetVar}
+        maxHeightPx={inspectorMaxHeight ?? undefined}
+      >
+        {selectedNode ? (
+          <NodeSettings
+            node={selectedNode}
+            incomingOptions={selectedNodeIncomingOptions}
+            onPatch={updateNodeData}
+            onUpdateInputOrder={handleUpdateInputOrder}
+            onDelete={handleDeleteSelectedNode}
+            onUploadRefs={handleUploadNodeRefs}
+            onRemoveRef={handleRemoveNodeRef}
+            isUploading={uploadingNodeId === selectedNode.id}
+          />
+        ) : (
+          <p className="mt-2 text-xs text-zinc-500">Нажмите на ноду, чтобы открыть её настройки</p>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={isMobileViewport && activeMobileSheet === 'templates'}
+        onClose={closeMobileSheet}
+        title="Templates"
+        initialSnap="full"
+        allowCollapsed={false}
+        bottomClassName={aboveTabbarClass}
+      >
+        <button
+          className="inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1.5 text-xs text-cyan-100"
+          onClick={handleCreateTemplateDraft}
+          disabled={isTemplateActionLoading}
+        >
+          + Create New
+        </button>
+
+        {templates.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-400">Сохраненные шаблоны пока отсутствуют</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {templates.map((item) => {
+              const isActive = item.id === activeTemplateId
+              const isRenaming = templateRenameId === item.id
+              const isDeleting = templateDeleteId === item.id
+              return (
+                <div key={item.id} className="rounded-xl border border-white/10 bg-zinc-900/65 p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{item.name}</p>
+                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                        #{item.id}
+                        {isActive ? ' • active' : ''}
+                      </p>
+                    </div>
+                    <button
+                      className={`rounded-lg border px-2 py-1 text-[11px] ${
+                        isActive
+                          ? 'border-cyan-300/70 bg-cyan-500/20 text-cyan-100'
+                          : 'border-white/10 bg-zinc-800/80 text-zinc-200'
+                      }`}
+                      onClick={() => {
+                        handleSelectTemplate(String(item.id))
+                        closeMobileSheet()
+                      }}
+                      disabled={isTemplateActionLoading}
+                    >
+                      {isActive ? 'Selected' : 'Select'}
+                    </button>
+                  </div>
+
+                  {isRenaming ? (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-zinc-100 outline-none"
+                        value={templateRenameValue}
+                        onChange={(event) => setTemplateRenameValue(event.target.value)}
+                        placeholder="Название шаблона"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded-md border border-cyan-400/60 bg-cyan-500/15 px-2 py-1 text-[11px] text-cyan-100"
+                          onClick={() => {
+                            void handleSubmitTemplateRename(item.id)
+                          }}
+                          disabled={isTemplateActionLoading}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-[11px] text-zinc-200"
+                          onClick={() => {
+                            setTemplateRenameId(null)
+                            setTemplateRenameValue('')
+                          }}
+                          disabled={isTemplateActionLoading}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {isDeleting ? (
+                    <div className="mt-2 rounded-md border border-red-400/30 bg-red-900/20 p-2 text-[11px] text-red-100">
+                      <p>Удалить шаблон безвозвратно?</p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          className="rounded-md border border-red-300/60 bg-red-500/15 px-2 py-1 text-red-200"
+                          onClick={() => {
+                            void handleDeleteTemplate(item.id)
+                          }}
+                          disabled={isTemplateActionLoading}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-zinc-200"
+                          onClick={() => setTemplateDeleteId(null)}
+                          disabled={isTemplateActionLoading}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-2 flex gap-2 text-[11px]">
+                    {!isRenaming ? (
+                      <button
+                        className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-zinc-200"
+                        onClick={() => handleStartTemplateRename(item.id, item.name)}
+                        disabled={isTemplateActionLoading}
+                      >
+                        Rename
+                      </button>
+                    ) : null}
+                    {!isDeleting ? (
+                      <button
+                        className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-red-200"
+                        onClick={() => setTemplateDeleteId(item.id)}
+                        disabled={isTemplateActionLoading}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={isMobileViewport && activeMobileSheet === 'rename'}
+        onClose={closeMobileSheet}
+        title="Rename Workflow"
+        initialSnap="half"
+        allowCollapsed={false}
+        bottomClassName={aboveTabbarClass}
+      >
+        <label className="block rounded-lg border border-white/10 bg-zinc-900/70 px-2.5 py-2">
+          <p className="text-[11px] text-zinc-500">Название workflow</p>
+          <input
+            className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-zinc-100 outline-none"
+            value={renameDraftValue}
+            onChange={(event) => setRenameDraftValue(event.target.value)}
+            placeholder="Название сценария"
+          />
+        </label>
+        <div className="mt-3 flex gap-2">
+          <button
+            className="rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+            onClick={handleApplyLocalRename}
+          >
+            Save
+          </button>
+          <button
+            className="rounded-lg border border-white/10 bg-zinc-800/80 px-3 py-1.5 text-xs font-semibold text-zinc-200"
+            onClick={closeMobileSheet}
+          >
+            Cancel
+          </button>
+        </div>
+      </BottomSheet>
     </div>
   )
 }

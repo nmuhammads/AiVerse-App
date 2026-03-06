@@ -16,7 +16,7 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
 
   return (
     <div
-      className={`relative w-[178px] rounded-xl border p-2.5 shadow-[0_16px_32px_rgba(0,0,0,0.38)] ${tone.card} ${
+      className={`relative w-[148px] rounded-xl border p-2 shadow-[0_16px_32px_rgba(0,0,0,0.38)] sm:w-[178px] sm:p-2.5 ${tone.card} ${
         nodeData.highlighted ? 'ring-2 ring-cyan-300/80' : ''
       }`}
     >
@@ -43,12 +43,12 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
         )}
       </div>
 
-      <p className="mt-2 text-[13px] font-semibold leading-none">{nodeData.title}</p>
-      <p className="mt-1 text-[11px] text-zinc-500">{nodeData.subtitle}</p>
-      <div className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-zinc-300">
+      <p className="mt-2 text-[12px] font-semibold leading-none sm:text-[13px]">{nodeData.title}</p>
+      <p className="mt-1 text-[10px] text-zinc-500 sm:text-[11px]">{nodeData.subtitle}</p>
+      <div className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[9px] text-zinc-300 sm:text-[10px]">
         {nodeData.model}
       </div>
-      <p className="mt-1 text-[10px] text-zinc-400">{nodeData.paramsText}</p>
+      <p className="mt-1 text-[9px] text-zinc-400 sm:text-[10px]">{nodeData.paramsText}</p>
 
       <Handle
         type="source"
