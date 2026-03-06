@@ -1,5 +1,6 @@
 import { Coins, Trash2 } from 'lucide-react'
 import type {
+  NodeArtifact,
   WorkflowNode,
   WorkflowNodeData,
 } from '@aiverse/shared/types/workflow'
@@ -19,6 +20,8 @@ function deriveNodeTitle(node: WorkflowNode): string {
 
 export function NodeSettings(props: {
   node: WorkflowNode
+  output?: NodeArtifact | null
+  onOpenOutput?: () => void
   incomingOptions: Array<{ id: string; edgeId: string; order: number; label: string; type: string }>
   onPatch: (nodeId: string, patch: Partial<WorkflowNodeData>) => void
   onUpdateInputOrder: (nodeId: string, edgeId: string, fragmentOrder: number) => void
@@ -27,7 +30,7 @@ export function NodeSettings(props: {
   onRemoveRef: (node: WorkflowNode, index: number) => void
   isUploading: boolean
 }) {
-  const { node, incomingOptions, onPatch, onUpdateInputOrder, onDelete, onUploadRefs, onRemoveRef, isUploading } = props
+  const { node, output, onOpenOutput, incomingOptions, onPatch, onUpdateInputOrder, onDelete, onUploadRefs, onRemoveRef, isUploading } = props
   const imageIncomingOptions = Array.from(
     new Map(
       incomingOptions
@@ -69,9 +72,61 @@ export function NodeSettings(props: {
       { value: 'upload', label: 'Загруженные фото' },
       { value: 'mixed', label: 'Смешанный источник' },
     ]
+  const outputImages = output?.type === 'image'
+    ? output.image_urls.filter((item) => typeof item === 'string' && item.trim().length > 0)
+    : []
+  const outputVideo = output?.type === 'video' ? output.video_url : null
 
   return (
     <div className="mt-3 space-y-2 text-[11px]">
+      {output ? (
+        <div className="rounded-xl border border-emerald-400/35 bg-emerald-900/15 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-emerald-100">Результат ноды</p>
+            {onOpenOutput ? (
+              <button
+                className="rounded-md border border-emerald-300/50 bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-100"
+                onClick={onOpenOutput}
+              >
+                Открыть
+              </button>
+            ) : null}
+          </div>
+
+          {output.type === 'image' ? (
+            outputImages.length > 0 ? (
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                {outputImages.map((url, index) => (
+                  <img
+                    key={`${url}-${index}`}
+                    src={url}
+                    alt={`node-output-${index + 1}`}
+                    className="h-16 w-full rounded-md border border-emerald-200/20 object-cover"
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-zinc-300">Изображение недоступно</p>
+            )
+          ) : output.type === 'video' ? (
+            outputVideo ? (
+              <video
+                src={outputVideo}
+                controls
+                playsInline
+                className="mt-2 max-h-52 w-full rounded-md border border-emerald-200/20 bg-black object-contain"
+              />
+            ) : (
+              <p className="mt-1 text-zinc-300">Видео недоступно</p>
+            )
+          ) : (
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-emerald-200/20 bg-black/25 p-2 text-[10px] text-zinc-200">
+              {output.text || 'Пустой текст'}
+            </pre>
+          )}
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-white/10 bg-zinc-900/80 p-2.5">
         <p className="text-xs font-semibold text-zinc-100">{deriveNodeTitle(node)}</p>
         <p className="mt-1 text-[11px] text-zinc-400">{node.id}</p>

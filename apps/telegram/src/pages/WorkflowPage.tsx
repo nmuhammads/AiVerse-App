@@ -19,11 +19,12 @@ import {
   Play,
   Plus,
   Save,
+  Shapes,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
 import { getAuthHeaders } from '@/hooks/useTelegram'
 import type {
+  NodeArtifact,
   WorkflowGraph,
   WorkflowNode,
   WorkflowNodeData,
@@ -51,9 +52,12 @@ import { WorkflowNodeCard } from '@/components/workflow/WorkflowNodeCard'
 import { NodeSettings } from '@/components/workflow/NodeSettings'
 import { BottomSheet } from '@/components/workflow/BottomSheet'
 import { MobileHeaderMenu } from '@/components/workflow/MobileHeaderMenu'
+import { NodeResultModal } from '@/components/workflow/NodeResultModal'
+import { WorkflowResultsOverlay } from '@/components/workflow/WorkflowResultsOverlay'
+import { TemplateListModal } from '@/components/workflow/TemplateListModal'
 import { resolvedPlatform } from '@/utils/platform'
 
-type MobileSheet = 'none' | 'library' | 'inspector' | 'templates' | 'rename'
+type MobileSheet = 'none' | 'library' | 'inspector' | 'rename'
 
 const DEFAULT_WORKFLOW_NAME = 'Пайплайн фото в видео'
 
@@ -72,7 +76,6 @@ function cloneGraph(graph: WorkflowGraph): WorkflowGraph {
 }
 
 export default function WorkflowPage() {
-  const navigate = useNavigate()
   const nodeTypes = useMemo(() => ({ workflow: WorkflowNodeCard }), [])
 
   const {
@@ -109,15 +112,25 @@ export default function WorkflowPage() {
   const [isTemplateActionLoading, setIsTemplateActionLoading] = useState(false)
   const [renameDraftValue, setRenameDraftValue] = useState('')
   const [inspectorMaxHeight, setInspectorMaxHeight] = useState<number | null>(null)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [isResultsOverlayOpen, setIsResultsOverlayOpen] = useState(false)
+  const [nodeResultNodeId, setNodeResultNodeId] = useState<string | null>(null)
 
   const isGraphSyncingRef = useRef(false)
   const workflowCanvasRef = useRef<HTMLElement | null>(null)
+  const lastAutoOpenedRunIdRef = useRef<number | null>(null)
   const isRunning = runStatus === 'running' || runStatus === 'queued'
   const aboveTabbarClass = resolvedPlatform === 'android' ? 'above-tabbar-android' : 'above-tabbar-ios'
   const tabbarOffsetVar = resolvedPlatform === 'android' ? 'var(--tabbar-offset-android)' : 'var(--tabbar-offset-ios)'
 
+  const handleOpenNodeResult = useCallback((nodeId: string) => {
+    const artifact = run?.node_states?.[nodeId]?.output
+    if (!artifact) return
+    setNodeResultNodeId(nodeId)
+  }, [run])
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>(
-    graphToFlowNodes(graph, selectedNodeId, run)
+    graphToFlowNodes(graph, selectedNodeId, run, { onOpenNodeResult: handleOpenNodeResult })
   )
   const [edges, setEdges, onEdgesChange] = useEdgesState(graphToFlowEdges(graph, isRunning))
 
@@ -203,14 +216,14 @@ export default function WorkflowPage() {
 
   useEffect(() => {
     isGraphSyncingRef.current = true
-    setNodes(graphToFlowNodes(graph, selectedNodeId, run))
+    setNodes(graphToFlowNodes(graph, selectedNodeId, run, { onOpenNodeResult: handleOpenNodeResult }))
     setEdges(graphToFlowEdges(graph, isRunning))
     const timer = window.setTimeout(() => {
       isGraphSyncingRef.current = false
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [graph, isRunning, run, selectedNodeId, setEdges, setNodes])
+  }, [graph, handleOpenNodeResult, isRunning, run, selectedNodeId, setEdges, setNodes])
 
   useEffect(() => {
     if (isGraphSyncingRef.current) return
@@ -222,6 +235,26 @@ export default function WorkflowPage() {
   }, [edges, graph, nodes, setDirty, setGraph])
 
   const selectedNode = useMemo(() => graph.nodes.find((node) => node.id === selectedNodeId) || null, [graph.nodes, selectedNodeId])
+  const selectedNodeOutput = selectedNode ? run?.node_states?.[selectedNode.id]?.output ?? null : null
+  const nodeResultArtifact = nodeResultNodeId ? run?.node_states?.[nodeResultNodeId]?.output ?? null : null
+  const nodeResultNodeLabel = useMemo(() => {
+    if (!nodeResultNodeId) return ''
+    const source = graph.nodes.find((item) => item.id === nodeResultNodeId)
+    return source ? getNodeDisplayName(source) : nodeResultNodeId
+  }, [graph.nodes, nodeResultNodeId])
+  const runOutputEntries = useMemo(() => {
+    if (!run?.outputs) return []
+    const nodesById = new Map(graph.nodes.map((node) => [node.id, node]))
+    return Object.entries(run.outputs).map(([nodeId, artifact]) => {
+      const source = nodesById.get(nodeId)
+      return {
+        nodeId,
+        nodeLabel: source ? getNodeDisplayName(source) : nodeId,
+        artifact: artifact as NodeArtifact,
+      }
+    })
+  }, [graph.nodes, run?.outputs])
+  const hasRunOutputs = runOutputEntries.length > 0
   const selectedNodeIncomingOptions = useMemo(() => {
     if (!selectedNode) return []
     return graph.edges
@@ -289,7 +322,6 @@ export default function WorkflowPage() {
   const progressValue = Math.max(0, Math.min(100, Number(run?.progress || 0)))
   const terminalRun = run?.status === 'completed' || run?.status === 'failed' || run?.status === 'cancelled'
   const runError = run?.error?.message || null
-  const runGenerationId = run?.generation_ids?.[0] || null
 
   useEffect(() => {
     if (!activeRunId) return
@@ -327,6 +359,20 @@ export default function WorkflowPage() {
       window.clearInterval(interval)
     }
   }, [activeRunId, setRun])
+
+  useEffect(() => {
+    if (run?.status !== 'completed' || !run.id) return
+    if (!run.outputs || Object.keys(run.outputs).length === 0) return
+    if (lastAutoOpenedRunIdRef.current === run.id) return
+    lastAutoOpenedRunIdRef.current = run.id
+    setIsResultsOverlayOpen(true)
+  }, [run])
+
+  useEffect(() => {
+    if (!nodeResultNodeId) return
+    if (nodeResultArtifact) return
+    setNodeResultNodeId(null)
+  }, [nodeResultArtifact, nodeResultNodeId])
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -515,6 +561,10 @@ export default function WorkflowPage() {
 
   const closeMobileSheet = useCallback(() => {
     setActiveMobileSheet('none')
+  }, [])
+
+  const closeTemplateModal = useCallback(() => {
+    setIsTemplateModalOpen(false)
     setTemplateRenameId(null)
     setTemplateRenameValue('')
     setTemplateDeleteId(null)
@@ -533,8 +583,9 @@ export default function WorkflowPage() {
 
   const handleCreateTemplateDraft = useCallback(() => {
     createNewDraft()
+    closeTemplateModal()
     toast.success('Создан новый черновик')
-  }, [createNewDraft])
+  }, [closeTemplateModal, createNewDraft])
 
   const handleStartTemplateRename = useCallback((templateId: number, currentName: string) => {
     setTemplateRenameId(templateId)
@@ -565,6 +616,11 @@ export default function WorkflowPage() {
     }
   }, [activeTemplateId, setTemplates, templateRenameValue, templates])
 
+  const handleCancelTemplateRename = useCallback(() => {
+    setTemplateRenameId(null)
+    setTemplateRenameValue('')
+  }, [])
+
   const handleDeleteTemplate = useCallback(async (templateId: number) => {
     setIsTemplateActionLoading(true)
     try {
@@ -593,6 +649,10 @@ export default function WorkflowPage() {
       setIsTemplateActionLoading(false)
     }
   }, [activeTemplateId, createNewDraft, setActiveRun, setActiveTemplateId, setDirty, setGraph, setRun, setSelectedNodeId, setTemplates, templates])
+
+  const handleCancelTemplateDelete = useCallback(() => {
+    setTemplateDeleteId(null)
+  }, [])
 
   const handleOpenRenameSheet = useCallback(() => {
     setRenameDraftValue(workflowName)
@@ -674,8 +734,7 @@ export default function WorkflowPage() {
     }
   }
 
-  const handleSelectTemplate = (value: string) => {
-    const templateId = Number(value)
+  const handleSelectTemplate = (templateId: number) => {
     const selectedTemplate = templates.find((item) => item.id === templateId)
     if (!selectedTemplate) return
 
@@ -717,7 +776,7 @@ export default function WorkflowPage() {
                 }}
                 onOpenLibrary={() => setActiveMobileSheet('library')}
                 onOpenInspector={() => setActiveMobileSheet('inspector')}
-                onOpenTemplates={() => setActiveMobileSheet('templates')}
+                onOpenTemplates={() => setIsTemplateModalOpen(true)}
                 onOpenRename={handleOpenRenameSheet}
                 disabled={isLoading || isSaving || isRunningAction || isTemplateActionLoading}
               />
@@ -740,19 +799,6 @@ export default function WorkflowPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                   <span>{activeTemplateLabel}</span>
                   {dirty ? <span className="text-amber-300">есть несохраненные изменения</span> : null}
-                  {templates.length > 0 ? (
-                    <select
-                      value={activeTemplateId ?? ''}
-                      onChange={(event) => handleSelectTemplate(event.target.value)}
-                      className="rounded-lg border border-white/10 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200"
-                    >
-                      {templates.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
                 </div>
               </div>
 
@@ -778,6 +824,13 @@ export default function WorkflowPage() {
                 >
                   <PanelRight className="h-3.5 w-3.5" />
                   Настройки
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/75 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900"
+                  onClick={() => setIsTemplateModalOpen(true)}
+                >
+                  <Shapes className="h-3.5 w-3.5" />
+                  Templates
                 </button>
                 <button
                   className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/75 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900 disabled:opacity-60"
@@ -853,12 +906,12 @@ export default function WorkflowPage() {
                   />
                 </div>
                 {runError ? <p className="mt-2 text-[11px] text-red-300">{runError}</p> : null}
-                {terminalRun && runGenerationId ? (
+                {terminalRun && hasRunOutputs ? (
                   <button
                     className="pointer-events-auto mt-2 inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1 text-[11px] text-cyan-200"
-                    onClick={() => navigate(`/profile?gen=${runGenerationId}`)}
+                    onClick={() => setIsResultsOverlayOpen(true)}
                   >
-                    Открыть результат
+                    View Results
                   </button>
                 ) : null}
               </div>
@@ -908,6 +961,8 @@ export default function WorkflowPage() {
               {selectedNode ? (
                 <NodeSettings
                   node={selectedNode}
+                  output={selectedNodeOutput}
+                  onOpenOutput={() => handleOpenNodeResult(selectedNode.id)}
                   incomingOptions={selectedNodeIncomingOptions}
                   onPatch={updateNodeData}
                   onUpdateInputOrder={handleUpdateInputOrder}
@@ -943,12 +998,12 @@ export default function WorkflowPage() {
               />
             </div>
             {runError ? <p className="mt-1.5 text-[11px] text-red-300">{runError}</p> : null}
-            {terminalRun && runGenerationId ? (
+            {terminalRun && hasRunOutputs ? (
               <button
                 className="mt-2 inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1 text-[11px] text-cyan-200"
-                onClick={() => navigate(`/profile?gen=${runGenerationId}`)}
+                onClick={() => setIsResultsOverlayOpen(true)}
               >
-                Открыть результат
+                View Results
               </button>
             ) : null}
           </div>
@@ -992,6 +1047,8 @@ export default function WorkflowPage() {
         {selectedNode ? (
           <NodeSettings
             node={selectedNode}
+            output={selectedNodeOutput}
+            onOpenOutput={() => handleOpenNodeResult(selectedNode.id)}
             incomingOptions={selectedNodeIncomingOptions}
             onPatch={updateNodeData}
             onUpdateInputOrder={handleUpdateInputOrder}
@@ -1002,139 +1059,6 @@ export default function WorkflowPage() {
           />
         ) : (
           <p className="mt-2 text-xs text-zinc-500">Нажмите на ноду, чтобы открыть её настройки</p>
-        )}
-      </BottomSheet>
-
-      <BottomSheet
-        open={isMobileViewport && activeMobileSheet === 'templates'}
-        onClose={closeMobileSheet}
-        title="Templates"
-        initialSnap="full"
-        allowCollapsed={false}
-        bottomClassName={aboveTabbarClass}
-      >
-        <button
-          className="inline-flex rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-2.5 py-1.5 text-xs text-cyan-100"
-          onClick={handleCreateTemplateDraft}
-          disabled={isTemplateActionLoading}
-        >
-          + Create New
-        </button>
-
-        {templates.length === 0 ? (
-          <p className="mt-3 text-xs text-zinc-400">Сохраненные шаблоны пока отсутствуют</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {templates.map((item) => {
-              const isActive = item.id === activeTemplateId
-              const isRenaming = templateRenameId === item.id
-              const isDeleting = templateDeleteId === item.id
-              return (
-                <div key={item.id} className="rounded-xl border border-white/10 bg-zinc-900/65 p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">{item.name}</p>
-                      <p className="mt-0.5 text-[11px] text-zinc-500">
-                        #{item.id}
-                        {isActive ? ' • active' : ''}
-                      </p>
-                    </div>
-                    <button
-                      className={`rounded-lg border px-2 py-1 text-[11px] ${
-                        isActive
-                          ? 'border-cyan-300/70 bg-cyan-500/20 text-cyan-100'
-                          : 'border-white/10 bg-zinc-800/80 text-zinc-200'
-                      }`}
-                      onClick={() => {
-                        handleSelectTemplate(String(item.id))
-                        closeMobileSheet()
-                      }}
-                      disabled={isTemplateActionLoading}
-                    >
-                      {isActive ? 'Selected' : 'Select'}
-                    </button>
-                  </div>
-
-                  {isRenaming ? (
-                    <div className="mt-2 space-y-2">
-                      <input
-                        className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-zinc-100 outline-none"
-                        value={templateRenameValue}
-                        onChange={(event) => setTemplateRenameValue(event.target.value)}
-                        placeholder="Название шаблона"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          className="rounded-md border border-cyan-400/60 bg-cyan-500/15 px-2 py-1 text-[11px] text-cyan-100"
-                          onClick={() => {
-                            void handleSubmitTemplateRename(item.id)
-                          }}
-                          disabled={isTemplateActionLoading}
-                        >
-                          Save
-                        </button>
-                        <button
-                          className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-[11px] text-zinc-200"
-                          onClick={() => {
-                            setTemplateRenameId(null)
-                            setTemplateRenameValue('')
-                          }}
-                          disabled={isTemplateActionLoading}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {isDeleting ? (
-                    <div className="mt-2 rounded-md border border-red-400/30 bg-red-900/20 p-2 text-[11px] text-red-100">
-                      <p>Удалить шаблон безвозвратно?</p>
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          className="rounded-md border border-red-300/60 bg-red-500/15 px-2 py-1 text-red-200"
-                          onClick={() => {
-                            void handleDeleteTemplate(item.id)
-                          }}
-                          disabled={isTemplateActionLoading}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-zinc-200"
-                          onClick={() => setTemplateDeleteId(null)}
-                          disabled={isTemplateActionLoading}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="mt-2 flex gap-2 text-[11px]">
-                    {!isRenaming ? (
-                      <button
-                        className="rounded-md border border-white/10 bg-zinc-800/80 px-2 py-1 text-zinc-200"
-                        onClick={() => handleStartTemplateRename(item.id, item.name)}
-                        disabled={isTemplateActionLoading}
-                      >
-                        Rename
-                      </button>
-                    ) : null}
-                    {!isDeleting ? (
-                      <button
-                        className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-red-200"
-                        onClick={() => setTemplateDeleteId(item.id)}
-                        disabled={isTemplateActionLoading}
-                      >
-                        Delete
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
         )}
       </BottomSheet>
 
@@ -1170,6 +1094,45 @@ export default function WorkflowPage() {
           </button>
         </div>
       </BottomSheet>
+
+      <TemplateListModal
+        open={isTemplateModalOpen}
+        isMobileViewport={isMobileViewport}
+        bottomClassName={aboveTabbarClass}
+        templates={templates}
+        activeTemplateId={activeTemplateId}
+        templateRenameId={templateRenameId}
+        templateRenameValue={templateRenameValue}
+        templateDeleteId={templateDeleteId}
+        isTemplateActionLoading={isTemplateActionLoading}
+        onClose={closeTemplateModal}
+        onCreateDraft={handleCreateTemplateDraft}
+        onSelectTemplate={handleSelectTemplate}
+        onStartRename={handleStartTemplateRename}
+        onRenameValueChange={setTemplateRenameValue}
+        onSubmitRename={(templateId) => {
+          void handleSubmitTemplateRename(templateId)
+        }}
+        onCancelRename={handleCancelTemplateRename}
+        onRequestDelete={setTemplateDeleteId}
+        onCancelDelete={handleCancelTemplateDelete}
+        onConfirmDelete={(templateId) => {
+          void handleDeleteTemplate(templateId)
+        }}
+      />
+
+      <NodeResultModal
+        open={!!nodeResultNodeId && !!nodeResultArtifact}
+        artifact={nodeResultArtifact}
+        nodeLabel={nodeResultNodeLabel}
+        onClose={() => setNodeResultNodeId(null)}
+      />
+
+      <WorkflowResultsOverlay
+        open={isResultsOverlayOpen}
+        entries={runOutputEntries}
+        onClose={() => setIsResultsOverlayOpen(false)}
+      />
     </div>
   )
 }

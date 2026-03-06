@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, type MouseEvent } from 'react'
 import {
   Handle,
   Position,
@@ -13,6 +13,16 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
   const nodeData = data as FlowNodeData
   const Icon = ICONS[nodeData.icon]
   const tone = STATUS_STYLES[nodeData.status]
+  const output = nodeData.output
+  const imageUrl = output?.type === 'image' ? output.image_urls[0] || null : null
+  const hasVideoOutput = output?.type === 'video'
+  const canOpenResult = nodeData.status === 'done' && !!output && !!nodeData.onOpenResult
+
+  const handleOpenResult = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    nodeData.onOpenResult?.()
+  }
 
   return (
     <div
@@ -49,6 +59,29 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
         {nodeData.model}
       </div>
       <p className="mt-1 text-[9px] text-zinc-400 sm:text-[10px]">{nodeData.paramsText}</p>
+
+      {canOpenResult ? (
+        <button
+          className="mt-2 block w-full overflow-hidden rounded-md border border-emerald-300/35 bg-emerald-900/20 text-left"
+          onClick={handleOpenResult}
+        >
+          {imageUrl ? (
+            <div className="relative">
+              <img src={imageUrl} alt={`${nodeData.title} result`} className="h-16 w-full object-cover" />
+              <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-zinc-100">result</span>
+            </div>
+          ) : hasVideoOutput ? (
+            <div className="flex h-14 items-center justify-between px-2.5 py-1.5">
+              <span className="text-[10px] text-emerald-100">Видео готово</span>
+              <span className="rounded-md border border-emerald-200/50 px-1.5 py-0.5 text-[9px] text-emerald-200">preview</span>
+            </div>
+          ) : (
+            <div className="h-12 px-2.5 py-1.5">
+              <span className="text-[10px] text-emerald-100">Результат доступен</span>
+            </div>
+          )}
+        </button>
+      ) : null}
 
       <Handle
         type="source"

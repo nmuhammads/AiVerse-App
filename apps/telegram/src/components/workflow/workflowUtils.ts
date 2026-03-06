@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type {
+  NodeArtifact,
   WorkflowGraph,
   WorkflowNode,
   WorkflowNodeData,
@@ -29,6 +30,8 @@ export type FlowNodeData = {
   sourceText: string
   icon: IconKey
   status: FlowNodeStatus
+  output?: NodeArtifact | null
+  onOpenResult?: () => void
   highlighted?: boolean
   rawData: WorkflowNodeData
 }
@@ -235,7 +238,14 @@ function deriveNodeParamsText(node: WorkflowNode, graph: WorkflowGraph): string 
   return parts.join(' • ')
 }
 
-export function graphToFlowNodes(graph: WorkflowGraph, selectedNodeId: string | null, run: WorkflowRunDTO | null): Node<FlowNodeData>[] {
+export function graphToFlowNodes(
+  graph: WorkflowGraph,
+  selectedNodeId: string | null,
+  run: WorkflowRunDTO | null,
+  options?: {
+    onOpenNodeResult?: (nodeId: string) => void
+  }
+): Node<FlowNodeData>[] {
   return graph.nodes.map((node) => ({
     id: node.id,
     type: 'workflow',
@@ -249,6 +259,10 @@ export function graphToFlowNodes(graph: WorkflowGraph, selectedNodeId: string | 
       sourceText: getIncomingSourceIds(graph, node.id).join(', '),
       icon: deriveNodeIcon(node),
       status: mapNodeStatus(run, node.id),
+      output: run?.node_states?.[node.id]?.output ?? null,
+      onOpenResult: options?.onOpenNodeResult
+        ? () => options.onOpenNodeResult?.(node.id)
+        : undefined,
       highlighted: selectedNodeId === node.id,
       rawData: node.data || {},
     },
