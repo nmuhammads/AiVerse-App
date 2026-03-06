@@ -619,12 +619,12 @@ export function AIChatOverlay({ variant = 'overlay' }: AIChatOverlayProps) {
 
             {(isOpen || isInline) && <ChatFeaturesOnboarding />}
 
-            {!isInline && <div className="fixed inset-0 z-[45] bg-black" />}
+            {!isInline && <div className="fixed inset-0 z-[170] bg-black" />}
 
             <div
                 className={isInline
                     ? "relative flex flex-col w-full h-full min-h-0 bg-black border-t-0"
-                    : "fixed left-0 right-0 bottom-0 z-[60] bg-black flex flex-col min-h-0 border-t border-white/10 rounded-t-2xl"
+                    : "fixed left-0 right-0 bottom-0 z-[180] bg-black flex flex-col min-h-0 border-t border-white/10 rounded-t-2xl"
                 }
                 style={isInline ? {} : { top: headerOffset }}
             >

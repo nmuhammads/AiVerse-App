@@ -134,7 +134,7 @@ export function NotificationsModal({ isOpen, onClose }: Props) {
 
     return createPortal(
         <div
-            className={`fixed inset-0 z-[60] flex items-start justify-center px-2 ${platform === 'ios' ? 'pt-28' : 'pt-20'}`}
+            className={`fixed inset-0 z-[190] flex items-start justify-center px-2 ${platform === 'ios' ? 'pt-28' : 'pt-20'}`}
         >
             {/* Backdrop */}
             <div
