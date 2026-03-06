@@ -65,6 +65,14 @@ function hasExplicitSeedanceFrameSelection(node: WorkflowNode): boolean {
     || typeof node.data?.selected_end_upstream_node_id === 'string'
 }
 
+function isStartHandle(handle?: string | null): boolean {
+  return String(handle || '').toLowerCase() === 'start_image'
+}
+
+function isEndHandle(handle?: string | null): boolean {
+  return String(handle || '').toLowerCase() === 'end_image'
+}
+
 function getUploadedRefCount(node: WorkflowNode): number {
   if (!Array.isArray(node.data?.ref_images)) return 0
   return node.data.ref_images.filter((item) => typeof item === 'string' && item.trim().length > 0).length
@@ -115,6 +123,8 @@ function validateNodeCardinality(
   let promptInputs = 0
   let videoInputs = 0
   const imageInputsBySource = new Map<string, number>()
+  let startHandleImageInputs = 0
+  let endHandleImageInputs = 0
 
   for (const edge of incoming) {
     const sourceNode = nodesById.get(edge.source)
@@ -131,6 +141,8 @@ function validateNodeCardinality(
       if (sourceKind === 'image') {
         imageInputs += 1
         imageInputsBySource.set(edge.source, (imageInputsBySource.get(edge.source) || 0) + 1)
+        if (isStartHandle(edge.targetHandle)) startHandleImageInputs += 1
+        if (isEndHandle(edge.targetHandle)) endHandleImageInputs += 1
       }
       continue
     }
@@ -139,6 +151,8 @@ function validateNodeCardinality(
     else if (sourceKind === 'image') {
       imageInputs += 1
       imageInputsBySource.set(edge.source, (imageInputsBySource.get(edge.source) || 0) + 1)
+      if (isStartHandle(edge.targetHandle)) startHandleImageInputs += 1
+      if (isEndHandle(edge.targetHandle)) endHandleImageInputs += 1
     }
     else videoInputs += 1
   }
@@ -197,8 +211,17 @@ function validateNodeCardinality(
   const mode = (node.data?.mode || '').toString()
   const isSeedanceNode = node.type === 'video.generate' && model === 'seedance-1.5-pro'
   const isSeedanceI2VNode = isSeedanceNode && (mode === 'i2v' || mode === '')
+  const hasSeedanceHandleFrames = startHandleImageInputs > 0 || endHandleImageInputs > 0
 
-  if ((refSource === 'upstream' || refSource === 'mixed') && hasSelectedUpstream && selectedUpstreamImageInputs === 0 && !(isSeedanceI2VNode && explicitSeedanceFrameSelection)) {
+  if ((startHandleImageInputs > 0 || endHandleImageInputs > 0) && !isSeedanceI2VNode) {
+    issues.push({
+      code: 'seedance_handles_unsupported',
+      message: `Node "${node.id}" start_image/end_image handles are supported only for seedance i2v`,
+      nodeId: node.id,
+    })
+  }
+
+  if ((refSource === 'upstream' || refSource === 'mixed') && hasSelectedUpstream && selectedUpstreamImageInputs === 0 && !(isSeedanceI2VNode && (explicitSeedanceFrameSelection || hasSeedanceHandleFrames))) {
     issues.push({
       code: 'selected_upstream_missing',
       message: `Node "${node.id}" selected upstream "${selectedUpstreamNodeId}" is not connected as image source`,
@@ -206,7 +229,23 @@ function validateNodeCardinality(
     })
   }
 
-  if ((refSource === 'upstream' || refSource === 'mixed') && isSeedanceI2VNode && explicitSeedanceFrameSelection) {
+  if (startHandleImageInputs > 1) {
+    issues.push({
+      code: 'seedance_start_handle_too_many_inputs',
+      message: `Seedance node "${node.id}" start_image handle accepts at most 1 image input`,
+      nodeId: node.id,
+    })
+  }
+
+  if (endHandleImageInputs > 1) {
+    issues.push({
+      code: 'seedance_end_handle_too_many_inputs',
+      message: `Seedance node "${node.id}" end_image handle accepts at most 1 image input`,
+      nodeId: node.id,
+    })
+  }
+
+  if ((refSource === 'upstream' || refSource === 'mixed') && isSeedanceI2VNode && explicitSeedanceFrameSelection && !hasSeedanceHandleFrames) {
     if (hasSelectedStartUpstream && selectedStartImageInputs === 0) {
       issues.push({
         code: 'seedance_selected_start_missing',
@@ -228,18 +267,20 @@ function validateNodeCardinality(
     : refSource === 'mixed'
       ? uploadedImageInputs + selectedUpstreamImageInputs
       : selectedUpstreamImageInputs
-  const selectedSeedanceUpstreamImageInputs = explicitSeedanceFrameSelection
-    ? (
-      (selectedStartUpstreamNodeId === 'auto'
-        ? (imageInputs > 0 ? 1 : 0)
-        : (selectedStartImageInputs > 0 ? 1 : 0)
-      ) + (
-        selectedEndUpstreamNodeId === 'none'
-          ? 0
-          : (selectedEndImageInputs > 0 ? 1 : 0)
+  const selectedSeedanceUpstreamImageInputs = hasSeedanceHandleFrames
+    ? ((startHandleImageInputs > 0 ? 1 : 0) + (endHandleImageInputs > 0 ? 1 : 0))
+    : explicitSeedanceFrameSelection
+      ? (
+        (selectedStartUpstreamNodeId === 'auto'
+          ? (imageInputs > 0 ? 1 : 0)
+          : (selectedStartImageInputs > 0 ? 1 : 0)
+        ) + (
+          selectedEndUpstreamNodeId === 'none'
+            ? 0
+            : (selectedEndImageInputs > 0 ? 1 : 0)
+        )
       )
-    )
-    : selectedUpstreamImageInputs
+      : selectedUpstreamImageInputs
   const effectiveSeedanceImageInputs = refSource === 'upload'
     ? uploadedImageInputs
     : refSource === 'mixed'

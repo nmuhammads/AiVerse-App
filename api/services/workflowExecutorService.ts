@@ -76,6 +76,14 @@ function hasExplicitSeedanceFrameSelection(node: WorkflowNode): boolean {
     || typeof node.data?.selected_end_upstream_node_id === 'string'
 }
 
+function isStartHandle(handle?: string | null): boolean {
+  return String(handle || '').toLowerCase() === 'start_image'
+}
+
+function isEndHandle(handle?: string | null): boolean {
+  return String(handle || '').toLowerCase() === 'end_image'
+}
+
 function getUploadedRefImages(node: WorkflowNode): string[] {
   if (!Array.isArray(node.data?.ref_images)) return []
   return node.data.ref_images
@@ -160,6 +168,15 @@ function collectSeedanceFrameInputs(node: WorkflowNode, incoming: ResolvedIncomi
     if (endImage) images.push(endImage)
   }
 
+  return images
+}
+
+function collectSeedanceFrameInputsFromHandles(incoming: ResolvedIncoming[]): string[] {
+  const images: string[] = []
+  const startImage = collectImageInputs(incoming.filter((item) => isStartHandle(item.edge.targetHandle)))[0]
+  const endImage = collectImageInputs(incoming.filter((item) => isEndHandle(item.edge.targetHandle)))[0]
+  if (startImage) images.push(startImage)
+  if (endImage) images.push(endImage)
   return images
 }
 
@@ -281,7 +298,13 @@ async function executeNode(params: {
   const videoMode = node.type === 'video.generate'
     ? (node.data?.mode || '').toString()
     : ''
-  const upstreamIncoming = selectUpstreamInputs(node, incomingResolved)
+  const seedanceHandleIncoming = incomingResolved.filter((item) => isStartHandle(item.edge.targetHandle) || isEndHandle(item.edge.targetHandle))
+  const hasSeedanceHandleFrames = node.type === 'video.generate'
+    && videoModel === 'seedance-1.5-pro'
+    && seedanceHandleIncoming.length > 0
+  const upstreamIncoming = hasSeedanceHandleFrames
+    ? incomingResolved
+    : selectUpstreamInputs(node, incomingResolved)
   let upstreamImages = collectImageInputs(upstreamIncoming)
   const uploadedImages = getUploadedRefImages(node)
   const effectiveVideoMode = videoMode || ((upstreamImages.length + uploadedImages.length) > 0 ? 'i2v' : 't2v')
@@ -290,7 +313,9 @@ async function executeNode(params: {
     && effectiveVideoMode === 'i2v'
     && hasExplicitSeedanceFrameSelection(node)
 
-  if (useExplicitSeedanceFrames) {
+  if (node.type === 'video.generate' && videoModel === 'seedance-1.5-pro' && effectiveVideoMode === 'i2v' && hasSeedanceHandleFrames) {
+    upstreamImages = collectSeedanceFrameInputsFromHandles(incomingResolved)
+  } else if (useExplicitSeedanceFrames) {
     upstreamImages = collectSeedanceFrameInputs(node, incomingResolved)
   }
 
@@ -312,6 +337,8 @@ async function executeNode(params: {
       prompt,
       model: node.data?.model || 'nanobanana-pro',
       aspect_ratio: node.data?.aspect_ratio || '3:4',
+      resolution: node.data?.resolution,
+      gpt_image_quality: node.data?.gpt_image_quality,
       images: inputImages,
       image_count: imageCount,
       parent_id: parentGenerationIds[0] || undefined,

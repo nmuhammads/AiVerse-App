@@ -311,6 +311,14 @@ function getIncomingEdges(graph: WorkflowGraph, nodeId: string) {
   return graph.edges.filter((edge) => edge.target === nodeId)
 }
 
+function isStartHandle(edge: { targetHandle?: string | null }) {
+  return String(edge.targetHandle || '').toLowerCase() === 'start_image'
+}
+
+function isEndHandle(edge: { targetHandle?: string | null }) {
+  return String(edge.targetHandle || '').toLowerCase() === 'end_image'
+}
+
 function detectCycle(graph: WorkflowGraph): boolean {
   const incoming = new Map<string, number>()
   const outgoing = new Map<string, string[]>()
@@ -370,6 +378,8 @@ export function validateBeforeRun(graph: WorkflowGraph): string[] {
       return sourceType !== 'video.generate' && sourceType !== 'video.concat'
     })
     const imageIncomingNodeIds = Array.from(new Set(imageIncomingEdges.map((edge) => edge.source)))
+    const startHandleEdges = imageIncomingEdges.filter((edge) => isStartHandle(edge))
+    const endHandleEdges = imageIncomingEdges.filter((edge) => isEndHandle(edge))
     const refSource = getRefSource(node)
     const selectedUpstreamNodeId = getSelectedUpstreamNodeId(node)
     const selectedStartUpstreamNodeId = getSelectedStartUpstreamNodeId(node)
@@ -395,11 +405,13 @@ export function validateBeforeRun(graph: WorkflowGraph): string[] {
     const selectedSeedanceIncoming = explicitSeedanceFrameSelection
       ? selectedStartIncoming + selectedEndIncoming
       : selectedImageIncoming
+    const handleSeedanceIncoming = (startHandleEdges.length > 0 ? 1 : 0) + (endHandleEdges.length > 0 ? 1 : 0)
+    const hasHandleFrameSelection = startHandleEdges.length > 0 || endHandleEdges.length > 0
     const effectiveSeedanceImageInputs = refSource === 'upload'
       ? uploadedRefs
       : refSource === 'mixed'
-        ? selectedSeedanceIncoming + uploadedRefs
-        : selectedSeedanceIncoming
+        ? (hasHandleFrameSelection ? handleSeedanceIncoming : selectedSeedanceIncoming) + uploadedRefs
+        : (hasHandleFrameSelection ? handleSeedanceIncoming : selectedSeedanceIncoming)
 
     if (node.type === 'prompt') {
       const text = String(node.data?.text || node.data?.prompt || '').trim()
@@ -436,13 +448,23 @@ export function validateBeforeRun(graph: WorkflowGraph): string[] {
       const prompt = String(node.data?.prompt || '').trim()
       const skipLegacySelectionValidation = model === 'seedance-1.5-pro'
         && (mode === 'i2v' || mode === '')
-        && explicitSeedanceFrameSelection
+        && (explicitSeedanceFrameSelection || hasHandleFrameSelection)
+
+      if (startHandleEdges.length > 1) {
+        issues.push(`Нода ${node.id}: start_image поддерживает только 1 вход`)
+      }
+      if (endHandleEdges.length > 1) {
+        issues.push(`Нода ${node.id}: end_image поддерживает только 1 вход`)
+      }
+      if ((startHandleEdges.length > 0 || endHandleEdges.length > 0) && !(model === 'seedance-1.5-pro' && mode === 'i2v')) {
+        issues.push(`Нода ${node.id}: start/end handles доступны только для seedance i2v`)
+      }
 
       if ((refSource === 'upstream' || refSource === 'mixed') && selectedUpstreamNodeId !== 'all' && selectedImageIncoming === 0 && !skipLegacySelectionValidation) {
         issues.push(`Нода ${node.id}: выбранный предыдущий нод не подключен`)
       }
 
-      if ((refSource === 'upstream' || refSource === 'mixed') && model === 'seedance-1.5-pro' && mode === 'i2v' && explicitSeedanceFrameSelection) {
+      if ((refSource === 'upstream' || refSource === 'mixed') && model === 'seedance-1.5-pro' && mode === 'i2v' && !hasHandleFrameSelection && explicitSeedanceFrameSelection) {
         if (selectedStartUpstreamNodeId !== 'auto' && selectedStartIncoming === 0) {
           issues.push(`Нода ${node.id}: выбранный нод для стартового кадра не подключен`)
         }

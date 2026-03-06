@@ -15,6 +15,8 @@ const DEFAULT_GRAPH: WorkflowGraph = {
       position: { x: 120, y: 110 },
       data: {
         model: 'gpt-image-1.5',
+        gpt_image_quality: 'medium',
+        resolution: '1K',
         aspect_ratio: '3:4',
         image_count: 1,
         prompt: 'cinematic neon city at night, rainy street, depth of field',
@@ -32,6 +34,9 @@ const DEFAULT_GRAPH: WorkflowGraph = {
         mode: 'i2v',
         video_duration: '8',
         video_resolution: '720p',
+        generate_audio: false,
+        kling_duration: '5',
+        kling_sound: false,
         prompt: 'camera slowly pushes forward, wet asphalt reflections, cinematic movement',
         ref_source: 'upstream',
         selected_upstream_node_id: 'all',

@@ -17,6 +17,9 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
   const imageUrl = output?.type === 'image' ? output.image_urls[0] || null : null
   const hasVideoOutput = output?.type === 'video'
   const canOpenResult = nodeData.status === 'done' && !!output && !!nodeData.onOpenResult
+  const isSeedanceI2V = nodeData.nodeType === 'video.generate'
+    && String(nodeData.rawData?.model || 'seedance-1.5-pro') === 'seedance-1.5-pro'
+    && String(nodeData.rawData?.mode || 'i2v') === 'i2v'
 
   const handleOpenResult = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
@@ -30,11 +33,30 @@ export const WorkflowNodeCard = memo(({ data }: NodeProps<Node<FlowNodeData>>) =
         nodeData.highlighted ? 'ring-2 ring-cyan-300/80' : ''
       }`}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!h-2.5 !w-2.5 !border !border-white/20 !bg-zinc-950"
-      />
+      {isSeedanceI2V ? (
+        <>
+          <Handle
+            id="start_image"
+            type="target"
+            position={Position.Left}
+            style={{ top: '36%' }}
+            className="!h-2.5 !w-2.5 !border !border-cyan-300/50 !bg-cyan-900"
+          />
+          <Handle
+            id="end_image"
+            type="target"
+            position={Position.Left}
+            style={{ top: '68%' }}
+            className="!h-2.5 !w-2.5 !border !border-fuchsia-300/50 !bg-fuchsia-900"
+          />
+        </>
+      ) : (
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!h-2.5 !w-2.5 !border !border-white/20 !bg-zinc-950"
+        />
+      )}
 
       <div className="flex items-start justify-between gap-2">
         <div className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/25">

@@ -13,6 +13,11 @@ import {
   getDefaultNodeTitle,
   getNodeDisplayName,
 } from './workflowUtils'
+import {
+  WORKFLOW_IMAGE_MODEL_OPTIONS,
+  WORKFLOW_VIDEO_MODEL_OPTIONS,
+  calculateWorkflowNodeCost,
+} from './workflowPricing'
 
 function deriveNodeTitle(node: WorkflowNode): string {
   return getNodeDisplayName(node)
@@ -21,6 +26,7 @@ function deriveNodeTitle(node: WorkflowNode): string {
 export function NodeSettings(props: {
   node: WorkflowNode
   output?: NodeArtifact | null
+  nodeCost?: number
   onOpenOutput?: () => void
   incomingOptions: Array<{ id: string; edgeId: string; order: number; label: string; type: string }>
   onPatch: (nodeId: string, patch: Partial<WorkflowNodeData>) => void
@@ -30,7 +36,7 @@ export function NodeSettings(props: {
   onRemoveRef: (node: WorkflowNode, index: number) => void
   isUploading: boolean
 }) {
-  const { node, output, onOpenOutput, incomingOptions, onPatch, onUpdateInputOrder, onDelete, onUploadRefs, onRemoveRef, isUploading } = props
+  const { node, output, nodeCost, onOpenOutput, incomingOptions, onPatch, onUpdateInputOrder, onDelete, onUploadRefs, onRemoveRef, isUploading } = props
   const imageIncomingOptions = Array.from(
     new Map(
       incomingOptions
@@ -54,6 +60,9 @@ export function NodeSettings(props: {
   const isGeneratorNode = node.type === 'image.generate' || node.type === 'video.generate'
   const videoModel = node.type === 'video.generate'
     ? String(node.data?.model || 'seedance-1.5-pro')
+    : ''
+  const imageModel = node.type === 'image.generate'
+    ? String(node.data?.model || 'gpt-image-1.5')
     : ''
   const videoMode = node.type === 'video.generate'
     ? String(node.data?.mode || 'i2v')
@@ -326,14 +335,50 @@ export function NodeSettings(props: {
             <p className="text-zinc-500">Модель</p>
             <select
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
-              value={String(node.data?.model || 'gpt-image-1.5')}
-              onChange={(event) => onPatch(node.id, { model: event.target.value })}
+              value={imageModel}
+              onChange={(event) => {
+                const nextModel = event.target.value
+                const patch: Partial<WorkflowNodeData> = { model: nextModel }
+                if (nextModel === 'gpt-image-1.5') patch.gpt_image_quality = 'medium'
+                if (nextModel === 'nanobanana-pro') patch.resolution = '1K'
+                if (nextModel === 'nanobanana-2') patch.resolution = '1K'
+                onPatch(node.id, patch)
+              }}
             >
-              <option value="gpt-image-1.5">gpt-image-1.5</option>
-              <option value="nanobanana-pro">nanobanana-pro</option>
-              <option value="seedream4-5">seedream4-5</option>
+              {WORKFLOW_IMAGE_MODEL_OPTIONS.map((modelId) => (
+                <option key={modelId} value={modelId}>{modelId}</option>
+              ))}
             </select>
           </label>
+
+          {imageModel === 'gpt-image-1.5' ? (
+            <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+              <p className="text-zinc-500">Качество GPT Image</p>
+              <select
+                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                value={String(node.data?.gpt_image_quality || 'medium')}
+                onChange={(event) => onPatch(node.id, { gpt_image_quality: event.target.value as WorkflowNodeData['gpt_image_quality'] })}
+              >
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+          ) : null}
+
+          {(imageModel === 'nanobanana-pro' || imageModel === 'nanobanana-2') ? (
+            <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+              <p className="text-zinc-500">Разрешение</p>
+              <select
+                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                value={String(node.data?.resolution || '1K')}
+                onChange={(event) => onPatch(node.id, { resolution: event.target.value as WorkflowNodeData['resolution'] })}
+              >
+                <option value="1K">1K</option>
+                <option value="2K">2K</option>
+                {imageModel === 'nanobanana-2' ? <option value="4K">4K</option> : null}
+              </select>
+            </label>
+          ) : null}
 
           <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
             <p className="text-zinc-500">Промпт</p>
@@ -389,11 +434,13 @@ export function NodeSettings(props: {
                 selected_upstream_node_id: 'all',
                 selected_start_upstream_node_id: 'auto',
                 selected_end_upstream_node_id: 'none',
+                kling_duration: '5',
+                kling_sound: false,
               })}
             >
-              <option value="seedance-1.5-pro">seedance-1.5-pro</option>
-              <option value="kling-i2v">kling-i2v</option>
-              <option value="kling-t2v">kling-t2v</option>
+              {WORKFLOW_VIDEO_MODEL_OPTIONS.map((modelId) => (
+                <option key={modelId} value={modelId}>{modelId}</option>
+              ))}
             </select>
           </label>
 
@@ -421,32 +468,76 @@ export function NodeSettings(props: {
             />
           </label>
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Длительность</p>
-              <select
-                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
-                value={String(node.data?.video_duration || '8')}
-                onChange={(event) => onPatch(node.id, { video_duration: event.target.value })}
-              >
-                <option value="4">4s</option>
-                <option value="8">8s</option>
-                <option value="12">12s</option>
-              </select>
-            </label>
+          {videoModel === 'seedance-1.5-pro' ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+                  <p className="text-zinc-500">Длительность</p>
+                  <select
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                    value={String(node.data?.video_duration || '8')}
+                    onChange={(event) => onPatch(node.id, { video_duration: event.target.value })}
+                  >
+                    <option value="4">4s</option>
+                    <option value="8">8s</option>
+                    <option value="12">12s</option>
+                  </select>
+                </label>
 
-            <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
-              <p className="text-zinc-500">Разрешение</p>
-              <select
-                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
-                value={String(node.data?.video_resolution || '720p')}
-                onChange={(event) => onPatch(node.id, { video_resolution: event.target.value })}
-              >
-                <option value="480p">480p</option>
-                <option value="720p">720p</option>
-              </select>
-            </label>
-          </div>
+                <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+                  <p className="text-zinc-500">Разрешение</p>
+                  <select
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                    value={String(node.data?.video_resolution || '720p')}
+                    onChange={(event) => onPatch(node.id, { video_resolution: event.target.value })}
+                  >
+                    <option value="480p">480p</option>
+                    <option value="720p">720p</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+                <p className="text-zinc-500">Генерация аудио</p>
+                <select
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                  value={String(Boolean(node.data?.generate_audio ?? false))}
+                  onChange={(event) => onPatch(node.id, { generate_audio: event.target.value === 'true' })}
+                >
+                  <option value="false">Нет</option>
+                  <option value="true">Да</option>
+                </select>
+              </label>
+            </>
+          ) : null}
+
+          {(videoModel === 'kling-t2v' || videoModel === 'kling-i2v') ? (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+                <p className="text-zinc-500">Длительность Kling</p>
+                <select
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                  value={String(node.data?.kling_duration || '5')}
+                  onChange={(event) => onPatch(node.id, { kling_duration: event.target.value })}
+                >
+                  <option value="5">5s</option>
+                  <option value="10">10s</option>
+                </select>
+              </label>
+
+              <label className="block rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
+                <p className="text-zinc-500">Звук Kling</p>
+                <select
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
+                  value={String(Boolean(node.data?.kling_sound ?? false))}
+                  onChange={(event) => onPatch(node.id, { kling_sound: event.target.value === 'true' })}
+                >
+                  <option value="false">Нет</option>
+                  <option value="true">Да</option>
+                </select>
+              </label>
+            </div>
+          ) : null}
         </>
       ) : null}
 
@@ -458,7 +549,7 @@ export function NodeSettings(props: {
         <p className="text-zinc-500">Оценка стоимости</p>
         <p className="mt-0.5 inline-flex items-center gap-1 text-zinc-200">
           <Coins className="h-3.5 w-3.5 text-yellow-400" />
-          зависит от выбранных моделей
+          {typeof nodeCost === 'number' ? `${nodeCost} токенов` : `${calculateWorkflowNodeCost(node)} токенов`}
         </p>
       </div>
 

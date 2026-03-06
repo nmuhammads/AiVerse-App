@@ -14,6 +14,8 @@ export interface WorkflowNodeData {
   mode?: 't2v' | 'i2v'
   prompt?: string
   text?: string
+  resolution?: '1K' | '2K' | '4K'
+  gpt_image_quality?: 'medium' | 'high'
   ref_source?: 'upstream' | 'upload' | 'mixed'
   selected_upstream_node_id?: string | 'all'
   selected_start_upstream_node_id?: string | 'auto'

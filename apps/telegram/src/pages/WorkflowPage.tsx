@@ -56,6 +56,11 @@ import { NodeResultModal } from '@/components/workflow/NodeResultModal'
 import { WorkflowResultsOverlay } from '@/components/workflow/WorkflowResultsOverlay'
 import { TemplateListModal } from '@/components/workflow/TemplateListModal'
 import { resolvedPlatform } from '@/utils/platform'
+import {
+  calculateWorkflowNodeCost,
+  calculateWorkflowTotalCost,
+  isSeedanceI2V,
+} from '@/components/workflow/workflowPricing'
 
 type MobileSheet = 'none' | 'library' | 'inspector' | 'rename'
 
@@ -320,6 +325,7 @@ export default function WorkflowPage() {
   }, [graph, setDirty, setGraph])
 
   const progressValue = Math.max(0, Math.min(100, Number(run?.progress || 0)))
+  const totalEstimatedCost = useMemo(() => calculateWorkflowTotalCost(graph.nodes), [graph.nodes])
   const terminalRun = run?.status === 'completed' || run?.status === 'failed' || run?.status === 'cancelled'
   const runError = run?.error?.message || null
 
@@ -378,6 +384,29 @@ export default function WorkflowPage() {
     (connection: Connection) => {
       if (!connection.source || !connection.target) return
 
+      const targetNode = graph.nodes.find((node) => node.id === connection.target)
+      const sourceNode = graph.nodes.find((node) => node.id === connection.source)
+      const targetHandle = String(connection.targetHandle || '')
+      const isSeedanceHandle = targetHandle === 'start_image' || targetHandle === 'end_image'
+
+      if (isSeedanceHandle) {
+        if (!targetNode || !isSeedanceI2V(targetNode)) {
+          toast.error('Start/End входы доступны только для Seedance i2v')
+          return
+        }
+        if (!sourceNode || sourceNode.type !== 'image.generate') {
+          toast.error('К start/end можно подключать только image-ноды')
+          return
+        }
+        const alreadyConnected = edges.some((edge) =>
+          edge.target === connection.target && String(edge.targetHandle || '') === targetHandle
+        )
+        if (alreadyConnected) {
+          toast.error(`${targetHandle} уже подключен`)
+          return
+        }
+      }
+
       const incomingCount = edges.filter((edge) => edge.target === connection.target).length
       const nextEdge: Edge = styleEdge(
         {
@@ -393,8 +422,18 @@ export default function WorkflowPage() {
       )
 
       setEdges((currentEdges) => addEdge(nextEdge, currentEdges))
+
+      if (isSeedanceHandle && targetNode) {
+        const patch: Partial<WorkflowNodeData> = {}
+        if (targetHandle === 'start_image') {
+          patch.selected_start_upstream_node_id = connection.source
+        } else if (targetHandle === 'end_image') {
+          patch.selected_end_upstream_node_id = connection.source
+        }
+        updateNodeData(targetNode.id, patch)
+      }
     },
-    [edges, isRunning, setEdges]
+    [edges, graph.nodes, isRunning, setEdges, updateNodeData]
   )
 
   const handleNodeClick = useCallback(
@@ -439,6 +478,8 @@ export default function WorkflowPage() {
             model: 'gpt-image-1.5',
             aspect_ratio: '3:4',
             image_count: 1,
+            gpt_image_quality: 'medium',
+            resolution: '1K',
             prompt: '',
             ref_source: 'upstream',
             selected_upstream_node_id: 'all',
@@ -452,6 +493,9 @@ export default function WorkflowPage() {
             mode: 'i2v',
             video_duration: '8',
             video_resolution: '720p',
+            generate_audio: false,
+            kling_duration: '5',
+            kling_sound: false,
             prompt: '',
             ref_source: 'upstream',
             selected_upstream_node_id: 'all',
@@ -888,6 +932,8 @@ export default function WorkflowPage() {
               <span className="font-semibold text-zinc-200">{activeTemplateLabel}</span>
               <span className="text-zinc-500">|</span>
               <span className="text-zinc-400">нод {graph.nodes.length}</span>
+              <span className="text-zinc-500">|</span>
+              <span className="text-amber-300">~ {totalEstimatedCost} токенов</span>
             </div>
 
             {!isMobileViewport ? (
@@ -962,6 +1008,7 @@ export default function WorkflowPage() {
                 <NodeSettings
                   node={selectedNode}
                   output={selectedNodeOutput}
+                  nodeCost={calculateWorkflowNodeCost(selectedNode)}
                   onOpenOutput={() => handleOpenNodeResult(selectedNode.id)}
                   incomingOptions={selectedNodeIncomingOptions}
                   onPatch={updateNodeData}
