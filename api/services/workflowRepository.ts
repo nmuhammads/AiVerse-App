@@ -1,7 +1,85 @@
 import { supaDelete, supaPatch, supaPost, supaSelect } from './supabaseService.js'
 import type { WorkflowGraph, WorkflowRunRecord, WorkflowRunStatus, WorkflowTemplateRecord } from '../types/workflow.js'
 
-const WORKFLOW_SCHEMA = 'workflow'
+const WORKFLOW_SCHEMA = String(process.env.WORKFLOW_SCHEMA || 'workflow').trim() || 'workflow'
+const WORKFLOW_SCHEMA_FALLBACK = WORKFLOW_SCHEMA === 'public' ? null : 'public'
+
+type SupaResultLike = { ok: boolean; data?: unknown }
+
+function shouldFallbackToPublic(result: SupaResultLike) {
+  if (result.ok || !WORKFLOW_SCHEMA_FALLBACK) return false
+  const payload = (result.data || {}) as { code?: string; message?: string; details?: string }
+  const code = String(payload.code || '')
+  const message = String(payload.message || '').toLowerCase()
+  const details = String(payload.details || '').toLowerCase()
+  return (
+    code === 'PGRST106'
+    || code === '42P01'
+    || message.includes('schema must be one of')
+    || message.includes('relation') && message.includes('does not exist')
+    || details.includes('schema must be one of')
+  )
+}
+
+function logWorkflowRepoError(context: string, result: SupaResultLike) {
+  if (result.ok) return
+  console.error(`[WorkflowRepo] ${context} failed`, result.data || null)
+}
+
+async function withWorkflowSchemaFallback<T extends SupaResultLike>(
+  context: string,
+  call: (schema: string) => Promise<T>
+): Promise<T> {
+  const primary = await call(WORKFLOW_SCHEMA)
+  if (!shouldFallbackToPublic(primary)) return primary
+
+  console.warn(
+    `[WorkflowRepo] ${context}: schema "${WORKFLOW_SCHEMA}" unavailable, retrying with "${WORKFLOW_SCHEMA_FALLBACK}"`
+  )
+  return call(WORKFLOW_SCHEMA_FALLBACK as string)
+}
+
+async function workflowSelect(table: string, query: string) {
+  const result = await withWorkflowSchemaFallback(
+    `select ${table}`,
+    (schema) => supaSelect(table, query, schema)
+  )
+  logWorkflowRepoError(`select ${table}`, result)
+  return result
+}
+
+async function workflowPost(table: string, body: unknown, params = '') {
+  const result = await withWorkflowSchemaFallback(
+    `post ${table}`,
+    (schema) => supaPost(table, body, params, schema)
+  )
+  logWorkflowRepoError(`post ${table}`, result)
+  return result
+}
+
+async function workflowPatch(
+  table: string,
+  filter: string,
+  body: unknown,
+  preferReturnRepresentation = false
+) {
+  const result = await withWorkflowSchemaFallback(
+    `patch ${table}`,
+    (schema) => supaPatch(table, filter, body, preferReturnRepresentation, schema)
+  )
+  logWorkflowRepoError(`patch ${table}`, result)
+  return result
+}
+
+async function workflowDelete(table: string, filter: string) {
+  const primary = await supaDelete(table, filter, WORKFLOW_SCHEMA)
+  if (primary.ok || !WORKFLOW_SCHEMA_FALLBACK) return primary
+
+  console.warn(
+    `[WorkflowRepo] delete ${table}: schema "${WORKFLOW_SCHEMA}" failed, retrying with "${WORKFLOW_SCHEMA_FALLBACK}"`
+  )
+  return supaDelete(table, filter, WORKFLOW_SCHEMA_FALLBACK)
+}
 
 function asTemplate(row: any): WorkflowTemplateRecord {
   return {
@@ -40,7 +118,7 @@ export async function createWorkflowTemplate(params: {
   description?: string | null
   graph: WorkflowGraph
 }) {
-  const result = await supaPost(
+  const result = await workflowPost(
     'workflow_templates',
     {
       user_id: params.userId,
@@ -48,8 +126,7 @@ export async function createWorkflowTemplate(params: {
       description: params.description ?? null,
       graph: params.graph,
     },
-    '',
-    WORKFLOW_SCHEMA
+    '?select=*'
   )
 
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
@@ -59,20 +136,18 @@ export async function createWorkflowTemplate(params: {
 }
 
 export async function listWorkflowTemplates(userId: number) {
-  const result = await supaSelect(
+  const result = await workflowSelect(
     'workflow_templates',
-    `?user_id=eq.${userId}&is_archived=eq.false&order=updated_at.desc`,
-    WORKFLOW_SCHEMA
+    `?user_id=eq.${userId}&is_archived=eq.false&order=updated_at.desc`
   )
   if (!result.ok || !Array.isArray(result.data)) return []
   return result.data.map(asTemplate)
 }
 
 export async function getWorkflowTemplateById(id: number, userId: number) {
-  const result = await supaSelect(
+  const result = await workflowSelect(
     'workflow_templates',
-    `?id=eq.${id}&user_id=eq.${userId}&is_archived=eq.false&select=*`,
-    WORKFLOW_SCHEMA
+    `?id=eq.${id}&user_id=eq.${userId}&is_archived=eq.false&select=*`
   )
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) return null
   return asTemplate(result.data[0])
@@ -88,24 +163,22 @@ export async function updateWorkflowTemplate(
   if (Object.prototype.hasOwnProperty.call(patch, 'description')) body.description = patch.description ?? null
   if (patch.graph) body.graph = patch.graph
 
-  const updated = await supaPatch(
+  const updated = await workflowPatch(
     'workflow_templates',
     `?id=eq.${id}&user_id=eq.${userId}`,
     body,
-    true,
-    WORKFLOW_SCHEMA
+    true
   )
   if (!updated.ok || !Array.isArray(updated.data) || updated.data.length === 0) return null
   return asTemplate(updated.data[0])
 }
 
 export async function archiveWorkflowTemplate(id: number, userId: number) {
-  const updated = await supaPatch(
+  const updated = await workflowPatch(
     'workflow_templates',
     `?id=eq.${id}&user_id=eq.${userId}`,
     { is_archived: true },
-    false,
-    WORKFLOW_SCHEMA
+    false
   )
   return updated.ok
 }
@@ -115,7 +188,7 @@ export async function createWorkflowRun(params: {
   userId: number
   status?: WorkflowRunStatus
 }) {
-  const result = await supaPost(
+  const result = await workflowPost(
     'workflow_runs',
     {
       workflow_id: params.workflowId,
@@ -126,28 +199,25 @@ export async function createWorkflowRun(params: {
       generation_ids: [],
       outputs: {},
     },
-    '',
-    WORKFLOW_SCHEMA
+    '?select=*'
   )
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) return null
   return asRun(result.data[0])
 }
 
 export async function getWorkflowRunById(runId: number, userId: number) {
-  const result = await supaSelect(
+  const result = await workflowSelect(
     'workflow_runs',
-    `?id=eq.${runId}&user_id=eq.${userId}&select=*`,
-    WORKFLOW_SCHEMA
+    `?id=eq.${runId}&user_id=eq.${userId}&select=*`
   )
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) return null
   return asRun(result.data[0])
 }
 
 export async function getWorkflowRunByIdInternal(runId: number) {
-  const result = await supaSelect(
+  const result = await workflowSelect(
     'workflow_runs',
-    `?id=eq.${runId}&select=*`,
-    WORKFLOW_SCHEMA
+    `?id=eq.${runId}&select=*`
   )
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) return null
   return asRun(result.data[0])
@@ -155,10 +225,9 @@ export async function getWorkflowRunByIdInternal(runId: number) {
 
 export async function listWorkflowRuns(userId: number, workflowId?: number) {
   const wfFilter = workflowId ? `&workflow_id=eq.${workflowId}` : ''
-  const result = await supaSelect(
+  const result = await workflowSelect(
     'workflow_runs',
-    `?user_id=eq.${userId}${wfFilter}&order=created_at.desc&select=*`,
-    WORKFLOW_SCHEMA
+    `?user_id=eq.${userId}${wfFilter}&order=created_at.desc&select=*`
   )
   if (!result.ok || !Array.isArray(result.data)) return []
   return result.data.map(asRun)
@@ -176,12 +245,11 @@ export async function updateWorkflowRun(runId: number, patch: Partial<WorkflowRu
   if (patch.finished_at !== undefined) body.finished_at = patch.finished_at
   if (patch.generation_ids) body.generation_ids = patch.generation_ids
 
-  const result = await supaPatch(
+  const result = await workflowPatch(
     'workflow_runs',
     `?id=eq.${runId}`,
     body,
-    true,
-    WORKFLOW_SCHEMA
+    true
   )
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) return null
   return asRun(result.data[0])
@@ -197,17 +265,16 @@ export async function appendWorkflowRunGenerationIds(runId: number, generationId
 }
 
 export async function markRunningWorkflowRunsAsFailed(reason: string) {
-  const select = await supaSelect(
+  const select = await workflowSelect(
     'workflow_runs',
-    `?status=in.(queued,running)&select=id,error`,
-    WORKFLOW_SCHEMA
+    `?status=in.(queued,running)&select=id,error`
   )
   if (!select.ok || !Array.isArray(select.data)) return 0
 
   let updated = 0
   for (const row of select.data) {
     const nextError = row.error || { message: reason }
-    const res = await supaPatch(
+    const res = await workflowPatch(
       'workflow_runs',
       `?id=eq.${row.id}&status=in.(queued,running)`,
       {
@@ -215,8 +282,7 @@ export async function markRunningWorkflowRunsAsFailed(reason: string) {
         error: nextError,
         finished_at: new Date().toISOString(),
       },
-      false,
-      WORKFLOW_SCHEMA
+      false
     )
     if (res.ok) updated += 1
   }
@@ -224,5 +290,5 @@ export async function markRunningWorkflowRunsAsFailed(reason: string) {
 }
 
 export async function hardDeleteWorkflowTemplate(id: number, userId: number) {
-  return supaDelete('workflow_templates', `?id=eq.${id}&user_id=eq.${userId}`, WORKFLOW_SCHEMA)
+  return workflowDelete('workflow_templates', `?id=eq.${id}&user_id=eq.${userId}`)
 }
