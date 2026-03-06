@@ -49,6 +49,7 @@ import {
   getNodeDisplayName,
 } from '@/components/workflow/workflowUtils'
 import { WorkflowNodeCard } from '@/components/workflow/WorkflowNodeCard'
+import { WorkflowDeletableEdge } from '@/components/workflow/WorkflowDeletableEdge'
 import { NodeSettings } from '@/components/workflow/NodeSettings'
 import { BottomSheet } from '@/components/workflow/BottomSheet'
 import { MobileHeaderMenu } from '@/components/workflow/MobileHeaderMenu'
@@ -82,6 +83,7 @@ function cloneGraph(graph: WorkflowGraph): WorkflowGraph {
 
 export default function WorkflowPage() {
   const nodeTypes = useMemo(() => ({ workflow: WorkflowNodeCard }), [])
+  const edgeTypes = useMemo(() => ({ deletable: WorkflowDeletableEdge }), [])
 
   const {
     graph,
@@ -272,6 +274,7 @@ export default function WorkflowPage() {
           order: Number(edge.data?.order ?? index),
           label: source ? `${getNodeDisplayName(source)} (${source.id})` : edge.source,
           type: source?.type || 'image.generate',
+          targetHandle: edge.targetHandle,
         }
       })
       .sort((a, b) => {
@@ -415,25 +418,15 @@ export default function WorkflowPage() {
           target: connection.target,
           sourceHandle: connection.sourceHandle,
           targetHandle: connection.targetHandle,
-          type: 'smoothstep',
+          type: 'deletable',
           data: { order: incomingCount },
         },
         isRunning
       )
 
       setEdges((currentEdges) => addEdge(nextEdge, currentEdges))
-
-      if (isSeedanceHandle && targetNode) {
-        const patch: Partial<WorkflowNodeData> = {}
-        if (targetHandle === 'start_image') {
-          patch.selected_start_upstream_node_id = connection.source
-        } else if (targetHandle === 'end_image') {
-          patch.selected_end_upstream_node_id = connection.source
-        }
-        updateNodeData(targetNode.id, patch)
-      }
     },
-    [edges, graph.nodes, isRunning, setEdges, updateNodeData]
+    [edges, graph.nodes, isRunning, setEdges]
   )
 
   const handleNodeClick = useCallback(
@@ -973,6 +966,7 @@ export default function WorkflowPage() {
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
@@ -990,7 +984,7 @@ export default function WorkflowPage() {
               preventScrolling={false}
               fitViewOptions={{ padding: 0.2, maxZoom: 1.05 }}
               defaultEdgeOptions={{
-                type: 'smoothstep',
+                type: 'deletable',
               }}
               className="workflow-flow"
               proOptions={{ hideAttribution: true }}

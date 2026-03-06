@@ -28,7 +28,7 @@ export function NodeSettings(props: {
   output?: NodeArtifact | null
   nodeCost?: number
   onOpenOutput?: () => void
-  incomingOptions: Array<{ id: string; edgeId: string; order: number; label: string; type: string }>
+  incomingOptions: Array<{ id: string; edgeId: string; order: number; label: string; type: string; targetHandle?: string | null }>
   onPatch: (nodeId: string, patch: Partial<WorkflowNodeData>) => void
   onUpdateInputOrder: (nodeId: string, edgeId: string, fragmentOrder: number) => void
   onDelete: () => void
@@ -37,10 +37,10 @@ export function NodeSettings(props: {
   isUploading: boolean
 }) {
   const { node, output, nodeCost, onOpenOutput, incomingOptions, onPatch, onUpdateInputOrder, onDelete, onUploadRefs, onRemoveRef, isUploading } = props
+  const rawImageIncomingOptions = incomingOptions.filter((item) => item.type === 'image.generate')
   const imageIncomingOptions = Array.from(
     new Map(
-      incomingOptions
-        .filter((item) => item.type === 'image.generate')
+      rawImageIncomingOptions
         .map((item) => [item.id, item])
     ).values()
   )
@@ -56,6 +56,10 @@ export function NodeSettings(props: {
   const selectedUpstreamNodeId = getSelectedUpstreamNodeId(node)
   const selectedStartUpstreamNodeId = getSelectedStartUpstreamNodeId(node)
   const selectedEndUpstreamNodeId = getSelectedEndUpstreamNodeId(node)
+  const connectedStartOption = rawImageIncomingOptions.find((item) => String(item.targetHandle || '').toLowerCase() === 'start_image')
+  const connectedEndOption = rawImageIncomingOptions.find((item) => String(item.targetHandle || '').toLowerCase() === 'end_image')
+  const resolvedSelectedStartUpstreamNodeId = connectedStartOption?.id || selectedStartUpstreamNodeId
+  const resolvedSelectedEndUpstreamNodeId = connectedEndOption?.id || selectedEndUpstreamNodeId
   const refImages = Array.isArray(node.data?.ref_images) ? node.data.ref_images : []
   const isGeneratorNode = node.type === 'image.generate' || node.type === 'video.generate'
   const videoModel = node.type === 'video.generate'
@@ -238,7 +242,7 @@ export function NodeSettings(props: {
                 <p className="text-zinc-500">Стартовый кадр: источник-нода</p>
                 <select
                   className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
-                  value={selectedStartUpstreamNodeId}
+                  value={resolvedSelectedStartUpstreamNodeId}
                   onChange={(event) => onPatch(node.id, {
                     selected_start_upstream_node_id: event.target.value as WorkflowNodeData['selected_start_upstream_node_id'],
                   })}
@@ -254,7 +258,7 @@ export function NodeSettings(props: {
                 <p className="text-zinc-500">Финальный кадр: источник-нода</p>
                 <select
                   className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-zinc-100 outline-none"
-                  value={selectedEndUpstreamNodeId}
+                  value={resolvedSelectedEndUpstreamNodeId}
                   onChange={(event) => onPatch(node.id, {
                     selected_end_upstream_node_id: event.target.value as WorkflowNodeData['selected_end_upstream_node_id'],
                   })}

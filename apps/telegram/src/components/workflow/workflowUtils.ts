@@ -279,7 +279,7 @@ export function graphToFlowEdges(graph: WorkflowGraph, isRunning: boolean): Edge
         sourceHandle: edge.sourceHandle,
         targetHandle: edge.targetHandle,
         data: edge.data,
-        type: 'smoothstep',
+        type: 'deletable',
       },
       isRunning
     )
