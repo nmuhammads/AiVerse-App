@@ -7,8 +7,8 @@ import { uploadVideoBuffer } from './r2Service.js'
 
 const execFileAsync = promisify(execFile)
 
-const TARGET_WIDTH = 1280
-const TARGET_HEIGHT = 720
+const DEFAULT_TARGET_WIDTH = 1280
+const DEFAULT_TARGET_HEIGHT = 720
 const TARGET_FPS = 30
 const MAX_INPUT_VIDEOS = 12
 
@@ -16,11 +16,54 @@ function sanitizeFilePart(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48) || 'node'
 }
 
-function buildConcatFilter(inputCount: number): string {
+function normalizeEvenDimension(value: number, fallback: number): number {
+  if (!Number.isFinite(value) || value <= 0) return fallback
+  const rounded = Math.round(value)
+  const even = rounded % 2 === 0 ? rounded : rounded - 1
+  return Math.max(2, even)
+}
+
+async function probeVideoDimensions(filePath: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const ffprobeArgs = [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height:stream_tags=rotate',
+      '-of', 'json',
+      filePath,
+    ]
+    const { stdout } = await execFileAsync('ffprobe', ffprobeArgs, { maxBuffer: 1024 * 1024 })
+    const payload = JSON.parse(stdout || '{}') as {
+      streams?: Array<{ width?: number; height?: number; tags?: { rotate?: string } }>
+    }
+    const stream = Array.isArray(payload.streams) ? payload.streams[0] : null
+    if (!stream) return null
+
+    let width = Number(stream.width || 0)
+    let height = Number(stream.height || 0)
+    const rotate = Number(stream.tags?.rotate || 0)
+    if (Math.abs(rotate) % 180 === 90) {
+      const nextWidth = height
+      height = width
+      width = nextWidth
+    }
+
+    if (!width || !height) return null
+
+    return {
+      width: normalizeEvenDimension(width, DEFAULT_TARGET_WIDTH),
+      height: normalizeEvenDimension(height, DEFAULT_TARGET_HEIGHT),
+    }
+  } catch {
+    return null
+  }
+}
+
+function buildConcatFilter(inputCount: number, targetWidth: number, targetHeight: number): string {
   const chains: string[] = []
   for (let index = 0; index < inputCount; index += 1) {
     chains.push(
-      `[${index}:v]fps=${TARGET_FPS},scale=${TARGET_WIDTH}:${TARGET_HEIGHT}:force_original_aspect_ratio=decrease,pad=${TARGET_WIDTH}:${TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${index}]`
+      `[${index}:v]fps=${TARGET_FPS},scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${index}]`
     )
   }
   const concatInputs = Array.from({ length: inputCount }, (_, idx) => `[v${idx}]`).join('')
@@ -61,13 +104,16 @@ export async function concatWorkflowVideos(params: {
     for (let index = 0; index < videoUrls.length; index += 1) {
       await downloadVideoToPath(videoUrls[index], inputPaths[index])
     }
+    const probed = await probeVideoDimensions(inputPaths[0])
+    const targetWidth = probed?.width || DEFAULT_TARGET_WIDTH
+    const targetHeight = probed?.height || DEFAULT_TARGET_HEIGHT
 
     const ffmpegArgs: string[] = ['-y', '-hide_banner', '-loglevel', 'error']
     for (const inputPath of inputPaths) {
       ffmpegArgs.push('-i', inputPath)
     }
     ffmpegArgs.push(
-      '-filter_complex', buildConcatFilter(inputPaths.length),
+      '-filter_complex', buildConcatFilter(inputPaths.length, targetWidth, targetHeight),
       '-map', '[vout]',
       '-r', String(TARGET_FPS),
       '-c:v', 'libx264',

@@ -8,7 +8,9 @@ import {
 import { executeGenerationRequest } from './generationExecutionService.js'
 import { validateWorkflowGraph } from './workflowValidationService.js'
 import { concatWorkflowVideos } from './workflowVideoConcatService.js'
-import { supaSelect } from './supabaseService.js'
+import { supaPost, supaSelect } from './supabaseService.js'
+import { createNotification, getUserNotificationSettings } from '../controllers/notificationController.js'
+import { tg } from '../controllers/telegramController.js'
 import type {
   NodeArtifact,
   WorkflowEdge,
@@ -21,6 +23,14 @@ const MAX_PARALLEL_NODES = 2
 const GENERATION_POLL_INTERVAL_MS = 3000
 const GENERATION_POLL_TIMEOUT_MS = 12 * 60 * 1000
 
+type MediaArtifact = Extract<NodeArtifact, { type: 'image' } | { type: 'video' }>
+type PrimaryMediaOutput = {
+  nodeId: string
+  nodeType: WorkflowNode['type']
+  nodeLabel: string
+  artifact: MediaArtifact
+}
+
 function incomingOf(nodeId: string, edges: WorkflowEdge[]) {
   return edges
     .filter((edge) => edge.target === nodeId)
@@ -29,6 +39,159 @@ function incomingOf(nodeId: string, edges: WorkflowEdge[]) {
 
 function outgoingOf(nodeId: string, edges: WorkflowEdge[]) {
   return edges.filter((edge) => edge.source === nodeId)
+}
+
+function isMediaArtifact(artifact?: NodeArtifact): artifact is MediaArtifact {
+  return Boolean(artifact && (artifact.type === 'image' || artifact.type === 'video'))
+}
+
+function pickPrimaryTerminalMediaOutput(params: {
+  outputs: Record<string, NodeArtifact>
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+}): PrimaryMediaOutput | null {
+  const nodesById = new Map(params.nodes.map((node) => [node.id, node]))
+  const terminalNodeIds = params.nodes
+    .filter((node) => outgoingOf(node.id, params.edges).length === 0)
+    .map((node) => node.id)
+
+  const candidates: PrimaryMediaOutput[] = terminalNodeIds
+    .map((nodeId) => {
+      const artifact = params.outputs[nodeId]
+      const node = nodesById.get(nodeId)
+      if (!node || !isMediaArtifact(artifact)) return null
+      return {
+        nodeId,
+        nodeType: node.type,
+        nodeLabel: String(node.id),
+        artifact,
+      } satisfies PrimaryMediaOutput
+    })
+    .filter((item): item is PrimaryMediaOutput => Boolean(item))
+
+  if (candidates.length === 0) return null
+
+  const concatVideo = candidates.find((item) => item.nodeType === 'video.concat' && item.artifact.type === 'video')
+  if (concatVideo) return concatVideo
+
+  const firstVideo = candidates.find((item) => item.artifact.type === 'video')
+  if (firstVideo) return firstVideo
+
+  return candidates[0]
+}
+
+async function resolvePreviewImageFromParents(parentGenerationIds: number[]): Promise<string | null> {
+  const uniqueIds = Array.from(new Set(parentGenerationIds.map(Number).filter((id) => Number.isFinite(id) && id > 0)))
+  for (const generationId of uniqueIds) {
+    const q = await supaSelect(
+      'generations',
+      `?id=eq.${generationId}&select=image_url,input_images,video_thumbnail_url`
+    )
+    if (!q.ok || !Array.isArray(q.data) || q.data.length === 0) continue
+
+    const row = q.data[0] as {
+      image_url?: string | null
+      input_images?: string[] | null
+      video_thumbnail_url?: string | null
+    }
+    if (typeof row.image_url === 'string' && row.image_url.trim()) return row.image_url.trim()
+    if (typeof row.video_thumbnail_url === 'string' && row.video_thumbnail_url.trim()) return row.video_thumbnail_url.trim()
+    if (Array.isArray(row.input_images)) {
+      const first = row.input_images.find((item) => typeof item === 'string' && item.trim().length > 0)
+      if (first) return first.trim()
+    }
+  }
+  return null
+}
+
+async function upsertWorkflowResultGeneration(params: {
+  run: WorkflowRunRecord
+  workflowName: string
+  output: PrimaryMediaOutput
+}): Promise<{ generationId: number; created: boolean; mediaUrl: string } | null> {
+  let mediaType: 'video' | 'image' = 'image'
+  let mediaUrl = ''
+  if (params.output.artifact.type === 'video') {
+    mediaType = 'video'
+    mediaUrl = params.output.artifact.video_url
+  } else {
+    mediaType = 'image'
+    mediaUrl = params.output.artifact.image_urls[0] || ''
+  }
+
+  if (!mediaUrl) return null
+
+  const taskId = `workflow:${params.run.id}:${params.output.nodeId}`
+  const existing = await supaSelect(
+    'generations',
+    `?task_id=eq.${encodeURIComponent(taskId)}&user_id=eq.${params.run.user_id}&select=id`
+  )
+  if (existing.ok && Array.isArray(existing.data) && existing.data.length > 0) {
+    const existingId = Number(existing.data[0]?.id || 0)
+    if (existingId > 0) {
+      return { generationId: existingId, created: false, mediaUrl }
+    }
+  }
+
+  const prompt = `${params.workflowName || 'Workflow'} [workflow_run=${params.run.id}; output_node=${params.output.nodeLabel}]`
+  const body: Record<string, unknown> = {
+    user_id: params.run.user_id,
+    prompt,
+    model: 'workflow',
+    status: 'completed',
+    media_type: mediaType,
+    completed_at: new Date().toISOString(),
+    task_id: taskId,
+    parent_id: params.output.artifact.generation_ids[0] || undefined,
+    cost: 0,
+  }
+
+  if (mediaType === 'video') {
+    body.video_url = mediaUrl
+    const previewImage = await resolvePreviewImageFromParents(params.output.artifact.generation_ids || [])
+    if (previewImage) body.input_images = [previewImage]
+  } else {
+    body.image_url = mediaUrl
+  }
+
+  const insert = await supaPost('generations', body, '?select=id')
+  if (!insert.ok || !Array.isArray(insert.data) || insert.data.length === 0) return null
+
+  const generationId = Number(insert.data[0]?.id || 0)
+  if (!generationId) return null
+
+  return { generationId, created: true, mediaUrl }
+}
+
+async function notifyWorkflowResult(params: {
+  run: WorkflowRunRecord
+  generationId: number
+  mediaUrl: string
+}) {
+  try {
+    const settings = await getUserNotificationSettings(params.run.user_id)
+    if (settings.telegram_generation) {
+      await tg('sendDocument', {
+        chat_id: params.run.user_id,
+        document: params.mediaUrl,
+        caption: '✨ Workflow завершен!',
+      })
+    }
+  } catch (error) {
+    console.error(`[WorkflowRun] Telegram notify failed (runId=${params.run.id}):`, error)
+  }
+
+  try {
+    await createNotification(
+      params.run.user_id,
+      'generation_completed',
+      'Workflow готов ✨',
+      'Финальный результат сохранен в профиль',
+      { generation_id: params.generationId, deep_link: `/profile?gen=${params.generationId}` }
+    )
+  } catch (error) {
+    console.error(`[WorkflowRun] In-app notify failed (runId=${params.run.id}):`, error)
+  }
 }
 
 function buildPromptForNode(node: WorkflowNode, incomingArtifacts: NodeArtifact[]) {
@@ -635,6 +798,34 @@ export async function executeWorkflowRun(runId: number): Promise<void> {
     current_node_id: null,
     error: null,
   })
+
+  try {
+    const primaryOutput = pickPrimaryTerminalMediaOutput({
+      outputs,
+      nodes: template.graph.nodes,
+      edges: template.graph.edges,
+    })
+    if (!primaryOutput) return
+
+    const persisted = await upsertWorkflowResultGeneration({
+      run,
+      workflowName: template.name,
+      output: primaryOutput,
+    })
+    if (!persisted) return
+
+    await appendWorkflowRunGenerationIds(runId, [persisted.generationId])
+
+    if (persisted.created) {
+      await notifyWorkflowResult({
+        run,
+        generationId: persisted.generationId,
+        mediaUrl: persisted.mediaUrl,
+      })
+    }
+  } catch (error) {
+    console.error(`[WorkflowRun] Failed to publish result to generations (runId=${runId}):`, error)
+  }
 }
 
 export async function markStaleWorkflowRunsAsFailed() {
