@@ -90,6 +90,7 @@ export function NodeSettings(props: {
     ? output.image_urls.filter((item) => typeof item === 'string' && item.trim().length > 0)
     : []
   const outputVideo = output?.type === 'video' ? output.video_url : null
+  const showSeedanceUploadHints = isSeedanceI2V && refSource === 'upload'
 
   return (
     <div className="mt-3 space-y-2 text-[11px]">
@@ -297,6 +298,12 @@ export function NodeSettings(props: {
                 <p className="text-zinc-500">Загруженные фото-референсы</p>
                 <span className="text-zinc-400">{refImages.length}/{maxRefs}</span>
               </div>
+              {showSeedanceUploadHints ? (
+                <div className="mt-2 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-2 py-1.5 text-[10px] text-cyan-100">
+                  <p>Для Seedance i2v: 1-е фото это стартовый кадр, 2-е фото это финальный кадр.</p>
+                  <p className="mt-1 text-cyan-200/90">Если загрузили в обратном порядке, нажмите кнопку ниже.</p>
+                </div>
+              ) : null}
               <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-cyan-400/60 bg-cyan-500/10 px-2 py-1 text-zinc-100">
                 {isUploading ? 'Загрузка...' : 'Добавить фото'}
                 <input
@@ -317,6 +324,11 @@ export function NodeSettings(props: {
                   {refImages.map((url, index) => (
                     <div key={`${url}-${index}`} className="relative overflow-hidden rounded-md border border-white/10 bg-black/30">
                       <img src={url} alt={`ref-${index + 1}`} className="h-14 w-full object-cover" />
+                      {showSeedanceUploadHints ? (
+                        <span className="absolute left-1 top-1 rounded bg-black/70 px-1 text-[9px] text-cyan-100">
+                          {index === 0 ? 'Старт' : 'Финал'}
+                        </span>
+                      ) : null}
                       <button
                         className="absolute right-1 top-1 rounded bg-black/70 px-1 text-[10px] text-white"
                         onClick={() => onRemoveRef(node, index)}
@@ -329,6 +341,17 @@ export function NodeSettings(props: {
               ) : (
                 <p className="mt-2 text-zinc-400">Референсы не добавлены</p>
               )}
+              {showSeedanceUploadHints && refImages.length === 1 ? (
+                <p className="mt-2 text-[10px] text-zinc-400">Добавьте второе фото, чтобы задать финальный кадр.</p>
+              ) : null}
+              {showSeedanceUploadHints && refImages.length >= 2 ? (
+                <button
+                  className="mt-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-zinc-100"
+                  onClick={() => onPatch(node.id, { ref_images: [refImages[1], refImages[0]] })}
+                >
+                  Поменять местами старт/финал
+                </button>
+              ) : null}
             </div>
           ) : null}
         </>
