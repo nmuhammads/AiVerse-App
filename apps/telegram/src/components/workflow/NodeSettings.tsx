@@ -12,6 +12,7 @@ import {
   hasExplicitSeedanceFrameSelection,
   getDefaultNodeTitle,
   getNodeDisplayName,
+  getNodeTypeLabel,
 } from './workflowUtils'
 import {
   WORKFLOW_IMAGE_MODEL_OPTIONS,
@@ -547,7 +548,7 @@ export function NodeSettings(props: {
 
       <div className="rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
         <p className="text-zinc-500">Тип</p>
-        <p className="mt-0.5 text-zinc-200">{node.type}</p>
+        <p className="mt-0.5 text-zinc-200">{getNodeTypeLabel(node.type)}</p>
       </div>
       <div className="rounded-lg border border-white/10 bg-zinc-900/75 px-2.5 py-2">
         <p className="text-zinc-500">Оценка стоимости</p>

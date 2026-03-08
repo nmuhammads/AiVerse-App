@@ -94,6 +94,7 @@ function getModelDisplayName(model: string | null): string {
     case 'kling-2.6/text-to-video': return 'Kling 2.6'
     case 'kling-i2v':
     case 'kling-2.6/image-to-video': return 'Kling 2.6'
+    case 'workflow': return 'Workflow'
     default: return model
   }
 }
@@ -431,11 +432,18 @@ export default function Profile() {
       const modelMap: Record<string, any> = {
         'nanobanana': 'nanobanana',
         'nanobanana-pro': 'nanobanana-pro',
+        'nanobanana-2': 'nanobanana-2',
         'seedream4': 'seedream4',
         'seedream4-5': 'seedream4-5',
         'seedream4.5': 'seedream4-5',
         'seedance-1.5-pro': 'seedance-1.5-pro',
-        'gptimage1.5': 'gpt-image-1.5'
+        'kling-t2v': 'kling-t2v',
+        'kling-i2v': 'kling-i2v',
+        'kling-mc': 'kling-mc',
+        'kling-2.6/text-to-video': 'kling-t2v',
+        'kling-2.6/image-to-video': 'kling-i2v',
+        'kling-2.6/motion-control': 'kling-mc',
+        'gptimage1.5': 'gpt-image-1.5',
       }
       if (modelMap[item.model]) {
         setSelectedModel(modelMap[item.model])
@@ -469,7 +477,7 @@ export default function Profile() {
     if (item.media_type === 'video') {
       setMediaType('video')
       // Ensure we use the video model
-      if (!item.model || item.model === 'seedance-1.5-pro') {
+      if (!item.model || item.model === 'seedance-1.5-pro' || item.model === 'workflow') {
         setSelectedModel('seedance-1.5-pro')
       }
     } else {
@@ -1071,6 +1079,7 @@ export default function Profile() {
                 { value: 'seedream4', label: 'Seedream 4' },
                 { value: 'seedream4-5', label: 'Seedream 4.5' },
                 { value: 'gptimage1.5', label: 'GPT Image 1.5' },
+                { value: 'workflow', label: 'Workflow' },
               ].map(m => {
                 const isActive = m.value === '' ? selectedModels.length === 0 : selectedModels.includes(m.value)
                 return (
@@ -1188,7 +1197,8 @@ export default function Profile() {
                       </button>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 pointer-events-none"></div>
                       {h.model && (
-                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md border border-white/10 font-medium z-10 pointer-events-none">
+                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md border border-white/10 font-medium z-10 pointer-events-none inline-flex items-center gap-1">
+                          {h.model === 'workflow' && <Repeat size={10} className="text-cyan-300" />}
                           {getModelDisplayName(h.model)}
                         </div>
                       )}

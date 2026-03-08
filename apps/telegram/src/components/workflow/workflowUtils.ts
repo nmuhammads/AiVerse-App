@@ -71,6 +71,14 @@ export const NODE_LIBRARY: Array<{ label: string; type: WorkflowNode['type'] }> 
   { label: 'Инструменты', type: 'video.concat' },
 ]
 
+export function getNodeTypeLabel(nodeType: WorkflowNode['type']): string {
+  if (nodeType === 'prompt') return 'Промпт'
+  if (nodeType === 'image.generate') return 'Генерация фото'
+  if (nodeType === 'video.generate') return 'Генерация видео'
+  if (nodeType === 'video.concat') return 'Соединение видео'
+  return nodeType
+}
+
 export function getDefaultNodeTitle(node: WorkflowNode): string {
   if (node.type === 'prompt') return 'Промпт'
   if (node.type === 'video.concat') return 'Инструменты'
